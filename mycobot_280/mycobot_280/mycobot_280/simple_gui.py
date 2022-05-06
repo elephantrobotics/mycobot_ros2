@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import tkinter as tk
-from mycobot_interfaces.srv import GetCoords, SetCoords, GetAngles, SetAngles, GripperStatus
-# import rclpy
+from pymycobot.mycobot import MyCobot
 import time
 
 
 class Window: 
     def __init__(self, handle):
+        self.mc = MyCobot("/dev/ttyUSB0", 115200)
+        
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
 
@@ -15,24 +16,30 @@ class Window:
         self.speed = 50
 
         # 设置默认速度123456
-        
         self.speed_d = tk.StringVar()
         self.speed_d.set(str(self.speed))
-        # print(self.speed)
-        self.connect_ser()
 
         # 获取机械臂数据
-        self.record_coords = [0, 0, 0, 0, 0, 0, self.speed, self.model]
-        self.res_angles = [0, 0, 0, 0, 0, 0, self.speed, self.model]
+        self.record_coords = [
+            [0, 0, 0, 0, 0, 0],
+            self.speed,
+            self.model
+        ]
+        self.res_angles = [
+            [0, 0, 0, 0, 0, 0],
+            self.speed,
+            self.model
+        ]
         self.get_date()
 
         # get screen width and height
         self.ws = self.win.winfo_screenwidth()  # width of the screen
         self.hs = self.win.winfo_screenheight()  # height of the screen
+        
         # calculate x and y coordinates for the Tk root window
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("430x370+{}+{}".format(x, y))
+        self.win.geometry("800x600+{}+{}".format(int(x), int(y)))
         # 布局
         self.set_layout()
         # 输入部分
@@ -57,28 +64,6 @@ class Window:
         tk.Button(self.frmLB, text="夹爪(关)", command=self.gripper_close, width=5).grid(
             row=1, column=1, sticky="w", padx=3, pady=2
         )
-
-    def connect_ser(self):
-        rclpy.init_node("simple_gui", anonymous=True, disable_signals=True)
-
-        rclpy.wait_for_service("get_joint_angles")
-        rclpy.wait_for_service("set_joint_angles")
-        rclpy.wait_for_service("get_joint_coords")
-        rclpy.wait_for_service("set_joint_coords")
-        rclpy.wait_for_service("switch_gripper_status")
-        try:
-            self.get_coords = rclpy.ServiceProxy("get_joint_coords", GetCoords)
-            self.set_coords = rclpy.ServiceProxy("set_joint_coords", SetCoords)
-            self.get_angles = rclpy.ServiceProxy("get_joint_angles", GetAngles)
-            self.set_angles = rclpy.ServiceProxy("set_joint_angles", SetAngles)
-            self.switch_gripper = rclpy.ServiceProxy(
-                "switch_gripper_status", GripperStatus
-            )
-        except:
-            print("start error ...")
-            exit(1)
-
-        print("Connect service success.")
 
     def set_layout(self):
         self.frmLT = tk.Frame(width=200, height=200)
@@ -108,30 +93,30 @@ class Window:
 
         # 设置输入框的默认值
         self.j1_default = tk.StringVar()
-        self.j1_default.set(self.res_angles[0])
+        self.j1_default.set(self.res_angles[0][0])
         self.j2_default = tk.StringVar()
-        self.j2_default.set(self.res_angles[1])
+        self.j2_default.set(self.res_angles[0][1])
         self.j3_default = tk.StringVar()
-        self.j3_default.set(self.res_angles[2])
+        self.j3_default.set(self.res_angles[0][2])
         self.j4_default = tk.StringVar()
-        self.j4_default.set(self.res_angles[3])
+        self.j4_default.set(self.res_angles[0][3])
         self.j5_default = tk.StringVar()
-        self.j5_default.set(self.res_angles[4])
+        self.j5_default.set(self.res_angles[0][4])
         self.j6_default = tk.StringVar()
-        self.j6_default.set(self.res_angles[5])
+        self.j6_default.set(self.res_angles[0][5])
 
         self.x_default = tk.StringVar()
-        self.x_default.set(self.record_coords[0])
+        self.x_default.set(self.record_coords[0][0])
         self.y_default = tk.StringVar()
-        self.y_default.set(self.record_coords[1])
+        self.y_default.set(self.record_coords[0][1])
         self.z_default = tk.StringVar()
-        self.z_default.set(self.record_coords[2])
+        self.z_default.set(self.record_coords[0][2])
         self.rx_default = tk.StringVar()
-        self.rx_default.set(self.record_coords[3])
+        self.rx_default.set(self.record_coords[0][3])
         self.ry_default = tk.StringVar()
-        self.ry_default.set(self.record_coords[4])
+        self.ry_default.set(self.record_coords[0][4])
         self.rz_default = tk.StringVar()
-        self.rz_default.set(self.record_coords[5])
+        self.rz_default.set(self.record_coords[0][5])
 
         # joint 输入框
         self.J_1 = tk.Entry(self.frmLT, textvariable=self.j1_default)
@@ -186,17 +171,17 @@ class Window:
 
         # ，展示出来
         self.cont_1 = tk.StringVar(self.frmLC)
-        self.cont_1.set(str(self.res_angles[0]) + "°")
+        self.cont_1.set(str(self.res_angles[0][0]) + "°")
         self.cont_2 = tk.StringVar(self.frmLC)
-        self.cont_2.set(str(self.res_angles[1]) + "°")
+        self.cont_2.set(str(self.res_angles[0][1]) + "°")
         self.cont_3 = tk.StringVar(self.frmLC)
-        self.cont_3.set(str(self.res_angles[2]) + "°")
+        self.cont_3.set(str(self.res_angles[0][2]) + "°")
         self.cont_4 = tk.StringVar(self.frmLC)
-        self.cont_4.set(str(self.res_angles[3]) + "°")
+        self.cont_4.set(str(self.res_angles[0][3]) + "°")
         self.cont_5 = tk.StringVar(self.frmLC)
-        self.cont_5.set(str(self.res_angles[4]) + "°")
+        self.cont_5.set(str(self.res_angles[0][4]) + "°")
         self.cont_6 = tk.StringVar(self.frmLC)
-        self.cont_6.set(str(self.res_angles[5]) + "°")
+        self.cont_6.set(str(self.res_angles[0][5]) + "°")
         self.cont_all = [
             self.cont_1,
             self.cont_2,
@@ -275,17 +260,17 @@ class Window:
         tk.Label(self.frmLC, text="  ry ").grid(row=4, column=3)
         tk.Label(self.frmLC, text="  rz ").grid(row=5, column=3)
         self.coord_x = tk.StringVar()
-        self.coord_x.set(str(self.record_coords[0]))
+        self.coord_x.set(str(self.record_coords[0][0]))
         self.coord_y = tk.StringVar()
-        self.coord_y.set(str(self.record_coords[1]))
+        self.coord_y.set(str(self.record_coords[0][1]))
         self.coord_z = tk.StringVar()
-        self.coord_z.set(str(self.record_coords[2]))
+        self.coord_z.set(str(self.record_coords[0][2]))
         self.coord_rx = tk.StringVar()
-        self.coord_rx.set(str(self.record_coords[3]))
+        self.coord_rx.set(str(self.record_coords[0][3]))
         self.coord_ry = tk.StringVar()
-        self.coord_ry.set(str(self.record_coords[4]))
+        self.coord_ry.set(str(self.record_coords[0][4]))
         self.coord_rz = tk.StringVar()
-        self.coord_rz.set(str(self.record_coords[5]))
+        self.coord_rz.set(str(self.record_coords[0][5]))
 
         self.coord_all = [
             self.coord_x,
@@ -372,81 +357,61 @@ class Window:
         # 获取 coord 输入的数据，发送给机械臂
         c_value = []
         for i in self.all_c:
-            # print(type(i.get()))
             c_value.append(float(i.get()))
         self.speed = (
             int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
         )
-        c_value.append(self.speed)
-        c_value.append(self.model)
-        # print(c_value)
+        
         try:
-            self.set_coords(*c_value)
+            self.mc.send_coords(c_value,self.speed, self.model)
         except Exception as e:
             pass
-        self.show_j_date(c_value[:-2], "coord")
+        self.show_j_date(c_value, "coord")
 
     def get_joint_input(self):
         # 获取joint输入的数据，发送给机械臂
         j_value = []
         for i in self.all_j:
-            # print(type(i.get()))
             j_value.append(float(i.get()))
+            
         self.speed = (
             int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
         )
-        j_value.append(self.speed)
+        
+        res = [j_value, self.speed]
 
         try:
-            self.set_angles(*j_value)
+            self.mc.send_angles(*res)
         except Exception as e:
             pass
-        self.show_j_date(j_value[:-1])
+        self.show_j_date(j_value)
         # return j_value,c_value,speed
 
     def get_date(self):
         # 拿机械臂的数据，用于展示
         t = time.time()
         while time.time() - t < 2:
-            self.res = self.get_coords()
-            if self.res.x > 1:
+            self.res = self.mc.get_coords()
+            if self.res != []:
                 break
             time.sleep(0.1)
 
         t = time.time()
         while time.time() - t < 2:
-            self.angles = self.get_angles()
-            if self.angles.joint_1 > 1:
+            self.angles = self.mc.get_angles()
+            if self.angles != []:
                 break
             time.sleep(0.1)
-        # print(self.angles.joint_1)
-        self.record_coords = [
-            round(self.res.x, 2),
-            round(self.res.y, 2),
-            round(self.res.z, 2),
-            round(self.res.rx, 2),
-            round(self.res.ry, 2),
-            round(self.res.rz, 2),
-            self.speed,
-            self.model,
-        ]
-        self.res_angles = [
-            round(self.angles.joint_1, 2),
-            round(self.angles.joint_2, 2),
-            round(self.angles.joint_3, 2),
-            round(self.angles.joint_4, 2),
-            round(self.angles.joint_5, 2),
-            round(self.angles.joint_6, 2),
-        ]
-        # print('coord:',self.record_coords)
-        # print('angles:',self.res_angles)
+        
+        self.record_coords[0] = self.res
+        self.res_angles[0] = self.angles
+ 
 
     # def send_input(self,dates):
     def show_j_date(self, date, way=""):
         # 展示数据
         if way == "coord":
             for i, j in zip(date, self.coord_all):
-                # print(i)
                 j.set(str(i))
         else:
             for i, j in zip(date, self.cont_all):

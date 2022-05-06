@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import cv2 as cv
+# pip install opencv-contrib-python
+import cv2
 import numpy as np
 import rclpy
 import tf_transformations
@@ -12,20 +13,21 @@ from tf2_ros import TransformBroadcaster
 class ImageConverter(Node):
     def __init__(self):
         super().__init__("detect_marker")
-        self.br = TransformBroadcaster()
+        self.br = TransformBroadcaster(self)
         self.bridge = CvBridge()
-        self.aruco_dict = cv.aruco.Dictionary_get(cv.aruco.DICT_6X6_250)
-        self.aruo_params = cv.aruco.DetectorParameters_create()
-        calibrationParams = cv.FileStorage(
-            "calibrationFileName.xml", cv.FILE_STORAGE_READ
+        self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
+        self.aruo_params = cv2.aruco.DetectorParameters_create()
+        calibrationParams = cv2.FileStorage(
+            "calibrationFileName.xml", cv2.FILE_STORAGE_READ
         )
         self.dist_coeffs = calibrationParams.getNode("distCoeffs").mat()
         self.camera_matrix = None
         # subscriber, listen wether has img come in.
         self.image_sub = self.create_subscription(
             msg_type=Image,
-            topic="/camera/image",
-            callback=self.callback
+            topic="camera/image",
+            callback=self.callback,
+            qos_profile=1
         )
 
     def callback(self, data):
@@ -52,9 +54,9 @@ class ImageConverter(Node):
                 ],
                 dtype=np.float32,
             )
-        gray = cv.cvtColor(cv_image, cv.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
         # detect aruco marker.
-        ret = cv.aruco.detectMarkers(
+        ret = cv2.aruco.detectMarkers(
             gray, self.aruco_dict, parameters=self.aruo_params)
         corners, ids = ret[0], ret[1]
         # process marker data.
@@ -66,7 +68,7 @@ class ImageConverter(Node):
                 # argument:
                 #   marker corners
                 #   marker size (meter)
-                ret = cv.aruco.estimatePoseSingleMarkers(
+                ret = cv2.aruco.estimatePoseSingleMarkers(
                     corners, 0.05, self.camera_matrix, self.dist_coeffs
                 )
                 (rvec, tvec) = (ret[0], ret[1])
@@ -76,8 +78,8 @@ class ImageConverter(Node):
 
                 # just select first one detected marker.
                 for i in range(rvec.shape[0]):
-                    cv.aruco.drawDetectedMarkers(cv_image, corners)
-                    cv.aruco.drawAxis(
+                    cv2.aruco.drawDetectedMarkers(cv_image, corners)
+                    cv2.aruco.drawAxis(
                         cv_image,
                         self.camera_matrix,
                         self.dist_coeffs,
@@ -102,9 +104,9 @@ class ImageConverter(Node):
                 )
 
         # [x, y, z, -172, 3, -46.8]
-        cv.imshow("Image", cv_image)
+        cv2.imshow("Image", cv_image)
 
-        cv.waitKey(3)
+        cv2.waitKey(3)
         try:
             pass
         except CvBridgeError as e:
@@ -119,7 +121,7 @@ def main(args=None):
         rclpy.spin(i)
     except KeyboardInterrupt:
         print("Shutting down cv_bridge_test node.")
-        cv.destroyAllWindows()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

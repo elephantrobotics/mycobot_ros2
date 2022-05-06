@@ -19,7 +19,6 @@ class Talker(Node):
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = MyCobot(port, str(baud))
-        self.mc.release_all_servos()
 
     def start(self):
         pub = self.create_publisher(

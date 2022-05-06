@@ -14,11 +14,11 @@ class Talker(Node):
             topic="visualization_marker",
             qos_profile=10,
         )
-        self.rate = self.create_rate(20)
+        self.timer = self.create_timer(0.05, self.timer_callback)
 
-    def start(self):
+    def timer_callback(self):
 
-        listener = TransformListener()
+        listener = TransformListener(self)
 
         marker_ = Marker()
         marker_.header.frame_id = "/joint1"
@@ -27,9 +27,10 @@ class Talker(Node):
         print("publishing ...")
         while rclpy.ok():
             rclpy.spin_once(self)
-            now = self.get_clock().now() - 0.1
+            now = self.get_clock().now()
             try:
-                trans, rot = listener.lookupTransform("joint1", "basic_shapes", now)
+                trans, rot = listener.lookupTransform(
+                    "joint1", "basic_shapes", now)
             except Exception as e:
                 print(e)
                 continue
@@ -57,16 +58,16 @@ class Talker(Node):
             marker_.color.a = 1.0
             marker_.color.g = 1.0
             self.pub_marker.publish(marker_)
+            print(marker_)
 
-            self.rate.sleep()
 
 def main(args=None):
     rclpy.init(args=args)
     talker = Talker()
-    talker.start()
     rclpy.spin(talker)
     talker.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

@@ -4,8 +4,7 @@ from ament_index_python import get_package_share_directory
 from launch_ros.actions import Node
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 
@@ -42,11 +41,10 @@ def generate_launch_description():
     )
     res.append(num_launch_arg)
 
-    # 	<node name="opencv_camera" pkg="mycobot_280" type="opencv_camera" args="$(arg num)"/>
     mycobot_280_node = Node(
         name="opencv_camera",
         package="mycobot_280",
-        executable="opencv_camera.cpp",
+        executable="opencv_camera",
         arguments=[LaunchConfiguration("num")]
     )
     res.append(mycobot_280_node)

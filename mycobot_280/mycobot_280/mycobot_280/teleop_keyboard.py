@@ -79,6 +79,7 @@ def teleop_keyboard():
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
                 if key == "q":
+                    mc.release_all_servos()
                     break
                 elif key in ["w", "W"]:
                     record_coords[0][0] += change_len
@@ -121,17 +122,12 @@ def teleop_keyboard():
                 elif key in ["h", "H"]:
                     mc.switch_gripper(False)
                 elif key == "1":
-                    rsp = mc.send_angles(*init_pose)
+                    mc.send_angles(*init_pose)
                 elif key in "2":
-                    rsp = mc.send_angles(*home_pose)
+                    mc.send_angles(*home_pose)
                 elif key in "3":
                     rep = mc.get_angles()
-                    home_pose[0] = rep[0]
-                    home_pose[1] = rep[1]
-                    home_pose[2] = rep[2]
-                    home_pose[3] = rep[3]
-                    home_pose[4] = rep[4]
-                    home_pose[5] = rep[5]
+                    home_pose[0] =rep
                 else:
                     continue
 

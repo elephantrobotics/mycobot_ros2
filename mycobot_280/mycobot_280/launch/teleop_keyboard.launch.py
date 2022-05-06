@@ -56,7 +56,6 @@ def generate_launch_description():
         executable="follow_display",
         name="follow_display",
         output="screen"
-
     )
     res.append(follow_display_node)
 
