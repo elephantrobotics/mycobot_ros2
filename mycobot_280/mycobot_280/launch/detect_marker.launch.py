@@ -40,6 +40,14 @@ def generate_launch_description():
         default_value="0",
     )
     res.append(num_launch_arg)
+    
+    # 发布数据
+    follow_display_node = Node(
+        name="follow_display",
+        package="mycobot_280",
+        executable="follow_display",
+    )
+    res.append(follow_display_node)
 
     mycobot_280_node = Node(
         name="opencv_camera",

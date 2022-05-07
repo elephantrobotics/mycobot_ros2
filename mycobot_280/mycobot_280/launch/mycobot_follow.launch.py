@@ -11,6 +11,18 @@ from launch.substitutions import Command, LaunchConfiguration
 
 def generate_launch_description():
     res = []
+    
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyUSB0"
+    )
+    res.append(port_launch_arg)
+
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="115200"
+    )
+    res.append(baud_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
         "model",

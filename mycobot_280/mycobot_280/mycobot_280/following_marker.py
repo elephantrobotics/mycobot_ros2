@@ -1,25 +1,26 @@
-#!/usr/bin/env python3
-
 import rclpy
 from rclpy.node import Node
 from tf2_ros.transform_listener import TransformListener
 from visualization_msgs.msg import Marker
+from tf2_ros.buffer import Buffer
 
 
 class Talker(Node):
     def __init__(self):
         super().__init__("following_marker")
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
         self.pub_marker = self.create_publisher(
             msg_type=Marker,
             topic="visualization_marker",
             qos_profile=10,
         )
+
         self.timer = self.create_timer(0.05, self.timer_callback)
 
     def timer_callback(self):
-
-        listener = TransformListener(self)
-
         marker_ = Marker()
         marker_.header.frame_id = "/joint1"
         marker_.ns = "basic_cube"
@@ -29,14 +30,17 @@ class Talker(Node):
             rclpy.spin_once(self)
             now = self.get_clock().now()
             try:
-                trans, rot = listener.lookupTransform(
-                    "joint1", "basic_shapes", now)
+                trans = self.tf_buffer.lookup_transform(
+                    "joint1",
+                    "basic_shapes",
+                    now
+                )
+                print("trans")
             except Exception as e:
                 print(e)
                 continue
 
             print(type(trans), trans)
-            print(type(rot), rot)
 
             # marker
             marker_.header.stamp = now.to_msg()
@@ -50,10 +54,10 @@ class Talker(Node):
             marker_.pose.position.x = trans[0]
             marker_.pose.position.y = trans[1]
             marker_.pose.position.z = trans[2]
-            marker_.pose.orientation.x = rot[0]
-            marker_.pose.orientation.y = rot[1]
-            marker_.pose.orientation.z = rot[2]
-            marker_.pose.orientation.w = rot[3]
+            marker_.pose.orientation.x = trans[3]
+            marker_.pose.orientation.y = trans[4]
+            marker_.pose.orientation.z = trans[5]
+            marker_.pose.orientation.w = trans[6]
 
             marker_.color.a = 1.0
             marker_.color.g = 1.0
@@ -61,11 +65,12 @@ class Talker(Node):
             print(marker_)
 
 
-def main(args=None):
-    rclpy.init(args=args)
+def main():
+    rclpy.init()
     talker = Talker()
+
     rclpy.spin(talker)
-    talker.destroy_node()
+
     rclpy.shutdown()
 
 

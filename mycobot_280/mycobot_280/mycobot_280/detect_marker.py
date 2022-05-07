@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# pip install opencv-contrib-python
 import cv2
 import numpy as np
 import rclpy

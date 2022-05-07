@@ -57,12 +57,12 @@ class Talker(Node):
 
             angles = self.mc.get_radians()
             data_list = []
-            for index, value in enumerate(angles):
+            for _, value in enumerate(angles):
                 data_list.append(value)
 
             
 
-            self.get_logger().info('{}'.format(data_list))
+            # self.get_logger().info('radians: {}'.format(data_list))
             joint_state_send.position = data_list
 
             pub.publish(joint_state_send)
@@ -82,7 +82,7 @@ class Talker(Node):
             
             if not coords:
                 coords = [0, 0, 0, 0, 0, 0]
-                self.get_logger().info("error [101]: can not get coord values")
+                # self.get_logger().info("error [101]: can not get coord values")
 
             marker_.pose.position.x = coords[1] / 1000 * -1
             marker_.pose.position.y = coords[0] / 1000

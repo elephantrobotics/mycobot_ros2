@@ -13,17 +13,19 @@ def generate_launch_description():
     res = []
 
     port_launch_arg = DeclareLaunchArgument(
-        "port", default_value="/dev/ttyUSB0"
+        name="port",
+        default_value="/dev/ttyUSB0"
     )
     res.append(port_launch_arg)
 
     baud_launch_arg = DeclareLaunchArgument(
-        "baud", default_value="115200"
+        name="baud",
+        default_value="115200"
     )
     res.append(baud_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
-        "model",
+        name="model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
             "urdf/mycobot/mycobot_urdf.urdf"
@@ -32,7 +34,7 @@ def generate_launch_description():
     res.append(model_launch_arg)
 
     rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
+        name="rvizconfig",
         default_value=os.path.join(
             get_package_share_directory("mycobot_280"),
             "config/mycobot_with_marker.rviz"
@@ -40,65 +42,72 @@ def generate_launch_description():
     )
     res.append(rvizconfig_launch_arg)
 
-    gui_launch_arg = DeclareLaunchArgument(
-        "gui",
-        default_value="false",
-    )
-    res.append(gui_launch_arg)
-
     num_launch_arg = DeclareLaunchArgument(
-        "num",
+        name="num",
         default_value="0",
     )
     res.append(num_launch_arg)
 
-    robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
-                                       value_type=str)
+    robot_description = ParameterValue(
+        Command(
+            [
+                'xacro ',
+                LaunchConfiguration('model')
+            ]
+        ),
+        value_type=str
+    )
 
     robot_state_publisher_node = Node(
         name="robot_state_publisher",
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[{"robot_description": robot_description}]
+        parameters=[{"robot_description": robot_description}],
+        arguments=[LaunchConfiguration("model")]
     )
     res.append(robot_state_publisher_node)
+    
+    # 发布数据
+    follow_display_node = Node(
+        name="follow_display",
+        package="mycobot_280",
+        executable="follow_display",
+    )
+    res.append(follow_display_node)
 
     rviz_node = Node(
         name="rviz2",
         package="rviz2",
         executable="rviz2",
-        output='screen',
+        # output='screen',
         arguments=['-d', LaunchConfiguration('rvizconfig')]
     )
     res.append(rviz_node)
-
-    mycobot_280_node = Node(
-        name="real_listener",
+    
+    real_listener_node = Node(
+        name="listen_real_of_topic",
         package="mycobot_280",
-        executable="listen_real_of_topic",
+        executable="listen_real_of_topic"
     )
-    res.append(mycobot_280_node)
+    res.append(real_listener_node)
 
-    mycobot_280_node = Node(
-        name="opencv_camera",
-        package="mycobot_280",
-        executable="opencv_camera.cpp",
-        arguments=[LaunchConfiguration("num"), ]
-    )
-    res.append(mycobot_280_node)
-
-    mycobot_280_node = Node(
-        name="detect_marker",
-        package="mycobot_280",
-        executable="detect_marker"
-    )
-    res.append(mycobot_280_node)
-
-    mycobot_280_node = Node(
-        name="following_marker",
-        package="mycobot_280",
-        executable="following_marker"
-    )
-    res.append(mycobot_280_node)
+    # opencv_camera_node = Node(
+    #     name="opencv_camera",
+    #     package="mycobot_280",
+    #     executable="opencv_camera",
+    #     output="screen",
+    #     arguments=[LaunchConfiguration("num")]
+    # )
+    # res.append(opencv_camera_node)
+    
+    # detect_marker_node = Node(
+    #     name="detect_marker",
+    #     package="mycobot_280",
+    #     executable="detect_marker",
+    # )
+    # res.append(detect_marker_node)
+    
+    
+    
 
     return LaunchDescription(res)

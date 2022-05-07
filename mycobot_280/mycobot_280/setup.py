@@ -34,6 +34,7 @@ setup(
             'detect_marker = mycobot_280.detect_marker:main',
             'follow_display = mycobot_280.follow_display:main',
             'following_marker = mycobot_280.following_marker:main',
+            'listen_real_of_topic = mycobot_280.listen_real_of_topic:main',
             'listen_real = mycobot_280.listen_real:main',
             'opencv_camera = mycobot_280.opencv_camera:main',
             'simple_gui = mycobot_280.simple_gui:main',
