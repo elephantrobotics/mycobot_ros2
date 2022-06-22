@@ -3,8 +3,10 @@
   <asset>
     <contributor>
       <!-- <author /> -->
-      <authoring_tool>Rhinoceros 7.5.21082.11001</authoring_tool>
-      <comments>Output from Rhinoceros COLLADA Exporter</comments>
+      <!-- <authoring_tool>Rhinoceros 7.5.21082.11001</authoring_tool>
+      <comments>Output from Rhinoceros COLLADA Exporter</comments> -->
+      <author>VCGLab</author>
+      <authoring_tool>VCGLib | MeshLab</authoring_tool>
       <!-- <copyright /> -->
       <!-- <source_data /> -->
     </contributor>
