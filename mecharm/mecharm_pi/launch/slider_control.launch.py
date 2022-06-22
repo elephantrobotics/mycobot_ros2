@@ -13,6 +13,7 @@ from launch.substitutions import Command, LaunchConfiguration
 def generate_launch_description():
     res = []
 
+
     model_launch_arg = DeclareLaunchArgument(
         "model",
         default_value=os.path.join(
@@ -26,7 +27,7 @@ def generate_launch_description():
         "rvizconfig",
         default_value=os.path.join(
             get_package_share_directory("mecharm_pi"),
-            "config/mecharm.rviz"
+            "config/mecharm_pi.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
