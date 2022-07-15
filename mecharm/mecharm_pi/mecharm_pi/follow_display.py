@@ -9,8 +9,8 @@ from visualization_msgs.msg import Marker
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        self.declare_parameter('port', '/dev/ttyAMA0')
-        self.declare_parameter('baud', 1000000)
+        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('baud', 115200)
    
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
@@ -64,7 +64,7 @@ class Talker(Node):
 
             # self.get_logger().info('radians: {}'.format(data_list))
             joint_state_send.position = data_list
-
+            print('data_list:',data_list)
             pub.publish(joint_state_send)
 
             coords = self.mc.get_coords()

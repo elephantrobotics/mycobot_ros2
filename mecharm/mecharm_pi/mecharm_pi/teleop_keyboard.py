@@ -48,10 +48,10 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobot("/dev/ttyAMA0", 1000000)
+    mc = MyCobot("/dev/ttyUSB0", 115200)
 
     model = 0
-    speed = 40
+    speed = 10
     change_percent = 2
 
     change_angle = 180 * change_percent / 100
@@ -67,8 +67,9 @@ def teleop_keyboard():
         if res:
             break
         time.sleep(0.1)
-
+    print(res)
     record_coords = [res, speed, model]
+    print(record_coords)
 
     try:
         print(msg)
@@ -78,15 +79,18 @@ def teleop_keyboard():
                 print("\r current coords: %s" % record_coords)
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
+                print('key:',key)
                 if key == "q":
                     mc.release_all_servos()
                     break
                 elif key in ["w", "W"]:
                     record_coords[0][0] += change_len
                     mc.send_coords(*record_coords)
+                    # print('ww',record_coords)
                 elif key in ["s", "S"]:
                     record_coords[0][0] -= change_len
                     mc.send_coords(*record_coords)
+                    # print('ss',record_coords)
                 elif key in ["a", "A"]:
                     record_coords[0][1] -= change_len
                     mc.send_coords(*record_coords)
