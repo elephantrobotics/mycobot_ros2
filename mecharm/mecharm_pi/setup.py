@@ -3,7 +3,7 @@ from setuptools import setup
 import os
 from glob import glob
 
-package_name = 'mecharm_pi'
+package_name = 'mecharm'
 
 setup(
     name=package_name,
@@ -29,14 +29,14 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'detect_marker = mecharm_pi.detect_marker:main',
-            'follow_display = mecharm_pi.follow_display:main',
-            'following_marker = mecharm_pi.following_marker:main',
-            'listen_real_of_topic = mecharm_pi.listen_real_of_topic:main',
-            'listen_real = mecharm_pi.listen_real:main',
-            'simple_gui = mecharm_pi.simple_gui:main',
-            'slider_control = mecharm_pi.slider_control:main',
-            'teleop_keyboard = mecharm_pi.teleop_keyboard:main',
+            'detect_marker = mecharm.detect_marker:main',
+            'follow_display = mecharm.follow_display:main',
+            'following_marker = mecharm.following_marker:main',
+            'listen_real_of_topic = mecharm.listen_real_of_topic:main',
+            'listen_real = mecharm.listen_real:main',
+            'simple_gui = mecharm.simple_gui:main',
+            'slider_control = mecharm.slider_control:main',
+            'teleop_keyboard = mecharm.teleop_keyboard:main',
         ],
     },
 )

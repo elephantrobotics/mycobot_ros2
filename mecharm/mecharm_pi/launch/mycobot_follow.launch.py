@@ -28,7 +28,7 @@ def generate_launch_description():
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mecharm_pi/mecharm_pi.urdf"
+            "urdf/mecharm/mecharm.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -36,8 +36,8 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         "rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mecharm_pi"),
-            "config/mecharm_pi.rviz"
+            get_package_share_directory("mecharm"),
+            "config/mecharm.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
@@ -56,7 +56,7 @@ def generate_launch_description():
     res.append(robot_state_publisher_node)
 
     follow_display_node = Node(
-        package="mecharm_pi",
+        package="mecharm",
         executable="follow_display",
         name="follow_display",
         output="screen"

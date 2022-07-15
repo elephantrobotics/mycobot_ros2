@@ -8,14 +8,14 @@
     <visual>
       <geometry>
 	     <!--- 0.0 0 -0.04  1.5708 3.14159-->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/base.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/base.dae"/>
       </geometry>
       <origin xyz = " 0 0 0 " rpy = " 0 0 -3.1415926"/>
     </visual>
     <collision>
       <geometry>
 	     <!--- 0.0 0 -0.04  1.5708 3.14159-->
-        <mesh filename="package://mycobot_description/urdf/mecharm_pi/base.dae"/>
+        <mesh filename="package://mycobot_description/urdf/mecharm/base.dae"/>
       </geometry>
       <origin xyz = " 0 0 0 " rpy = " 0 0 -3.1415926"/>
     </collision>
@@ -25,13 +25,13 @@
   <link name="link1">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link1.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link1.dae"/>
       </geometry>
       <origin xyz = "0 0 -0.132 " rpy = " 0 0 0"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/mecharm_pi/link1.dae"/>
+        <mesh filename="package://mycobot_description/urdf/mecharm/link1.dae"/>
       </geometry>
       <origin xyz = "0 0 -0.132 " rpy = " 0 0 0"/>
     </collision>
@@ -40,14 +40,14 @@
   <link name="link2">
     <visual>
       <geometry>    
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link2.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link2.dae"/>
       </geometry>
       <origin xyz = "-0.005 0.21 0.002  " rpy = " 1.5708 -3.1415926 0"/>
 
     </visual>
     <collision>
       <geometry>    
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link2.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link2.dae"/>
       </geometry>
       <origin xyz = "-0.005  -0.21 0.002  " rpy = " 1.5708 -3.1415926 0"/>
       
@@ -58,7 +58,7 @@
     <visual>
       <geometry> 
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link3.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link3.dae"/>
       </geometry>
       <origin xyz = "-0.09 0.306 0.005 " rpy = "1.5708 3.1415926  0"/>
       <!-- <origin xyz = "-0.0 0.0 0.000 " rpy = "0 0  0"/> -->
@@ -66,7 +66,7 @@
     <collision>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link3.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link3.dae"/>
       </geometry>
       <origin xyz = "-0.09 0.306 0.005" rpy = "1.5708 3.1415926 0"/>
     </collision>
@@ -76,14 +76,14 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link4.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link4.dae"/>
       </geometry>
       <origin xyz = "0.009 -0.311 -0.228" rpy = " 0 1.5708 1.5708"/>
     </visual>
     <collision>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link4.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link4.dae"/>
       </geometry>
     <origin xyz = "0.009 -0.311  -0.228" rpy = " 0 1.5708  1.5708"/>
     </collision>
@@ -93,13 +93,13 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link5.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link5.dae"/>
       </geometry>
       <origin xyz = "-0.292 -0.318 -0.007" rpy = " 1.5708 0 3.1415926"/>
     </visual>
     <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link5.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link5.dae"/>
       </geometry>
       <origin xyz = "-0.292 -0.318 -0.007 " rpy = " 1.5708 0 3.1415926"/>
     </collision>
@@ -109,13 +109,13 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link6.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link6.dae"/>
       </geometry>
       <origin xyz = "-0.1645 0.0536 -0.211 " rpy = " 0 1.5708 0"/>
     </visual>
     <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mecharm_pi/link6.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mecharm/link6.dae"/>
       </geometry>
       <origin xyz = "-0.1645 0.0536 -0.211 " rpy = " 0 1.5708 0"/>
     </collision>

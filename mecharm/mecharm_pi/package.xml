@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mecharm_pi</name>
+  <name>mecharm</name>
   <version>0.0.0</version>
-  <description>The mecharm_pi package</description>
+  <description>The mecharm package</description>
   <maintainer email="u20@todo.todo">u20</maintainer>
   <license>TODO: License declaration</license>
 
