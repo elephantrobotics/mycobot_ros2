@@ -66,8 +66,8 @@ class MycobotTopics(Node):
     def __init__(self):
         super().__init__("mycobot_topics")
 
-        self.declare_parameter('port', '/dev/ttyAMA0')
-        self.declare_parameter('baud', '1000000')
+        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('baud', '115200')
         self.get_logger().info("start ...")
 
         port = self.get_parameter("port").get_parameter_value().string_value

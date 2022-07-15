@@ -14,13 +14,13 @@ def generate_launch_description():
     
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyAMA0"
+        default_value="/dev/ttyUSB0"
     )
     res.append(port_launch_arg)
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
-        default_value="1000000"
+        default_value="115200"
     )
     res.append(baud_launch_arg)
 

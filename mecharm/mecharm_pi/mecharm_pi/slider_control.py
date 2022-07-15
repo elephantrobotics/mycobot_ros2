@@ -15,7 +15,7 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobot("/dev/ttyAMA0", 1000000)
+        self.mc = MyCobot("/dev/ttyUSB0", 115200)
 
     def listener_callback(self, msg):
         print(msg.position)
