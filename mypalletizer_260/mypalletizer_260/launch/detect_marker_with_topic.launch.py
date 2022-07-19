@@ -28,7 +28,7 @@ def generate_launch_description():
         name="model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mecharm/mecharm.urdf"
+            "urdf/urdf_260/mypal_260.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -36,8 +36,8 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         name="rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mecharm"),
-            "config/mycobot_with_marker.rviz"
+            get_package_share_directory("mypalletizer_260"),
+            "config/mypalletizer.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
