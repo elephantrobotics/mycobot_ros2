@@ -37,7 +37,7 @@ def generate_launch_description():
         "rvizconfig",
         default_value=os.path.join(
             get_package_share_directory("mycobot_320"),
-            "config/mycobot_320.rviz"
+            "config/mycobot_pro_320.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
