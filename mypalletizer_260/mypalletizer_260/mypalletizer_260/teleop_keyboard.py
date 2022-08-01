@@ -68,9 +68,7 @@ def teleop_keyboard():
         if res:
             break
         time.sleep(0.1)
-    print(res)
     record_coords = [res, speed, model]
-    print(record_coords)
 
     try:
         print(msg)
