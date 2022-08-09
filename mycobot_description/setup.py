@@ -21,6 +21,7 @@ setup(
         ('share/' + package_name + '/urdf'+'/mycobot', glob("urdf/mycobot/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_pi', glob("urdf/mycobot_pi/*")),
         ('share/' + package_name + '/urdf'+'/mecharm', glob("urdf/mecharm/*")),
+        ('share/' + package_name + '/urdf'+'/320_pi',glob("urdf/320_pi/*")),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
