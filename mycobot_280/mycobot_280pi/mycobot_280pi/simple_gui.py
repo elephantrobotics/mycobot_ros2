@@ -8,7 +8,7 @@ import time
 
 class Window: 
     def __init__(self, handle):
-        self.mc = MyCobotSocket("192.168.10.124", 9000)
+        self.mc = MyCobotSocket("192.168.123.49", 9000)
         self.mc.connect()
         
         self.win = handle

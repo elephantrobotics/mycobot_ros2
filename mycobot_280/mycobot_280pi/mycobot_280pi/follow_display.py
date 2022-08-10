@@ -10,14 +10,14 @@ from visualization_msgs.msg import Marker
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        self.declare_parameter('ip', '192.168.10.124')
-        self.declare_parameter('port', 9000)
+        # self.declare_parameter('ip', '192.168.123.49')
+        # self.declare_parameter('port', 9000)
    
-        ip = self.get_parameter("ip").get_parameter_value().string_value
-        port = self.get_parameter("port").get_parameter_value().integer_value
+        # ip = self.get_parameter("ip").get_parameter_value().string_value
+        # port = self.get_parameter("port").get_parameter_value().integer_value
 
-        self.get_logger().info("ip:%s, port:%d" % (ip, port))
-        self.mc = MyCobotSocket(ip, str(port))
+        # self.get_logger().info("ip:%s, port:%d" % (ip, port))
+        self.mc = MyCobotSocket('192.168.123.49',9000)
         self.mc.connect()
         self.mc.release_all_servos()
 

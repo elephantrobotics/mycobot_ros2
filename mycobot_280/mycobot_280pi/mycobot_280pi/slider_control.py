@@ -16,7 +16,7 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobotSocket("192.168.10.124", 9000)
+        self.mc = MyCobotSocket("192.168.123.49", 9000)
         self.mc.connect()
 
     def listener_callback(self, msg):

@@ -49,7 +49,7 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobotSocket("192.168.10.124", 9000)
+    mc = MyCobotSocket("192.168.123.49", 9000)
     mc.connect()
 
     model = 0
