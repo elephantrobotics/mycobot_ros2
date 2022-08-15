@@ -14,7 +14,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/urdf'+'/260_urdf', glob("urdf/260_urdf/*")),
+        ('share/' + package_name + '/urdf'+'/260_pi', glob("urdf/260_pi/*")),
         ('share/' + package_name + '/urdf'+'/280jn', glob("urdf/280jn/*")),
         ('share/' + package_name + '/urdf'+'/320_urdf', glob("urdf/320_urdf/*")),
         ('share/' + package_name + '/urdf'+'/600_urdf', glob("urdf/600_urdf/*")),
