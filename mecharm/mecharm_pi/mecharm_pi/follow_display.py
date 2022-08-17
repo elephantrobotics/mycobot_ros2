@@ -19,7 +19,7 @@ class Talker(Node):
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         # self.mc = MyCobot(port, str(baud))
         
-        self.mc = MyCobotSocket("192.168.123.23",9000)
+        self.mc = MyCobotSocket("192.168.123.22",9000)
         self.mc.connect()
         self.mc.release_all_servos()
 

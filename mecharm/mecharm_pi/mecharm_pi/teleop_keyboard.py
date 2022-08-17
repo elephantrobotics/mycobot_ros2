@@ -51,7 +51,7 @@ class Raw(object):
 
 def teleop_keyboard():
     # mc = MyCobot("/dev/ttyAMA0", 115200)
-    mc = MyCobotSocket("192.168.123.23",9000)
+    mc = MyCobotSocket("192.168.123.22",9000)
     mc.connect()
 
     model = 0

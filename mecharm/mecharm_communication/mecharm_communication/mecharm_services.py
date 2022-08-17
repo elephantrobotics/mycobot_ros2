@@ -27,7 +27,7 @@ class Mycobot_Service(Node):
         self.get_logger().info("%s,%d" % (port, baud))
 
         # self.mc = MyCobot(port, str(baud))
-        self.mc = MyCobotSocket("192.168.123.23",9000)
+        self.mc = MyCobotSocket("192.168.123.22",9000)
         self.mc.connect()
 
     def create_services(self):
