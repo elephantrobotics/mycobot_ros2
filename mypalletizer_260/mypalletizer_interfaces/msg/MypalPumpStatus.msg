@@ -1,0 +1,3 @@
+bool status
+int8 pin1
+int8 pin2
