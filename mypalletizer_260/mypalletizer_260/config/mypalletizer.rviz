@@ -6,16 +6,15 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /RobotModel1
         - /TF1
-        - /TF1/Status1
+        - /RobotModel1
       Splitter Ratio: 0.5
     Tree Height: 617
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
     Expanded:
-      - /2D Goal Pose1
+      - /2D Pose Estimate1
       - /Publish Point1
     Name: Tool Properties
     Splitter Ratio: 0.5886790156364441
@@ -55,14 +54,44 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: ""
+        Value: /robot_description
       Enabled: true
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
-        Link Tree Style: ""
+        Link Tree Style: Links in Alphabetic Order
+        base:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Name: RobotModel
       TF Prefix: ""
       Update Interval: 0
@@ -89,7 +118,7 @@ Visualization Manager:
       Name: TF
       Show Arrows: true
       Show Axes: true
-      Show Names: false
+      Show Names: true
       Tree:
         base:
           link1:
@@ -176,6 +205,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1200
-  X: 270
-  Y: 59
+  Width: 1848
+  X: 72
+  Y: 27

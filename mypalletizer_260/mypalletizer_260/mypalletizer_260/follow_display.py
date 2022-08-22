@@ -41,7 +41,7 @@ class Talker(Node):
             "joint1_to_base",
             "joint2_to_joint1",
             "joint3_to_joint2",
-            "joint4_to_joint3",
+            # "joint4_to_joint3",
             "joint5_to_joint4",
         ] 
         joint_state_send.velocity = [0.0,]

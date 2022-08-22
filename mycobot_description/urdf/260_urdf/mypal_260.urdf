@@ -11,7 +11,7 @@
        <mesh filename="package://mycobot_description/urdf/260_urdf/base.dae"/>
       </geometry>
       <!-- <origin xyz = " 0 -0.28 0.051 " rpy = " 1.5707963 0 1.5707963"/> -->
-         <origin xyz = " 0 0 0 " rpy = " 0 0 3.1415926"/>
+         <origin xyz = " 0 -0.28 0.051 " rpy = " 1.5707963 0 -1.5707963"/>
     </visual>
     <collision>
       <geometry>

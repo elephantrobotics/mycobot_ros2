@@ -24,7 +24,7 @@ def generate_launch_description():
         "rvizconfig",
         default_value=os.path.join(
             get_package_share_directory("mypalletizer_260"),
-            "config/mypal_260.rviz"
+            "config/mypalletizer.rviz"
         ),
     )
     res.append(rvizconfig_launch_arg)
