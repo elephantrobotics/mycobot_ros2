@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import tkinter as tk
-# from pymycobot.mycobot import MyCobot
-from pymycobot.mycobotsocket import MyCobotSocket
+from pymycobot.mycobot import MyCobot
+# from pymycobot.mycobotsocket import MyCobotSocket
 import time
 
 
 class Window: 
     def __init__(self, handle):
-        self.mc = MyCobotSocket("192.168.123.240", 9000)
-        self.mc.connect(serialport="/dev/ttyAMA0",baudrate="115200")
+        self.mc = MyCobot("/dev/ttyAMA0", 115200)
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
 

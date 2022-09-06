@@ -1,6 +1,6 @@
 import rclpy
-# from pymycobot.mycobot import MyCobot
-from pymycobot.mycobotsocket import MyCobotSocket
+from pymycobot.mycobot import MyCobot
+# from pymycobot.mycobotsocket import MyCobotSocket
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
@@ -10,15 +10,14 @@ from visualization_msgs.msg import Marker
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        # self.declare_parameter('ip', '192.168.123.240')
-        # self.declare_parameter('port', 9000)
+        self.declare_parameter('port', '/dev/ttyAMA0')
+        self.declare_parameter('baud', 115200)
    
-        # ip = self.get_parameter("ip").get_parameter_value().string_value
-        # port = self.get_parameter("port").get_parameter_value().integer_value
+        port = self.get_parameter("port").get_parameter_value().string_value
+        baud = self.get_parameter("baud").get_parameter_value().integer_value
 
-        # self.get_logger().info("ip:%s, port:%d" % (ip, port))
-        self.mc = MyCobotSocket('192.168.123.240', 9000)
-        self.mc.connect("/dev/ttyAMA0","115200")
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        self.mc = MyCobot(port, baud)
         self.mc.release_all_servos()
 
     def start(self):

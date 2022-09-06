@@ -1,6 +1,6 @@
 import rclpy
-# from pymycobot.mycobot import MyCobot
-from pymycobot.mycobotsocket import MyCobotSocket
+from pymycobot.mycobot import MyCobot
+# from pymycobot.mycobotsocket import MyCobotSocket
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
@@ -16,8 +16,7 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobotSocket("192.168.123.240", 9000)
-        self.mc.connect(serialport="/dev/ttyAMA0",baudrate="115200")
+        self.mc = MyCobot("/dev/ttyAMA0", 115200)
     def listener_callback(self, msg):
         print(msg.position)
         data_list = []

@@ -1,6 +1,6 @@
 from __future__ import print_function
-# from pymycobot.mycobot import MyCobot
-from pymycobot.mycobotsocket import MyCobotSocket
+from pymycobot.mycobot import MyCobot
+# from pymycobot.mycobotsocket import MyCobotSocket
 import sys
 import termios
 import tty
@@ -49,8 +49,7 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobotSocket("192.168.123.240", 9000)
-    mc.connect(serialport="/dev/ttyAMA0",baudrate="115200")
+    mc = MyCobot("/dev/ttyAMA0", 115200)
 
     model = 0
     speed = 30
