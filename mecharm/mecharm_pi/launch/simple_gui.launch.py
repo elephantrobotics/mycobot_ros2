@@ -44,8 +44,8 @@ def generate_launch_description():
 
     gui_launch_arg = DeclareLaunchArgument(
         name="gui",
-        # default_value="false"
-        default_value="true"
+        default_value="false"
+        # default_value="true"
         
     )
     res.append(gui_launch_arg)
@@ -61,8 +61,6 @@ def generate_launch_description():
     )
     res.append(robot_state_publisher_node)
 
-
-
     rviz_node = Node(
         name="rviz2",
         package="rviz2",
@@ -72,27 +70,20 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    # follow_display_node = Node(
-    #     package="mecharm_pi",
-    #     executable="follow_display",
-    #     name="follow_display",
-    #     output="screen"
-    # )
-    # res.append(follow_display_node)
-
-    listen_node = Node(
-        name="listen_real",
+    follow_display_node = Node(
         package="mecharm_pi",
-        executable="listen_real",
+        executable="follow_display",
+        name="follow_display",
+        output="screen"
     )
-    res.append(listen_node)
+    res.append(follow_display_node)
     
-    service_node = Node(
-        name="mecharm_services",
-        package="mecharm_communication",
-        executable="mecharm_services",
-    )
-    res.append(service_node)
+    # service_node = Node(
+    #     name="mecharm_services",
+    #     package="mecharm_communication",
+    #     executable="mecharm_services",
+    # )
+    # res.append(service_node)
     
     mecharm_node = Node(
         name="simple_gui",

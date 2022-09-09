@@ -51,12 +51,12 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    # follow_display_node = Node(
-    #     package="mecharm_pi",
-    #     executable="follow_display",
-    #     name="follow_display",
-    #     output="screen"
-    # )
-    # res.append(follow_display_node)
+    follow_display_node = Node(
+        package="mecharm_pi",
+        executable="follow_display",
+        name="follow_display",
+        output="screen"
+    )
+    res.append(follow_display_node)
 
     return LaunchDescription(res)
