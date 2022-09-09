@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from pymycobot import MyCobotSocket
+# from pymycobot import MyCobotSocket
+from pymycobot.mypalletizer import MyPalletizer
 import math,sys
 
 class Slider_Subscriber(Node):
@@ -15,8 +16,7 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobotSocket("192.168.123.63", 9000)
-        self.mc.connect()     
+        self.mc = MyPalletizer("/dev/ttyAMA0", 1000000)    
 
     def listener_callback(self, msg):
         

@@ -3,7 +3,7 @@ import sys
 import termios
 import tty
 import time
-from pymycobot import MyCobotSocket
+from pymycobot.mypalletizer import MyPalletizer
 # from . import mypalletizersocket as mps
 
 msg = """\
@@ -49,10 +49,8 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobotSocket("192.168.123.63", 9000)
-    # mc = mps.MyPalletizerSocket("192.168.123.62", 9000)
-    mc.connect()   
-    
+    mc = MyPalletizer("/dev/ttyAMA0", 1000000)    
+
     model = 0
     speed = 30
     change_percent = 2
@@ -65,15 +63,12 @@ def teleop_keyboard():
 
     mc.send_angles(*init_pose)
 
-    # while True:
-    #     # res = mc.get_coords()
-    #     # print("res:%s"%res)
-    #     res = []
-    #     if res:
-    #         break      
-    #     time.sleep(0.1)
-    
-    res = [0,0,0,0]
+    while True:
+        res = mc.get_coords()
+        # print("res:%s"%res)
+        if res:
+            break      
+        time.sleep(0.1)
     record_coords = [res, speed, model]
 
     try:

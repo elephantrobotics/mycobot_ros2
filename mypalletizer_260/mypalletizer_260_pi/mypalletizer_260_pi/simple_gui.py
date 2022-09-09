@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 import time
-from pymycobot import MyCobotSocket
+# from pymycobot import MyCobotSocket
+from pymycobot.mypalletizer import MyPalletizer
 from mypalletizer_interfaces.srv import (
     SetAngles,
     GetAngles,
@@ -19,13 +20,7 @@ from sensor_msgs.msg import JointState
 class Window(): 
 
     def __init__(self, handle):
-
-        # super().__init__("simple_gui")
-        
-
-        self.mc = MyCobotSocket("192.168.123.63", 9000)
-        self.mc.connect()     
-        
+        self.mc = MyPalletizer("/dev/ttyAMA0", 1000000)    
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
 
@@ -84,53 +79,6 @@ class Window():
             row=1, column=1, sticky="w", padx=3, pady=2
         )
 
-    def connect_ser(self):
-        # rclpy.init("simple_gui")
-
-        # rclpy.wait_for_service("get_joint_angles")
-        # rclpy.wait_for_service("set_joint_angles")
-        # rclpy.wait_for_service("get_joint_coords")
-        # rclpy.wait_for_service("set_joint_coords")
-        # rclpy.wait_for_service("switch_gripper_status")
-        # try:
-        #     self.get_coords = rclpy.ServiceProxy("get_joint_coords", GetCoords)
-        #     self.set_coords = rclpy.ServiceProxy("set_joint_coords", SetCoords)
-        #     self.get_angles = rclpy.ServiceProxy("get_joint_angles", GetAngles)
-        #     self.set_angles = rclpy.ServiceProxy("set_joint_angles", SetAngles)
-        #     self.switch_gripper = rclpy.ServiceProxy(
-        #         "switch_gripper_status", GripperStatus
-        #     )
-        # except:
-        #     print("start error ...")
-        #     exit(1)
-        
-        
-        try:
-            self.get_coords = self.create_client(GetCoords,"get_joint_coords")
-            self.set_coords = self.create_client(SetCoords,"set_joint_coords")
-            self.get_angles = self.create_client(GetAngles,"get_joint_angles")
-            self.set_angles = self.create_client(SetAngles,"set_joint_angles")
-            self.switch_gripper = self.create_client(
-                GripperStatus,"switch_gripper_status"
-            )
-            
-        except:
-            print("start error ...")
-            exit(1)
-        
-        try:
-            self.get_coords.wait_for_service(timeout_sec=1.0)
-            self.set_coords .wait_for_service(timeout_sec=1.0)
-            self.get_angles.wait_for_service(timeout_sec=1.0)
-            self.set_angles.wait_for_service(timeout_sec=1.0)
-            self.switch_gripper.wait_for_service(timeout_sec=1.0)
-            
-            print("GetCoords.Request:%s" % GetCoords.Request)
-        except:
-            self.get_logger().info('service not available, waiting again...')
-
-        print("Connect service success.")
-    
     
     def set_layout(self):
         self.frmLT = tk.Frame(width=200, height=200)
@@ -388,35 +336,18 @@ class Window():
     def get_date(self):
         # 拿机械臂的数据，用于展示
         t = time.time()
-        # while time.time() - t < 2:
-        while True:
-            try:
-                self.res = self.mc.get_coords()
-            # self.res = [0, 0, 0, 0]
-                if self.res != []:
-                    break
-                # time.sleep(0.1)
-            except Exception as e:
-                pass
-                
+        while time.time() - t < 2:
+            self.res = self.mc.get_coords()
+            if self.res != []:
+                break
+            time.sleep(0.1)
 
-        # t = time.time()
-        # while time.time() - t < 2:
-        #     self.angles = self.mc.get_angles()
-        #     # self.angles = [0,0,0,0]
-        #     if self.angles != []:
-        #         break
-        #     time.sleep(0.1)
-        while True:
-            try:
-                self.angles = self.mc.get_angles()
-        #     # self.angles = [0,0,0,0]
-                if self.angles != []:
-                    break
-                # time.sleep(0.1)
-            except Exception as e:
-                print(e)
-                # pass
+        t = time.time()
+        while time.time() - t < 2:
+            self.angles = self.mc.get_angles()
+            if self.angles != []:
+                break
+            time.sleep(0.1)
         
         self.record_coords[0] = self.res
         self.res_angles[0] = self.angles
@@ -449,23 +380,6 @@ def main():
     window = tk.Tk()
     window.title("mycobot ros GUI")
     Window(window).run()
-
-
-# def main(args=None): 
-
-#     rclpy.init(args=args)    
-#     window = tk.Tk()
-#     window.title("mycobot ros GUI")
-    
-#     # slider_subscriber = Slider_Subscriber()
-#     # rclpy.spin(slider_subscriber) 
-#     # slider_subscriber.destroy_node()
-#     gui_client = Window(window) 
-#     gui_client.run()
-
-#     gui_client.destroy_node()
-#     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()

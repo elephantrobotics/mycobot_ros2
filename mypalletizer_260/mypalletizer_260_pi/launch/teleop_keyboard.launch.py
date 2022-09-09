@@ -51,18 +51,18 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    # follow_display_node = Node(
-    #     package="mypalletizer_260_pi",
-    #     executable="follow_display",
-    #     name="follow_display",
-    #     output="screen"
-    # )
-    # res.append(follow_display_node)
-    teleop_keyboard_node = Node(
+    follow_display_node = Node(
         package="mypalletizer_260_pi",
-        executable="teleop_keyboard",
-        name="teleop_keyboard",
+        executable="follow_display",
+        name="follow_display",
         output="screen"
     )
-    res.append(teleop_keyboard_node)
+    res.append(follow_display_node)
+    # teleop_keyboard_node = Node(
+    #     package="mypalletizer_260_pi",
+    #     executable="teleop_keyboard",
+    #     name="teleop_keyboard",
+    #     output="screen"
+    # )
+    # res.append(teleop_keyboard_node)
     return LaunchDescription(res)

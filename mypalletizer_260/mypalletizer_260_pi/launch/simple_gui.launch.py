@@ -14,17 +14,13 @@ def generate_launch_description():
 
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyAMA0"
-        # default_value="192.168.123.62"
-        
+        default_value="/dev/ttyAMA0"      
     )
     res.append(port_launch_arg)
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
-        default_value="1000000"
-        # default_value="9000"
-        
+        default_value="1000000"       
     )
     res.append(baud_launch_arg)
 
@@ -48,9 +44,7 @@ def generate_launch_description():
 
     gui_launch_arg = DeclareLaunchArgument(
         name="gui",
-        # default_value="false"
-        default_value="true"
-        
+        default_value="false"
     )
     res.append(gui_launch_arg)
 
@@ -62,12 +56,6 @@ def generate_launch_description():
         package="robot_state_publisher",
         executable="robot_state_publisher",
         parameters=[{'robot_description': robot_description}]
-        # package='robot_state_publisher',
-        # executable='robot_state_publisher',
-        # name="robot_state_publisher",
-        # output="screen",
-        # parameters=[{'robot_description': robot_description}],
-        # arguments=[LaunchConfiguration("model")]
     )
     res.append(robot_state_publisher_node)
 
@@ -80,18 +68,10 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    # joint_state_publisher_gui_node = Node(
-    #     package='joint_state_publisher_gui',
-    #     executable='joint_state_publisher_gui',
-    #     condition=IfCondition(LaunchConfiguration('gui'))
-    # )
-    # res.append(joint_state_publisher_gui_node)
     simple_gui_node = Node(
-        package="mypalletizer_260_pi",
-        namespace="simple_gui_node",
         name="simple_gui",
+        package="mypalletizer_260_pi",
         executable="simple_gui",
-        output="screen"
     )
     res.append(simple_gui_node)
     
@@ -102,20 +82,5 @@ def generate_launch_description():
         output="screen"
     )
     res.append(follow_display_node)
-
-    # service_node = Node(
-    #     package="mypalletizer_communication",
-    #     namespace="service_node",
-    #     name="service",
-    #     executable="mypalletizer_services",
-    #     output="screen",
-    #     parameters=[{
-    #         "port": LaunchConfiguration("port"),
-    #         "baud": LaunchConfiguration("baud"),
-    #     }]
-    # )
-    # res.append(service_node)
-    
-    
     
     return LaunchDescription(res)

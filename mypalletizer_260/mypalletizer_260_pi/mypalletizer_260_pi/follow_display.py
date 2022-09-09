@@ -4,24 +4,22 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
-
-from pymycobot import MyCobotSocket
+from pymycobot.mypalletizer import MyPalletizer
+# from pymycobot import MyCobotSocket
 import math,sys
 
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        # self.declare_parameter('port', '/dev/ttyAMA0')
-        # self.declare_parameter('baud', 1000000)
+        self.declare_parameter('port', '/dev/ttyAMA0')
+        self.declare_parameter('baud', 1000000)
    
-        # port = self.get_parameter("port").get_parameter_value().string_value
-        # baud = self.get_parameter("baud").get_parameter_value().integer_value
+        port = self.get_parameter("port").get_parameter_value().string_value
+        baud = self.get_parameter("baud").get_parameter_value().integer_value
 
-        # self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        # self.mc = MyPalletizer(port, str(baud))
-        
-        self.mc = MyCobotSocket("192.168.123.63", 9000)
-        self.mc.connect()     
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        self.mc = MyPalletizer(port, str(baud))
+          
         self.mc.release_all_servos()
 
     def start(self):
@@ -74,8 +72,7 @@ class Talker(Node):
             pub.publish(joint_state_send)
             
             # print(self.mc.get_coords())
-            # coords = self.mc.get_coords()
-            coords = []
+            coords = self.mc.get_coords()
 
             # marker
             marker_.header.stamp = self.get_clock().now().to_msg()
