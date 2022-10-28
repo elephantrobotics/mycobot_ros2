@@ -114,7 +114,7 @@ Visualization Manager:
           Value: true
         link5:
           Value: true
-      Marker Scale: 1
+      Marker Scale: 0.3
       Name: TF
       Show Arrows: true
       Show Axes: true
