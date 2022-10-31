@@ -170,7 +170,7 @@ Visualization Manager:
           Value: true
         link6_R:
           Value: true
-      Marker Scale: 1
+      Marker Scale: 0.2
       Name: TF
       Show Arrows: true
       Show Axes: true
