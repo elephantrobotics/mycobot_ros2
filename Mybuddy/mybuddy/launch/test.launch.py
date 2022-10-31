@@ -22,14 +22,14 @@ def generate_launch_description():
     )
     res.append(model_launch_arg)
 
-    # rvizconfig_launch_arg = DeclareLaunchArgument(
-    #     name="rvizconfig",
-    #     default_value=os.path.join(
-    #         get_package_share_path("mybuddy"),
-    #         "config/dual_arm.rviz"
-    #     )
-    # )
-    # res.append(rvizconfig_launch_arg)
+    rvizconfig_launch_arg = DeclareLaunchArgument(
+        name="rvizconfig",
+        default_value=os.path.join(
+            get_package_share_path("mybuddy"),
+            "config/dual_arm.rviz"
+        )
+    )
+    res.append(rvizconfig_launch_arg)
 
     gui_launch_arg = DeclareLaunchArgument(
         name="gui",
