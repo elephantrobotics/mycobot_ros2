@@ -30,10 +30,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'follow_display = mycobot_280.follow_display:main',
-            'listen_real_of_topic = mycobot_280.listen_real_of_topic:main',
-            'listen_real = mycobot_280.listen_real:main',
-            'slider_control = mycobot_280.slider_control:main',
+            'follow_display = mybuddy.follow_display:main',
+            'listen_real_of_topic = mybuddy.listen_real_of_topic:main',
+            'listen_real = mybuddy.listen_real:main',
+            'slider_control = mybuddy.slider_control:main',
         ],
     },
 )

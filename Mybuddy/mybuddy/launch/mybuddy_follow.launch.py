@@ -37,7 +37,7 @@ def generate_launch_description():
         "rvizconfig",
         default_value=os.path.join(
             get_package_share_directory("mybuddy"),
-            "config/mybuddy.rviz"
+            "config/dual_arm.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
