@@ -21,11 +21,11 @@ from launch import LaunchDescription
 
 def generate_launch_description():
     # <arg name="port" default="/dev/ttyUSB0" />
-    port_launch_arg = DeclareLaunchArgument("port", default_value="/dev/ttyUSB0")
+    port_launch_arg = DeclareLaunchArgument("port", default_value="/dev/ttyAMA0")
 
 
     # <arg name="baud" default="115200" />
-    baud_launch_arg = DeclareLaunchArgument("baud", default_value="115200")
+    baud_launch_arg = DeclareLaunchArgument("baud", default_value="1000000")
 
 
     # <node name="mypalletizer_services" pkg="mypalletizer_communication" type="mypalletizer_services.py" output="screen">

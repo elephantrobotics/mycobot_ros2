@@ -2,6 +2,8 @@
 import time
 import rclpy
 from rclpy.node import Node
+from pymycobot import MyCobotSocket
+
 from mypalletizer_interfaces.srv import (
     SetAngles,
     GetAngles,
@@ -12,21 +14,27 @@ from mypalletizer_interfaces.srv import (
 )
 
 # from pymycobot.mycobot import MyCobot
-from pymycobot.mypalletizer import MyPalletizer
+# from pymycobot.mypalletizer import MyPalletizer
 
 
 class Mypalletizer_Service(Node):
     def __init__(self):
         super().__init__("mypalletizer_services")
-        self.declare_parameter('port', '/dev/ttyUSB0')
-        self.declare_parameter('baud', '115200')
+        self.declare_parameter("port", "/dev/ttyAMA0")
+        self.declare_parameter("baud", "1000000")
+        
+        # self.declare_parameter('port', '192.168.123.62')
+        # self.declare_parameter('baud', '9000')
+        
         self.get_logger().info("start ...")
 
-        port = self.get_parameter("port").get_parameter_value().string_value
-        baud = self.get_parameter("baud").get_parameter_value().integer_value
-        self.get_logger().info("%s,%d" % (port, baud))
+        # port = self.get_parameter("port").get_parameter_value().string_value
+        # baud = self.get_parameter("baud").get_parameter_value().integer_value
+        # self.get_logger().info("%s,%d" % (port, baud))
 
-        self.mc = MyPalletizer(port, str(baud))
+        # self.mc = MyPalletizer(port, str(baud))
+        self.mc = MyCobotSocket("192.168.123.62", 9000)
+        self.mc.connect() 
 
     def create_services(self):
         self.set_joint_angles_service = self.create_service(
