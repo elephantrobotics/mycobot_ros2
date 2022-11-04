@@ -14,14 +14,21 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/urdf'+'/260_urdf', glob("urdf/260_urdf/*")),
+        ('share/' + package_name + '/urdf'+'/260_pi', glob("urdf/260_pi/*")),
         ('share/' + package_name + '/urdf'+'/280jn', glob("urdf/280jn/*")),
         ('share/' + package_name + '/urdf'+'/320_urdf', glob("urdf/320_urdf/*")),
         ('share/' + package_name + '/urdf'+'/600_urdf', glob("urdf/600_urdf/*")),
         ('share/' + package_name + '/urdf'+'/mycobot', glob("urdf/mycobot/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_pi', glob("urdf/mycobot_pi/*")),
         ('share/' + package_name + '/urdf'+'/mecharm', glob("urdf/mecharm/*")),
+
         ('share/' + package_name + '/urdf'+'/mecharm_pi', glob("urdf/mecharm_pi/*")),
+
+        ('share/' + package_name + '/urdf'+'/320_pi',glob("urdf/320_pi/*")),
+
+        ('share/' + package_name + '/urdf'+'/mybuddy', glob("urdf/mybuddy/*")),
+
+
     ],
     install_requires=['setuptools'],
     zip_safe=True,
