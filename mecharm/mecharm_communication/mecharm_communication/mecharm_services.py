@@ -12,12 +12,13 @@ from mycobot_interfaces.srv import (
 )
 
 from pymycobot.mycobot import MyCobot
+from pymycobot import MyCobotSocket
 
 
 class Mycobot_Service(Node):
     def __init__(self):
         super().__init__("mecharm_services")
-        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('port', '/dev/ttyAMA0')
         self.declare_parameter('baud', '115200')
         self.get_logger().info("start ...")
 
@@ -25,7 +26,9 @@ class Mycobot_Service(Node):
         baud = self.get_parameter("baud").get_parameter_value().integer_value
         self.get_logger().info("%s,%d" % (port, baud))
 
-        self.mc = MyCobot(port, str(baud))
+        # self.mc = MyCobot(port, str(baud))
+        self.mc = MyCobotSocket("192.168.123.22",9000)
+        self.mc.connect()
 
     def create_services(self):
         self.set_joint_angles_service = self.create_service(
