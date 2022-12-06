@@ -42,7 +42,7 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
     def run_program(self):
         current_time = self.get_current_time()
         try:
-            if self.comboBox.currentText() == 'rviz2测试':
+            if self.comboBox.currentText() == 'rviz2':
                 self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'start test.....')
                 t1 = threading.Thread(target=self.rviz_test)
                 t1.setDaemon(True)
