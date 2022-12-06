@@ -27,7 +27,7 @@ class Slider_Subscriber(Node):
             data_list.append(round(value, 3))
             
         print('data_list:',data_list)
-        self.ua.set_radians(data_list, 80)
+        self.ua.set_radians(data_list, 50)
 
 
 def main(args=None):

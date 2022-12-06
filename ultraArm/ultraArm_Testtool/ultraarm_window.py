@@ -54,7 +54,7 @@ class Ui_MainWindow(object):
         self.compile_program.setText(_translate("MainWindow", "编译程序"))
         self.label.setText(_translate("MainWindow", "程序："))
         self.comboBox.setItemText(0, _translate("MainWindow", "滑块控制"))
-        self.comboBox.setItemText(1, _translate("MainWindow", "rviz2测试"))
+        self.comboBox.setItemText(1, _translate("MainWindow", "rviz2"))
         self.run_button.setText(_translate("MainWindow", "运行"))
         self.close_button.setText(_translate("MainWindow", "  关闭"))
 

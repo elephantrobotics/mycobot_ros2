@@ -62,7 +62,7 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
             
     
     def rviz_test(self):
-        if self.comboBox.currentText() == 'rviz2测试':
+        if self.comboBox.currentText() == 'rviz2':
             os.system("gnome-terminal -e 'bash -c \"cd $HOME/colcon_ws/; source install/setup.bash; ros2 launch ultraarm test.launch.py; exec bash\"'")
         elif self.comboBox.currentText() == '滑块控制':
             os.system("gnome-terminal -e 'bash -c \"cd $HOME/colcon_ws/; source install/setup.bash; ros2 launch ultraarm slider_control.launch.py; exec bash\"'")
@@ -71,7 +71,7 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
     def close_rviz(self):
         current_time = self.get_current_time()
         try:
-            if self.comboBox.currentText() == 'rviz2测试':
+            if self.comboBox.currentText() == 'rviz2':
                 self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'rviz2 test closed ! ! !')
                 t1 = threading.Thread(target=self.close_test)
                 t1.setDaemon(True)
@@ -90,7 +90,7 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
             
     def close_test(self):
         current_time = self.get_current_time()
-        if self.comboBox.currentText() == 'rviz2测试':
+        if self.comboBox.currentText() == 'rviz2':
             
             os.system("ps -ef | grep -E " + "test.launch.py" + " | grep -v 'grep' | awk '{print $2}' | xargs kill -9")
         
