@@ -70,7 +70,7 @@ class Talker(Node):
 
             # self.get_logger().info('radians: {}'.format(data_list))
             joint_state_send.position = data_list
-            print('data_list:',data_list)
+            # print('data_list:',data_list)
             pub.publish(joint_state_send)
 
             try:
