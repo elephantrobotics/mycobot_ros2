@@ -80,10 +80,10 @@ def teleop_keyboard():
         print(vels(speed, change_percent))
         while 1:
             try:
-                print("\r current coords: %s" % record_coords)
+                # print("\r current coords: %s" % record_coords)
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
-                print('key:',key)
+               
                 if key == "q":
                     mc.release_all_servos()
                     break
