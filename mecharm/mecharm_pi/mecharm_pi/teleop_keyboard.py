@@ -55,14 +55,14 @@ def teleop_keyboard():
     # mc.connect()
 
     model = 0
-    speed = 10
-    change_percent = 2
+    speed = 20
+    change_percent = 5
 
     change_angle = 180 * change_percent / 100
     change_len = 250 * change_percent / 100
 
     init_pose = [[0, 0, 0, 0, 0, 0], speed]
-    home_pose = [[0, 8, -127, 40, 0, 0], speed]
+    home_pose = [[0, 30, 30, 0, 30, 0], speed]
 
     mc.send_angles(*init_pose)
 
@@ -71,9 +71,9 @@ def teleop_keyboard():
         if res:
             break
         time.sleep(0.1)
-    print(res)
+    
     record_coords = [res, speed, model]
-    print(record_coords)
+  
 
     try:
         print(msg)
