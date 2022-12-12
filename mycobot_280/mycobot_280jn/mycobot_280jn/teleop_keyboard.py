@@ -118,9 +118,9 @@ def teleop_keyboard():
                     record_coords[0][5] -= change_angle
                     mc.send_coords(*record_coords)
                 elif key in ["g", "G"]:
-                    mc.switch_gripper(True)
+                    mc.set_gripper_state(0, 30)
                 elif key in ["h", "H"]:
-                    mc.switch_gripper(False)
+                    mc.set_gripper_state(1, 30)
                 elif key == "1":
                     mc.send_angles(*init_pose)
                 elif key in "2":
