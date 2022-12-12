@@ -343,14 +343,14 @@ class Window:
 
     def gripper_open(self):
         try:
-            self.switch_gripper(True)
+            self.mc.set_gripper_state(0, 30)
         except Exception as e:
             # 可能由于该方法没有返回值，服务抛出无法处理的错误
             pass
 
     def gripper_close(self):
         try:
-            self.switch_gripper(False)
+            self.mc.set_gripper_state(1, 30)
         except Exception as e:
             pass
 
