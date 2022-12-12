@@ -70,13 +70,10 @@ class Talker(Node):
 
             # self.get_logger().info('radians: {}'.format(data_list))
             joint_state_send.position = data_list
-            print('data_list:',data_list)
+            # print('data_list:',data_list)
             pub.publish(joint_state_send)
 
-            try:
-                coords = self.mc.get_coords()
-            except Exception:
-                pass
+            coords = []
 
             # marker
             marker_.header.stamp = self.get_clock().now().to_msg()
