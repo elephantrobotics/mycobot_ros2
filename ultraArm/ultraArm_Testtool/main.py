@@ -14,15 +14,49 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
     def __init__(self):
         super(ultraArm_window, self).__init__()
         self.setupUi(self)
-        self.setWindowTitle('ultraArm Test Tool')
+        # self.setWindowTitle('ultraArm Test Tool')
         # 使其窗口最前
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
         
         self.compile_program.clicked.connect(self.build_code)
         self.run_button.clicked.connect(self.run_program)
         self.close_button.clicked.connect(self.close_rviz)
+        self.language_button.clicked.connect(self.language)
+        self.flage = True
+        self.retranslateUi()
         
-        
+    
+    def language(self):
+        if self.flage:
+            self.flage = False
+            self.retranslateUi()
+            
+        else:
+            self.flage = True
+            self.retranslateUi()
+    
+    def retranslateUi(self):
+        if self.flage:
+            _translate = QtCore.QCoreApplication.translate
+            self.setWindowTitle("ultraArm ROS2 测试工具")
+            self.compile_program.setText(_translate("MainWindow", "编译程序"))
+            self.label.setText(_translate("MainWindow", "程序："))
+            self.comboBox.setItemText(0, _translate("MainWindow", "滑块控制"))
+            self.comboBox.setItemText(1, _translate("MainWindow", "rviz2"))
+            self.run_button.setText(_translate("MainWindow", "运行"))
+            self.close_button.setText(_translate("MainWindow", "  关闭"))
+            self.language_button.setText(_translate("MainWindow", "简体中文"))
+        else:
+            _translate = QtCore.QCoreApplication.translate
+            self.setWindowTitle("ultraArm ROS2 Test Tool")
+            self.compile_program.setText(_translate("MainWindow", "compile program"))
+            self.label.setText(_translate("MainWindow", "program："))
+            self.comboBox.setItemText(0, _translate("MainWindow", "slider control"))
+            self.comboBox.setItemText(1, _translate("MainWindow", "rviz2"))
+            self.run_button.setText(_translate("MainWindow", "run"))
+            self.close_button.setText(_translate("MainWindow", "  close"))
+            self.language_button.setText(_translate("MainWindow", "Simplified English"))
+    
     def get_current_time(self):
         current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         return current_time
