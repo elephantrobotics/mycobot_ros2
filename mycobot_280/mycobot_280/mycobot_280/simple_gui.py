@@ -3,11 +3,20 @@
 import tkinter as tk
 from pymycobot.mycobot import MyCobot
 import time
+import os
 
 
 class Window: 
     def __init__(self, handle):
-        self.mc = MyCobot("/dev/ttyUSB0", 115200)
+        self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
+        self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
+        if self.robot_m5:
+            port = self.robot_m5
+        else:
+            port = self.robot_wio
+            
+        print("port:%s, baud:%d" % (port, 115200))
+        self.mc = MyCobot(port, 115200)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小

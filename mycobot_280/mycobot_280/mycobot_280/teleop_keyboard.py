@@ -4,6 +4,7 @@ import sys
 import termios
 import tty
 import time
+import os
 
 msg = """\
 Mycobot Teleop Keyboard Controller
@@ -48,7 +49,15 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobot("/dev/ttyUSB0", 115200)
+    robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
+    robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
+    if robot_m5:
+        port = robot_m5
+    else:
+        port = robot_wio
+        
+    print("port:%s, baud:%d" % (port, 115200))
+    mc = MyCobot(port, 115200)
 
     model = 0
     speed = 10
