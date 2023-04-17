@@ -24,6 +24,12 @@ class Slider_Subscriber(Node):
             port = self.robot_wio
         self.get_logger().info("port:%s, baud:%d" % (port, 115200))
         self.mc = MyCobot(port, 115200)
+        # self.declare_parameter('port', '/dev/ttyUSB0')
+        # self.declare_parameter('baud', 115200)
+        # port = self.get_parameter('port').get_parameter_value().string_value
+        # baud = self.get_parameter('baud').get_parameter_value().integer_value
+        # self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        # self.mc = MyCobot(port, baud)
 
     def listener_callback(self, msg):
         print(msg.position)
