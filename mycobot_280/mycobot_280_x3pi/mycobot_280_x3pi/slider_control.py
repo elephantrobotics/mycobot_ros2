@@ -16,7 +16,12 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobot("/dev/ttyS3", 1000000)
+        self.declare_parameter('port', '/dev/ttyS3')
+        self.declare_parameter('baud', 1000000)
+        port = self.get_parameter('port').get_parameter_value().string_value
+        baud = self.get_parameter('baud').get_parameter_value().integer_value
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        self.mc = MyCobot(port, baud)
 
     def listener_callback(self, msg):
         print(msg.position)

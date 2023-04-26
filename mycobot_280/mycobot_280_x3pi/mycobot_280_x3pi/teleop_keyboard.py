@@ -52,7 +52,7 @@ def teleop_keyboard():
     mc = MyCobot("/dev/ttyS3", 1000000)
 
     model = 0
-    speed = 10
+    speed = 30
     change_percent = 2
 
     change_angle = 180 * change_percent / 100
@@ -124,8 +124,10 @@ def teleop_keyboard():
                     mc.set_gripper_state(1, 30)
                 elif key == "1":
                     mc.send_angles(*init_pose)
+                    record_coords = [res, speed, model]
                 elif key in "2":
                     mc.send_angles(*home_pose)
+                    record_coords = [res, speed, model]
                 elif key in "3":
                     rep = mc.get_angles()
                     home_pose[0] =rep

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import tkinter as tk
+try:
+    import tkinter as tk
+except ImportError:
+    import Tkinter as tk
 from pymycobot.mycobot import MyCobot
 # from pymycobot.mycobotsocket import MyCobotSocket
 import time
@@ -40,7 +43,7 @@ class Window:
         # calculate x and y coordinates for the Tk root window
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("800x600+{}+{}".format(int(x), int(y)))
+        self.win.geometry("450x420+{}+{}".format(int(x), int(y)))
         # 布局
         self.set_layout()
         # 输入部分

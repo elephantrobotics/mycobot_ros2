@@ -1,9 +1,50 @@
 import rclpy
+import time
+import os
+import fcntl
 from pymycobot.mycobot import MyCobot
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
+
+
+# Avoid serial port conflicts and need to be locked
+def acquire(lock_file):
+    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
+    fd = os.open(lock_file, open_mode)
+
+    pid = os.getpid()
+    lock_file_fd = None
+    
+    timeout = 50.0
+    start_time = current_time = time.time()
+    while current_time < start_time + timeout:
+        try:
+            # The LOCK_EX means that only one process can hold the lock
+            # The LOCK_NB means that the fcntl.flock() is not blocking
+            # and we are able to implement termination of while loop,
+            # when timeout is reached.
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            pass
+        else:
+            lock_file_fd = fd
+            break
+
+        # print('pid waiting for lock:%d'% pid)
+        time.sleep(1.0)
+        current_time = time.time()
+    if lock_file_fd is None:
+        os.close(fd)
+    return lock_file_fd
+
+
+def release(lock_file_fd):
+    # Do not remove the lockfile:
+    fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
+    os.close(lock_file_fd)
+    return None
 
 
 class Talker(Node):
@@ -17,7 +58,10 @@ class Talker(Node):
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = MyCobot(port,str(baud))
-        self.mc.release_all_servos()
+        if self.mc:
+            lock = acquire("/tmp/mycobot_lock")
+            self.mc.release_all_servos()
+            release(lock)
 
     def start(self):
         pub = self.create_publisher(
@@ -56,7 +100,10 @@ class Talker(Node):
             joint_state_send.header.stamp = self.get_clock().now().to_msg()
             
             try:
-                angles = self.mc.get_radians()
+                if self.mc:
+                    lock = acquire("/tmp/mycobot_lock")
+                    angles = self.mc.get_radians()
+                    release(lock)
                 data_list = []
                 for _, value in enumerate(angles):
                     data_list.append(value)
@@ -68,8 +115,11 @@ class Talker(Node):
                 joint_state_send.position = data_list
 
                 pub.publish(joint_state_send)
-
-                coords = self.mc.get_coords()
+                
+                if self.mc:
+                    lock = acquire("/tmp/mycobot_lock")
+                    coords = self.mc.get_coords()
+                    release(lock)
                 # coords = []
 
                 # marker
@@ -86,10 +136,12 @@ class Talker(Node):
                 if not coords:
                     coords = [0, 0, 0, 0, 0, 0]
                     # self.get_logger().info("error [101]: can not get coord values")
-
-                marker_.pose.position.x = coords[1] / 1000 * -1
-                marker_.pose.position.y = coords[0] / 1000
-                marker_.pose.position.z = coords[2] / 1000
+                if self.mc:
+                    lock = acquire("/tmp/mycobot_lock")
+                    marker_.pose.position.x = coords[1] / 1000 * -1
+                    marker_.pose.position.y = coords[0] / 1000
+                    marker_.pose.position.z = coords[2] / 1000
+                    release(lock)
 
                 marker_.color.a = 1.0
                 marker_.color.g = 1.0
