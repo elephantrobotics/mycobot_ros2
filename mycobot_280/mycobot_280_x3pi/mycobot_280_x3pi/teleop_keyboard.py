@@ -51,7 +51,7 @@ class Raw(object):
 def teleop_keyboard():
     mc = MyCobot("/dev/ttyS3", 1000000)
 
-    model = 0
+    model = 1
     speed = 30
     change_percent = 2
 
