@@ -68,13 +68,13 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    real_listener_node = Node(
         package="mycobot_280_x3pi",
-        executable="follow_display",
-        name="follow_display",
+        executable="listen_real",
+        name="listen_real",
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(real_listener_node)
 
     mycobot_280_x3pi_node = Node(
         name="simple_gui",
