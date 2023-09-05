@@ -107,6 +107,7 @@ class Window:
         self.j5_default.set(self.res_angles[0][4])
         self.j6_default = tk.StringVar()
         self.j6_default.set(self.res_angles[0][5])
+        self.j7_default = tk.StringVar()
         self.j7_default.set(self.res_angles[0][6])
 
         self.x_default = tk.StringVar()
