@@ -67,7 +67,7 @@ Visualization Manager: # 可视化管理
           Value: true
         joint7:
           Value: true
-      Marker Scale: 0.300000012
+      Marker Scale: 0.200000012
       Name: TF # 坐标系
       Show Arrows: true
       Show Axes: true
@@ -150,7 +150,7 @@ Visualization Manager: # 可视化管理
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: joint1
+    Fixed Frame: base
     Frame Rate: 30
   Name: root
   Tools:
