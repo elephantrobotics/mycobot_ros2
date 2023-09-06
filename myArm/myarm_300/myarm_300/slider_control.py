@@ -24,12 +24,13 @@ class Slider_Subscriber(Node):
         self.mc = MyArm(port, baud)
 
     def listener_callback(self, msg):
-        print(msg.position)
+        # print(msg.position)
         data_list = []
         for _, value in enumerate(msg.position):
-            angles = math.radians(value)
+            angles = round(math.degrees(value), 2)
             data_list.append(angles)
-
+        
+        print('current angles:', data_list)
         # self.mc.send_radians(data_list, 80)
         self.mc.send_angles(data_list, 80)
 
