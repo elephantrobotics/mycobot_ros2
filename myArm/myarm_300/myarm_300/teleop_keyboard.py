@@ -93,8 +93,8 @@ def teleop_keyboard():
     mc = MyArm("/dev/ttyAMA0", 115200)
 
     model = 0
-    speed = 50
-    change_percent = 5
+    speed = 80
+    change_percent = 10
 
     change_angle = 180 * change_percent / 100
     change_len = 250 * change_percent / 100
@@ -106,7 +106,7 @@ def teleop_keyboard():
         lock = acquire("/tmp/myarm_lock")
         mc.send_angles(*home_pose)
         release(lock)
-        time.sleep(3)
+        time.sleep(2)
 
     while True:
         if mc:
@@ -133,92 +133,108 @@ def teleop_keyboard():
                     break
                 elif key in ["w", "W"]:
                     record_coords[0][0] += change_len
+                    print('start X+', change_len)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["s", "S"]:
                     record_coords[0][0] -= change_len
+                    print('start X-', change_len)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["a", "A"]:
                     record_coords[0][1] -= change_len
+                    print('start Y-', change_len)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["d", "D"]:
                     record_coords[0][1] += change_len
+                    print('start Y+', change_len)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["z", "Z"]:
                     record_coords[0][2] -= change_len
+                    print('start Z-', change_len)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["x", "X"]:
                     record_coords[0][2] += change_len
+                    print('start Z+', change_len)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["u", "U"]:
                     record_coords[0][3] += change_angle
+                    print('start RX+', change_angle)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["j", "J"]:
                     record_coords[0][3] -= change_angle
+                    print('start RX-', change_angle)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["i", "I"]:
                     record_coords[0][4] += change_angle
+                    print('start RY+', change_angle)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["k", "K"]:
                     record_coords[0][4] -= change_angle
+                    print('start RY-', change_angle)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["o", "O"]:
                     record_coords[0][5] += change_angle
+                    print('start RZ+', change_angle)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["l", "L"]:
                     record_coords[0][5] -= change_angle
+                    print('start RZ-', change_angle)
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["g", "G"]:
+                    print('open gripper')
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.set_gripper_state(0, 95)
                         release(lock)
                 elif key in ["h", "H"]:
+                    print('close gripper')
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.set_gripper_state(1, 95)
                         release(lock)
                 elif key == "1":
+                    print('go init point')
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_angles(*init_pose)
                         release(lock)
                 elif key in "2":
+                    print('go home pose')
                     if mc:
                         lock = acquire("/tmp/myarm_lock")
                         mc.send_angles(*home_pose)
