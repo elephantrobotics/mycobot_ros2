@@ -15,7 +15,7 @@ def acquire(lock_file):
     pid = os.getpid()
     lock_file_fd = None
     
-    timeout = 50.0
+    timeout = 30.0
     start_time = current_time = time.time()
     while current_time < start_time + timeout:
         try:
@@ -31,7 +31,7 @@ def acquire(lock_file):
             break
 
         # print('pid waiting for lock:%d'% pid)
-        time.sleep(1.0)
+        time.sleep(1)
         current_time = time.time()
     if lock_file_fd is None:
         os.close(fd)
@@ -51,16 +51,13 @@ class Window:
         
         self.mc = CobotX("/dev/ttyAMA1", 115200)
         
-        if self.mc:
-            lock = acquire("/tmp/cobotx_lock")
-            self.mc.power_on()
-            release(lock)
-            time.sleep(0.2)
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
 
         self.model = 0
         self.speed = 50
+        
+        self.init_cobotx()
 
         # 设置默认速度123456
         self.speed_d = tk.StringVar()
@@ -111,6 +108,18 @@ class Window:
         tk.Button(self.frmLB, text="夹爪(关)", command=self.gripper_close, width=5).grid(
             row=1, column=1, sticky="w", padx=3, pady=2
         )
+        
+    def init_cobotx(self):
+        if self.mc:
+            lock = acquire("/tmp/cobotx_lock")
+            self.mc.power_on()
+            release(lock)
+            time.sleep(0.2)
+        if self.mc:
+            lock = acquire("/tmp/cobotx_lock")
+            self.mc.send_angles([0, 0, 0, 0, 0, 0, 0], 80)
+            release(lock)
+        time.sleep(3)
 
     def set_layout(self):
         self.frmLT = tk.Frame(width=200, height=200)
