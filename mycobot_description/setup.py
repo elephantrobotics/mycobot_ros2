@@ -32,6 +32,7 @@ setup(
         ('share/' + package_name + '/urdf'+'/mycobot_x3pi', glob("urdf/mycobot_x3pi/*")),
         ('share/' + package_name + '/urdf'+'/myarm_300', glob("urdf/myarm_300/*")),
         ('share/' + package_name + '/urdf'+'/cobotx_a450', glob("urdf/cobotx_a450/*")),
+        ('share/' + package_name + '/urdf'+'/mercury_b1', glob("urdf/mercury_b1/*")),
 
 
     ],
