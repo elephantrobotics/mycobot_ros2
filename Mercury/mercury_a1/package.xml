@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>cobotx_a450</name>
+  <name>mercury_a1</name>
   <version>0.0.1</version>
-  <description>The cobotx a450 package</description>
+  <description>The mercury_a1 package</description>
   <maintainer email="u2@todo.todo">u2</maintainer>
   <license>BSD</license>
 

@@ -3,7 +3,7 @@ from setuptools import setup
 import os
 from glob import glob
 
-package_name = 'cobotx_a450'
+package_name = 'mercury_a1'
 
 setup(
     name=package_name,
@@ -30,10 +30,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'follow_display = cobotx_a450.follow_display:main',
-            'simple_gui = cobotx_a450.simple_gui:main',
-            'slider_control = cobotx_a450.slider_control:main',
-            'teleop_keyboard = cobotx_a450.teleop_keyboard:main',
+            'follow_display = mercury_a1.follow_display:main',
+            'simple_gui = mercury_a1.simple_gui:main',
+            'slider_control = mercury_a1.slider_control:main',
+            'teleop_keyboard = mercury_a1.teleop_keyboard:main',
         ],
     },
 )

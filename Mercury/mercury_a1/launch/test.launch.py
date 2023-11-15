@@ -1,46 +1,41 @@
 import os
 
-from ament_index_python import get_package_share_directory
+from ament_index_python import get_package_share_path
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration
 
 
 def generate_launch_description():
     res = []
-    
-    port_launch_arg = DeclareLaunchArgument(
-        name="port",
-        default_value="/dev/ttyAMA1"
-    )
-    res.append(port_launch_arg)
-
-    baud_launch_arg = DeclareLaunchArgument(
-        name="baud",
-        default_value="115200"
-    )
-    res.append(baud_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
-        "model",
+        name="model",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_description"),
-            "urdf/cobotx_a450/cobotx_a450.urdf"
+            get_package_share_path("mycobot_description"),
+            "urdf/mercury_a1/mercury_a1.urdf"
         )
     )
     res.append(model_launch_arg)
 
     rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
+        name="rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("cobotx_a450"),
-            "config/cobotx_a450.rviz"
+            get_package_share_path("mercury_a1"),
+            "config/mercury_a1.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
+
+    gui_launch_arg = DeclareLaunchArgument(
+        name="gui",
+        default_value="true"
+    )
+    res.append(gui_launch_arg)
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
@@ -48,20 +43,23 @@ def generate_launch_description():
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        name="robot_state_publisher",
-        output="screen",
-        parameters=[{'robot_description': robot_description}],
-        arguments=[LaunchConfiguration("model")]
+        parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
 
-    follow_display_node = Node(
-        package="cobotx_a450",
-        executable="follow_display",
-        name="follow_display",
-        output="screen"
+    joint_state_publisher_node = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        condition=UnlessCondition(LaunchConfiguration('gui'))
     )
-    res.append(follow_display_node)
+    res.append(joint_state_publisher_node)
+
+    joint_state_publisher_gui_node = Node(
+        package='joint_state_publisher_gui',
+        executable='joint_state_publisher_gui',
+        condition=IfCondition(LaunchConfiguration('gui'))
+    )
+    res.append(joint_state_publisher_gui_node)
 
     rviz_node = Node(
         name="rviz2",

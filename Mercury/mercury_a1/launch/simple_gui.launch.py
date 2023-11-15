@@ -14,7 +14,7 @@ def generate_launch_description():
 
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyAMA0"
+        default_value="/dev/ttyAMA1"
     )
     res.append(port_launch_arg)
 
@@ -28,7 +28,7 @@ def generate_launch_description():
         name="model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/cobotx_a450/cobotx_a450.urdf"
+            "urdf/mercury_a1/mercury_a1.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -36,8 +36,8 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         name="rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("cobotx_a450"),
-            "config/cobotx_a450.rviz"
+            get_package_share_directory("mercury_a1"),
+            "config/mercury_a1.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
@@ -69,18 +69,18 @@ def generate_launch_description():
     res.append(rviz_node)
 
     follow_display_node = Node(
-        package="cobotx_a450",
+        package="mercury_a1",
         executable="follow_display",
         name="follow_display",
         output="screen"
     )
     res.append(follow_display_node)
 
-    cobotx_a450_node = Node(
+    mercury_a1_node = Node(
         name="simple_gui",
-        package="cobotx_a450",
+        package="mercury_a1",
         executable="simple_gui",
     )
-    res.append(cobotx_a450_node)
+    res.append(mercury_a1_node)
 
     return LaunchDescription(res)

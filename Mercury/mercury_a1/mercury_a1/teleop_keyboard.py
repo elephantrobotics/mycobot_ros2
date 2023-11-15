@@ -5,7 +5,7 @@ import tty
 import time
 import os
 
-from pymycobot.cobotx import CobotX
+from pymycobot.mercury import Mercury
 
 
 # Avoid serial port conflicts and need to be locked
@@ -47,7 +47,7 @@ def release(lock_file_fd):
     return None
 
 msg = """\
-CobotX A450 Teleop Keyboard Controller
+Mercury A1 Teleop Keyboard Controller
 ---------------------------
 Movimg options(control coordinations [x,y,z,rx,ry,rz]):
               w(x+)
@@ -90,7 +90,7 @@ class Raw(object):
 
 def teleop_keyboard():
   
-    mc = CobotX("/dev/ttyAMA1", 115200)
+    mc = Mercury("/dev/ttyAMA1", 115200)
 
     model = 1
     speed = 60
@@ -102,20 +102,20 @@ def teleop_keyboard():
     init_pose = [[0, 0, 0, 0, 0, 0, 0], speed]
     home_pose = [[0, 0, 0, -90, 0, 90, 0], speed]
     if mc:
-        lock = acquire("/tmp/cobotx_lock")
+        lock = acquire("/tmp/mercury_lock")
         mc.power_on()
         release(lock)
         time.sleep(0.2)
 
     if mc:
-        lock = acquire("/tmp/cobotx_lock")
+        lock = acquire("/tmp/mercury_lock")
         mc.send_angles(*home_pose)
         release(lock)
         time.sleep(2)
 
     while True:
         if mc:
-            lock = acquire("/tmp/cobotx_lock")
+            lock = acquire("/tmp/mercury_lock")
             res = mc.get_coords()
             release(lock)
         if res:
@@ -140,113 +140,113 @@ def teleop_keyboard():
                     record_coords[0][0] += change_len
                     print('start X+', change_len)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["s", "S"]:
                     record_coords[0][0] -= change_len
                     print('start X-', change_len)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["a", "A"]:
                     record_coords[0][1] -= change_len
                     print('start Y-', change_len)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["d", "D"]:
                     record_coords[0][1] += change_len
                     print('start Y+', change_len)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["z", "Z"]:
                     record_coords[0][2] -= change_len
                     print('start Z-', change_len)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["x", "X"]:
                     record_coords[0][2] += change_len
                     print('start Z+', change_len)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["u", "U"]:
                     record_coords[0][3] += change_angle
                     print('start RX+', change_angle)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["j", "J"]:
                     record_coords[0][3] -= change_angle
                     print('start RX-', change_angle)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["i", "I"]:
                     record_coords[0][4] += change_angle
                     print('start RY+', change_angle)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["k", "K"]:
                     record_coords[0][4] -= change_angle
                     print('start RY-', change_angle)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["o", "O"]:
                     record_coords[0][5] += change_angle
                     print('start RZ+', change_angle)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["l", "L"]:
                     record_coords[0][5] -= change_angle
                     print('start RZ-', change_angle)
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_coords(*record_coords)
                         release(lock)
                 elif key in ["g", "G"]:
                     print('open gripper')
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.set_gripper_state(0, 95)
                         release(lock)
                 elif key in ["h", "H"]:
                     print('close gripper')
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.set_gripper_state(1, 95)
                         release(lock)
                 elif key == "1":
                     print('go init point')
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_angles(*init_pose)
                         release(lock)
                 elif key in "2":
                     print('go home pose')
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         mc.send_angles(*home_pose)
                         release(lock)
                 elif key in "3":
                     if mc:
-                        lock = acquire("/tmp/cobotx_lock")
+                        lock = acquire("/tmp/mercury_lock")
                         rep = mc.get_angles()
                         release(lock)
                     home_pose[0] =rep

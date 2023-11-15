@@ -1,5 +1,5 @@
 import rclpy
-from pymycobot.cobotx import CobotX
+from pymycobot.mercury import Mercury
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 import math
@@ -22,7 +22,7 @@ class Slider_Subscriber(Node):
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        self.mc = CobotX(port, baud)
+        self.mc = Mercury(port, baud)
         self.mc.power_on()
         time.sleep(0.2)
 

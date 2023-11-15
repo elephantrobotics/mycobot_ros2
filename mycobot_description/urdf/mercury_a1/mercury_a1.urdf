@@ -7,13 +7,13 @@
   <link name="base">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/base.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/base.dae"/>
       </geometry>
       <origin xyz = "0.0 0 0 " rpy = " 0 0 0"/>
     </visual>
     <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/base.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/base.dae"/>
         </geometry>
         <origin xyz = "0.0 0 0 " rpy = " 0 0 0"/>
     </collision>
@@ -22,13 +22,13 @@
   <link name="joint1">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint1.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint1.dae"/>
       </geometry>
       <origin xyz = "0.0 0 -0.08 " rpy = " 0 0 0"/>
     </visual>
     <collision>
      <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint1.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint1.dae"/>
       </geometry>
       <origin xyz = "0.0 0 -0.08 " rpy = " 0 0 0"/>
     </collision>
@@ -37,13 +37,13 @@
   <link name="joint2">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint2.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint2.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0.0 " rpy = " 3.14159 0 -1.5708 "/>
     </visual>
     <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint2.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint2.dae"/>
       </geometry>
       <origin xyz = "0.0 0 0.0 " rpy = " 3.14159 0 -1.5708"/>
     </collision>
@@ -53,13 +53,13 @@
     <visual>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint3.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint3.dae"/>
       </geometry>
       <origin xyz = "0.0 0 0.038 " rpy = " 0 0 0"/>
     </visual>
     <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint3.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint3.dae"/>
       </geometry>
       <origin xyz = "0.0 0 0.038" rpy = " 0 0 0"/>
     </collision>
@@ -69,13 +69,13 @@
   <link name="joint4">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint4.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint4.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0 " rpy = " 0 0 -1.5708"/>
     </visual>
     <collision>
        <geometry>
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint4.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint4.dae"/>
       </geometry>
       <origin xyz = "0.0 0 0 " rpy = " 0 0 -1.5708"/>
     </collision>
@@ -86,14 +86,14 @@
     <visual>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint5.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint5.dae"/>
       </geometry>
     <origin xyz = "0 0 -0.069 " rpy = " 0 0 0"/>
     </visual>
     <collision>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint5.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint5.dae"/>
       </geometry>
     <origin xyz = "0 0 -0.069 " rpy = " 0 0 0"/>
     </collision>
@@ -104,14 +104,14 @@
     <visual>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint6.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint6.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.025 " rpy = " 0 0 -1.5708"/>
     </visual>
     <collision>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint6.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint6.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.025 " rpy = " 0 0 -1.5708"/>
     </collision>
@@ -121,14 +121,14 @@
     <visual>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint7.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint7.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.002 " rpy = " 0 0 -1.5708"/>
     </visual>
     <collision>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/cobotx_a450/joint7.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mercury_a1/joint7.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.002 " rpy = " 0 0 -1.5708"/>
     </collision>

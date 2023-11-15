@@ -6,6 +6,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration
 
 
@@ -16,7 +17,7 @@ def generate_launch_description():
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/cobotx_a450/cobotx_a450.urdf"
+            "urdf/mercury_a1/mercury_a1.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -24,11 +25,30 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         "rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("cobotx_a450"),
-            "config/cobotx_a450.rviz"
+            get_package_share_directory("mercury_a1"),
+            "config/mercury_a1.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
+
+    gui_launch_arg = DeclareLaunchArgument(
+        "gui",
+        default_value="true"
+    )
+    res.append(gui_launch_arg)
+    
+    # serial_port_arg = DeclareLaunchArgument(
+    #     'port',
+    #     default_value='/dev/ttyUSB0',
+    #     description='Serial port to use'
+    # )
+    # res.append(serial_port_arg)
+    # baud_rate_arg = DeclareLaunchArgument(
+    #     'baud',
+    #     default_value='115200',
+    #     description='Baud rate to use'
+    # )
+    # res.append(baud_rate_arg)
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
@@ -37,10 +57,16 @@ def generate_launch_description():
         name="robot_state_publisher",
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[{'robot_description': robot_description}],
-        arguments=[LaunchConfiguration("model")]
+        parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
+
+    joint_state_publisher_gui_node = Node(
+        package='joint_state_publisher_gui',
+        executable='joint_state_publisher_gui',
+        condition=IfCondition(LaunchConfiguration('gui'))
+    )
+    res.append(joint_state_publisher_gui_node)
 
     rviz_node = Node(
         name="rviz2",
@@ -50,13 +76,17 @@ def generate_launch_description():
         arguments=['-d', LaunchConfiguration("rvizconfig")],
     )
     res.append(rviz_node)
-
-    follow_display_node = Node(
-        package="cobotx_a450",
-        executable="follow_display",
-        name="follow_display",
+    
+    slider_control_node = Node(
+        package="mercury_a1",
+        executable="slider_control",
+        # parameters=[
+        #     {'port': LaunchConfiguration('port')},
+        #     {'baud': LaunchConfiguration('baud')}
+        # ],
+        name="slider_control",
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(slider_control_node)
 
     return LaunchDescription(res)

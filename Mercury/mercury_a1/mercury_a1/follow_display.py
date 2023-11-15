@@ -3,7 +3,7 @@ import time
 import os
 import math
 import fcntl
-from pymycobot.cobotx import CobotX
+from pymycobot.mercury import Mercury
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
@@ -59,9 +59,9 @@ class Talker(Node):
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        self.mc = CobotX(port, str(baud))
+        self.mc = Mercury(port, str(baud))
         if self.mc:
-            lock = acquire("/tmp/cobotx_lock")
+            lock = acquire("/tmp/mercury_lock")
             self.mc.release_all_servos()
             release(lock)
 
@@ -103,7 +103,7 @@ class Talker(Node):
             joint_state_send.header.stamp = self.get_clock().now().to_msg()
             try:
                 if self.mc:
-                    lock = acquire("/tmp/cobotx_lock")
+                    lock = acquire("/tmp/mercury_lock")
                     angles = self.mc.get_angles()
                     release(lock)
                 data_list = []
@@ -117,7 +117,7 @@ class Talker(Node):
                 pub.publish(joint_state_send)
                 
                 if self.mc:
-                    lock = acquire("/tmp/cobotx_lock")
+                    lock = acquire("/tmp/mercury_lock")
                     coords = self.mc.get_coords()
                     release(lock)
                 # marker
@@ -135,7 +135,7 @@ class Talker(Node):
                     coords = [0, 0, 0, 0, 0, 0, 0]
                     # self.get_logger().info("error [101]: can not get coord values")
                 if self.mc:
-                    lock = acquire("/tmp/cobotx_lock")
+                    lock = acquire("/tmp/mercury_lock")
                     marker_.pose.position.x = coords[1] / 1000 * -1
                     marker_.pose.position.y = coords[0] / 1000
                     marker_.pose.position.z = coords[2] / 1000

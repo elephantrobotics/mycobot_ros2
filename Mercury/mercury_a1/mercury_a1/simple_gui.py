@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import tkinter as tk
-from pymycobot.cobotx import CobotX
+from pymycobot.mercury import Mercury
 import time
 import os
 import fcntl
@@ -49,7 +49,7 @@ def release(lock_file_fd):
 class Window: 
     def __init__(self, handle):
         
-        self.mc = CobotX("/dev/ttyAMA1", 115200)
+        self.mc = Mercury("/dev/ttyAMA1", 115200)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
@@ -57,7 +57,7 @@ class Window:
         self.model = 0
         self.speed = 50
         
-        self.init_cobotx()
+        self.init_mercury()
 
         # 设置默认速度123456
         self.speed_d = tk.StringVar()
@@ -109,14 +109,14 @@ class Window:
             row=1, column=1, sticky="w", padx=3, pady=2
         )
         
-    def init_cobotx(self):
+    def init_mercury(self):
         if self.mc:
-            lock = acquire("/tmp/cobotx_lock")
+            lock = acquire("/tmp/mercury_lock")
             self.mc.power_on()
             release(lock)
             time.sleep(0.2)
         if self.mc:
-            lock = acquire("/tmp/cobotx_lock")
+            lock = acquire("/tmp/mercury_lock")
             self.mc.send_angles([0, 0, 0, 0, 0, 0, 0], 80)
             release(lock)
         time.sleep(3)
@@ -417,7 +417,7 @@ class Window:
     def gripper_open(self):
         try:
             if self.mc:
-                lock = acquire("/tmp/cobotx_lock")
+                lock = acquire("/tmp/mercury_lock")
                 self.mc.set_gripper_state(0, 95)
                 release(lock)
         except Exception as e:
@@ -427,7 +427,7 @@ class Window:
     def gripper_close(self):
         try:
             if self.mc:
-                lock = acquire("/tmp/cobotx_lock")
+                lock = acquire("/tmp/mercury_lock")
                 self.mc.set_gripper_state(1, 95)
                 release(lock)
         except Exception as e:
@@ -444,7 +444,7 @@ class Window:
         
         try:
             if self.mc:
-                lock = acquire("/tmp/cobotx_lock")
+                lock = acquire("/tmp/mercury_lock")
                 self.mc.send_coords(c_value,self.speed, self.model)
                 release(lock)
         except Exception as e:
@@ -465,7 +465,7 @@ class Window:
 
         try:
             if self.mc:
-                lock = acquire("/tmp/cobotx_lock")
+                lock = acquire("/tmp/mercury_lock")
                 self.mc.send_angles(*res)
                 release(lock)
         except Exception as e:
@@ -478,7 +478,7 @@ class Window:
         t = time.time()
         while time.time() - t < 2:
             if self.mc:
-                lock = acquire("/tmp/cobotx_lock")
+                lock = acquire("/tmp/mercury_lock")
                 self.res = self.mc.get_coords()
                 release(lock)
             if self.res != []:
@@ -488,7 +488,7 @@ class Window:
         t = time.time()
         while time.time() - t < 2:
             if self.mc:
-                lock = acquire("/tmp/cobotx_lock")
+                lock = acquire("/tmp/mercury_lock")
                 self.angles = self.mc.get_angles()
                 release(lock)
             if self.angles != []:
