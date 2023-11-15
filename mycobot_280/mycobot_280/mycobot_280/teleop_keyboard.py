@@ -23,6 +23,10 @@ Gripper control:
     g - open
     h - close
 
+Pump control:
+    b - open
+    m - close
+
 Other:
     1 - Go to init pose
     2 - Go to home pose
@@ -127,9 +131,15 @@ def teleop_keyboard():
                     record_coords[0][5] -= change_angle
                     mc.send_coords(*record_coords)
                 elif key in ["g", "G"]:
-                    mc.switch_gripper(True)
+                    mc.set_gripper_state(0, 80)
                 elif key in ["h", "H"]:
-                    mc.switch_gripper(False)
+                    mc.set_gripper_state(1, 80)
+                elif key in ["b", "B"]:
+                    mc.set_basic_output(2, 0)
+                    mc.set_basic_output(5, 0)
+                elif key in ["m", "M"]:
+                    mc.set_basic_output(2, 1)
+                    mc.set_basic_output(5, 1)
                 elif key == "1":
                     mc.send_angles(*init_pose)
                 elif key in "2":
