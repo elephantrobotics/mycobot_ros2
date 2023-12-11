@@ -1,5 +1,5 @@
 import rclpy
-from pymycobot.cobotx import CobotX
+from pymycobot.mercury import Mercury
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 import math
@@ -17,8 +17,8 @@ class Slider_Subscriber(Node):
         )
         self.subscription
      
-        self.declare_parameter('port1', '/dev/ttyS0')
-        self.declare_parameter('port2', '/dev/ttyTHS1')
+        self.declare_parameter('port1', '/dev/ttyTHS1')
+        self.declare_parameter('port2', '/dev/ttyS0')
         self.declare_parameter('baud', 115200)
         port1 = self.get_parameter('port1').get_parameter_value().string_value
         port2 = self.get_parameter('port2').get_parameter_value().string_value
@@ -26,11 +26,11 @@ class Slider_Subscriber(Node):
         self.get_logger().info("port1:%s, baud:%d" % (port1, baud))
         self.get_logger().info("port2:%s, baud:%d" % (port2, baud))
         # left arm
-        self.mc1 = CobotX(port1, baud)
-        # self.mc.power_on()
+        self.l = Mercury(port1, baud)
+
         time.sleep(0.05)
         # right arm
-        self.mc2 = CobotX(port2, baud)
+        self.r = Mercury(port2, baud)
 
     def listener_callback(self, msg):
         # print(msg.position)
@@ -51,15 +51,15 @@ class Slider_Subscriber(Node):
         print('right_arm:', right_arm)
         print('middle_arm:', middle_arm)
         
-        self.mc1.send_angles(left_arm, 50)
+        self.l.send_angles(left_arm, 50)
         time.sleep(0.02)
-        self.mc2.send_angles(right_arm, 50)
+        self.r.send_angles(right_arm, 50)
         time.sleep(0.02)
-        self.mc2.send_angle(11, middle_arm[0], 50)
+        self.r.send_angle(11, middle_arm[0], 50)
         time.sleep(0.02)
-        self.mc2.send_angle(12, middle_arm[1], 50)
+        self.r.send_angle(12, middle_arm[1], 50)
         time.sleep(0.02)
-        self.mc2.send_angle(13, middle_arm[2], 50)
+        self.r.send_angle(13, middle_arm[2], 50)
         time.sleep(0.02)
 
 

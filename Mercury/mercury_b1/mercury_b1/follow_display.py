@@ -3,7 +3,7 @@ import time
 import os
 import math
 import fcntl
-from pymycobot.cobotx import CobotX
+from pymycobot.mercury import Mercury
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
@@ -52,18 +52,26 @@ def release(lock_file_fd):
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        self.declare_parameter('port', '/dev/ttyAMA1')
+        self.declare_parameter('port1', '/dev/ttyTHS1')
+        self.declare_parameter('port2', '/dev/ttyS0')
         self.declare_parameter('baud', 115200)
    
-        port = self.get_parameter("port").get_parameter_value().string_value
+        port1 = self.get_parameter("port1").get_parameter_value().string_value
+        port2 = self.get_parameter("port2").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
-        self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        self.mc = CobotX(port, str(baud))
-        if self.mc:
-            lock = acquire("/tmp/cobotx_lock")
-            self.mc.release_all_servos()
-            release(lock)
+        self.get_logger().info("left port:%s, right port:%s, baud:%d" % (port1, port2, baud))
+        self.l = Mercury(port1, str(baud))
+        self.r = Mercury(port2, str(baud))
+        # if self.mc:
+        #     lock = acquire("/tmp/cobotx_lock")
+        #     self.mc.release_all_servos()
+        #     release(lock)
+        self.l.release_all_servos()
+        time.sleep(0.05)
+        self.r.release_all_servos()
+        time.sleep(0.05)
+        print("Rlease all servos over.\n")
 
     def start(self):
         pub = self.create_publisher(
@@ -83,14 +91,24 @@ class Talker(Node):
         joint_state_send.header = Header()
 
         joint_state_send.name = [
-            "joint1_to_base",
-            "joint2_to_joint1",
-            "joint3_to_joint2",
-            "joint4_to_joint3",
-            "joint5_to_joint4",
-            "joint6_to_joint5",
-            "joint7_to_joint6",
-        ] 
+        "joint1_L",
+        "joint2_L",
+        "joint3_L",
+        "joint4_L",
+        "joint5_L",
+        "joint6_L",
+        "joint7_L",
+        "joint1_R",
+        "joint2_R",
+        "joint3_R",
+        "joint4_R",
+        "joint5_R",
+        "joint6_R",
+        "joint7_R",
+        "eye",
+        "head",
+        "body",
+    ] 
         joint_state_send.velocity = [0.0,]
         joint_state_send.effort = []
 
@@ -102,12 +120,25 @@ class Talker(Node):
             rclpy.spin_once(self)
             joint_state_send.header.stamp = self.get_clock().now().to_msg()
             try:
-                if self.mc:
-                    lock = acquire("/tmp/cobotx_lock")
-                    angles = self.mc.get_angles()
-                    release(lock)
+                # if self.mc:
+                #     lock = acquire("/tmp/cobotx_lock")
+                #     angles = self.mc.get_angles()
+                #     release(lock)
+                left_angles = self.l.get_angles()
+                right_angles = self.r.get_angles()
+                eye_angle = self.r.get_angle(11)
+                head_angle = self.r.get_angle(12)
+                body_angle = self.r.get_angle(13)
+                
+                print('left:', left_angles)
+                print('right:', right_angles)
+                print('eye:', eye_angle)
+                print('head:', head_angle)
+                print('body:', body_angle)
+                
+                all_angles = left_angles + right_angles + eye_angle + head_angle + body_angle
                 data_list = []
-                for _, value in enumerate(angles):
+                for _, value in enumerate(all_angles):
                     radians = math.radians(value)
                     data_list.append(radians)
 
@@ -116,10 +147,16 @@ class Talker(Node):
 
                 pub.publish(joint_state_send)
                 
-                if self.mc:
-                    lock = acquire("/tmp/cobotx_lock")
-                    coords = self.mc.get_coords()
-                    release(lock)
+                # if self.mc:
+                #     lock = acquire("/tmp/cobotx_lock")
+                #     coords = self.mc.get_coords()
+                #     release(lock)
+                left_coords = self.l.get_coords()
+                right_coords = self.r.get_coords()
+                eye_coords = self.r.get_angle(11)
+                head_coords = self.r.get_angle(12)
+                body_coords = self.r.get_angle(13)
+                
                 # marker
                 marker_.header.stamp = self.get_clock().now().to_msg()
                 marker_.type = marker_.SPHERE
@@ -131,15 +168,28 @@ class Talker(Node):
                 # marker position initial
                 # self.get_logger().info('{}'.format(coords))
                 
-                if not coords:
-                    coords = [0, 0, 0, 0, 0, 0, 0]
-                    # self.get_logger().info("error [101]: can not get coord values")
-                if self.mc:
-                    lock = acquire("/tmp/cobotx_lock")
-                    marker_.pose.position.x = coords[1] / 1000 * -1
-                    marker_.pose.position.y = coords[0] / 1000
-                    marker_.pose.position.z = coords[2] / 1000
-                    release(lock)
+                if not left_coords:
+                    left_coords = [0, 0, 0, 0, 0, 0, 0]
+                    self.get_logger().info("error [101]: can not get coord values")
+                # if self.mc:
+                    # lock = acquire("/tmp/cobotx_lock")
+                marker_.pose.position.x = left_coords[1] / 1000 * -1
+                marker_.pose.position.y = left_coords[0] / 1000
+                marker_.pose.position.z = left_coords[2] / 1000
+                    # release(lock)
+                time.sleep(0.05)
+                marker_.pose.position.x = right_coords[1] / 1000 * -1
+                marker_.pose.position.y = right_coords[0] / 1000
+                marker_.pose.position.z = right_coords[2] / 1000
+                time.sleep(0.05)
+                marker_.pose.position.x = eye_coords[0] / 1000 * -1
+                time.sleep(0.05)
+                
+                marker_.pose.position.x = head_coords[0] / 1000 * -1
+                time.sleep(0.05)
+                
+                marker_.pose.position.x = body_coords[0] / 1000 * -1
+                time.sleep(0.05)
 
                 marker_.color.a = 1.0
                 marker_.color.g = 1.0

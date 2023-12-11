@@ -12,11 +12,17 @@ from launch.substitutions import Command, LaunchConfiguration
 def generate_launch_description():
     res = []
     
-    port_launch_arg = DeclareLaunchArgument(
-        name="port",
-        default_value="/dev/ttyAMA1"
+    port1_launch_arg = DeclareLaunchArgument(
+        name="port1",
+        default_value="/dev/ttyTHS1"
     )
-    res.append(port_launch_arg)
+    res.append(port1_launch_arg)
+    
+    port2_launch_arg = DeclareLaunchArgument(
+        name="port2",
+        default_value="/dev/ttyS0"
+    )
+    res.append(port2_launch_arg)
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
