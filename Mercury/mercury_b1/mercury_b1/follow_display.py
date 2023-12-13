@@ -1,52 +1,12 @@
 import rclpy
 import time
-import os
+import traceback
 import math
-import fcntl
 from pymycobot.mercury import Mercury
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
-
-
-
-# Avoid serial port conflicts and need to be locked
-def acquire(lock_file):
-    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
-    fd = os.open(lock_file, open_mode)
-
-    pid = os.getpid()
-    lock_file_fd = None
-    
-    timeout = 50.0
-    start_time = current_time = time.time()
-    while current_time < start_time + timeout:
-        try:
-            # The LOCK_EX means that only one process can hold the lock
-            # The LOCK_NB means that the fcntl.flock() is not blocking
-            # and we are able to implement termination of while loop,
-            # when timeout is reached.
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (IOError, OSError):
-            pass
-        else:
-            lock_file_fd = fd
-            break
-
-        # print('pid waiting for lock:%d'% pid)
-        time.sleep(1.0)
-        current_time = time.time()
-    if lock_file_fd is None:
-        os.close(fd)
-    return lock_file_fd
-
-
-def release(lock_file_fd):
-    # Do not remove the lockfile:
-    fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
-    os.close(lock_file_fd)
-    return None
 
 
 class Talker(Node):
@@ -60,13 +20,10 @@ class Talker(Node):
         port2 = self.get_parameter("port2").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
-        self.get_logger().info("left port:%s, right port:%s, baud:%d" % (port1, port2, baud))
+        self.get_logger().info("left arm:%s, right arm:%s, baud:%d" % (port1, port2, baud))
         self.l = Mercury(port1, str(baud))
         self.r = Mercury(port2, str(baud))
-        # if self.mc:
-        #     lock = acquire("/tmp/cobotx_lock")
-        #     self.mc.release_all_servos()
-        #     release(lock)
+        
         self.l.release_all_servos()
         time.sleep(0.05)
         self.r.release_all_servos()
@@ -120,23 +77,19 @@ class Talker(Node):
             rclpy.spin_once(self)
             joint_state_send.header.stamp = self.get_clock().now().to_msg()
             try:
-                # if self.mc:
-                #     lock = acquire("/tmp/cobotx_lock")
-                #     angles = self.mc.get_angles()
-                #     release(lock)
                 left_angles = self.l.get_angles()
                 right_angles = self.r.get_angles()
                 eye_angle = self.r.get_angle(11)
                 head_angle = self.r.get_angle(12)
                 body_angle = self.r.get_angle(13)
                 
-                print('left:', left_angles)
-                print('right:', right_angles)
-                print('eye:', eye_angle)
-                print('head:', head_angle)
-                print('body:', body_angle)
+                print('left_angles: {}'.format(left_angles))
+                print('right_angles: {}'.format(right_angles))
+                print('camera_angle: {}'.format(eye_angle))
+                print('head_angle: {}'.format(head_angle))
+                print('body_angle: {}'.format(body_angle))
                 
-                all_angles = left_angles + right_angles + eye_angle + head_angle + body_angle
+                all_angles = left_angles + right_angles + [eye_angle] + [head_angle] + [body_angle]
                 data_list = []
                 for _, value in enumerate(all_angles):
                     radians = math.radians(value)
@@ -147,15 +100,11 @@ class Talker(Node):
 
                 pub.publish(joint_state_send)
                 
-                # if self.mc:
-                #     lock = acquire("/tmp/cobotx_lock")
-                #     coords = self.mc.get_coords()
-                #     release(lock)
                 left_coords = self.l.get_coords()
                 right_coords = self.r.get_coords()
-                eye_coords = self.r.get_angle(11)
-                head_coords = self.r.get_angle(12)
-                body_coords = self.r.get_angle(13)
+                eye_coords = [self.r.get_angle(11)]
+                head_coords = [self.r.get_angle(12)]
+                body_coords = [self.r.get_angle(13)]
                 
                 # marker
                 marker_.header.stamp = self.get_clock().now().to_msg()
@@ -165,39 +114,31 @@ class Talker(Node):
                 marker_.scale.y = 0.04
                 marker_.scale.z = 0.04
 
-                # marker position initial
-                # self.get_logger().info('{}'.format(coords))
-                
+                # marker position initial    
                 if not left_coords:
                     left_coords = [0, 0, 0, 0, 0, 0, 0]
                     self.get_logger().info("error [101]: can not get coord values")
-                # if self.mc:
-                    # lock = acquire("/tmp/cobotx_lock")
+
                 marker_.pose.position.x = left_coords[1] / 1000 * -1
                 marker_.pose.position.y = left_coords[0] / 1000
                 marker_.pose.position.z = left_coords[2] / 1000
-                    # release(lock)
-                time.sleep(0.05)
+
                 marker_.pose.position.x = right_coords[1] / 1000 * -1
                 marker_.pose.position.y = right_coords[0] / 1000
                 marker_.pose.position.z = right_coords[2] / 1000
-                time.sleep(0.05)
-                marker_.pose.position.x = eye_coords[0] / 1000 * -1
-                time.sleep(0.05)
-                
-                marker_.pose.position.x = head_coords[0] / 1000 * -1
-                time.sleep(0.05)
-                
-                marker_.pose.position.x = body_coords[0] / 1000 * -1
-                time.sleep(0.05)
 
+                marker_.pose.position.x = eye_coords[0] / 1000 * -1
+                marker_.pose.position.x = head_coords[0] / 1000 * -1
+                marker_.pose.position.x = body_coords[0] / 1000 * -1
+                
                 marker_.color.a = 1.0
                 marker_.color.g = 1.0
                 pub_marker.publish(marker_)
 
                 rate.sleep()
             except Exception as e:
-                print(e)
+                e = traceback.format_exc()
+                print(str(e))
         
 def main(args=None):
     rclpy.init(args=args)

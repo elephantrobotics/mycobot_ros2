@@ -23,18 +23,19 @@ class Slider_Subscriber(Node):
         baud = self.get_parameter('baud').get_parameter_value().integer_value
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = Mercury(port, baud)
-        self.mc.power_on()
-        time.sleep(0.2)
+        time.sleep(0.05)
+        self.mc.set_fresh_mode(1)
+        time.sleep(0.05)
 
     def listener_callback(self, msg):
-        # print(msg.position)
+
         data_list = []
         for _, value in enumerate(msg.position):
-            angles = round(math.degrees(value), 2)
-            data_list.append(angles)
+            radians_to_angles = round(math.degrees(value), 2)
+            data_list.append(radians_to_angles)
         
-
-        self.mc.send_angles(data_list, 80)
+        print('data_list: {}'.format(data_list))
+        self.mc.send_angles(data_list, 25)
 
 
 def main(args=None):

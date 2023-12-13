@@ -91,9 +91,12 @@ class Raw(object):
 class TeleopKeyboard:
     def __init__(self):
         self.mc = MyCobot('/dev/ttyS3', 1000000)
+        time.sleep(0.05)
+        self.mc.set_free_mode(1)
+        time.sleep(0.05)
 
         self.model = 0
-        self.speed = 40
+        self.speed = 30
         self.change_percent = 5
 
         self.change_angle = 180 * self.change_percent / 100

@@ -23,44 +23,39 @@ class Slider_Subscriber(Node):
         port1 = self.get_parameter('port1').get_parameter_value().string_value
         port2 = self.get_parameter('port2').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
-        self.get_logger().info("port1:%s, baud:%d" % (port1, baud))
-        self.get_logger().info("port2:%s, baud:%d" % (port2, baud))
+        self.get_logger().info("left arm:%s, baud:%d" % (port1, baud))
+        self.get_logger().info("right arm:%s, baud:%d" % (port2, baud))
         # left arm
         self.l = Mercury(port1, baud)
-
-        time.sleep(0.05)
         # right arm
         self.r = Mercury(port2, baud)
-
+        time.sleep(0.05)
+        self.l.set_fresh_mode(1)
+        self.r.set_fresh_mode(1)
+        time.sleep(0.05)
+        
     def listener_callback(self, msg):
-        # print(msg.position)
-        rounded_data_tuple = tuple(round(value, 2) for value in msg.position)
-        print(rounded_data_tuple)
+
         data_list = []
         for index, value in enumerate(msg.position):
             radians_to_angles = round(math.degrees(value), 2)
             data_list.append(radians_to_angles)
             
-        print('data_list:', data_list)
+        print('data_list: {}'.format(data_list))
         
         left_arm = data_list[:7]
         right_arm = data_list[7:-3]
         middle_arm = data_list[-3:]
         
-        print('left_arm:', left_arm)
-        print('right_arm:', right_arm)
-        print('middle_arm:', middle_arm)
+        print('left_angles: {}'.format(left_arm))
+        print('right_angles: {}'.format(right_arm))
+        print('middle_arm: {}'.format(middle_arm))
         
-        self.l.send_angles(left_arm, 50)
-        time.sleep(0.02)
-        self.r.send_angles(right_arm, 50)
-        time.sleep(0.02)
-        self.r.send_angle(11, middle_arm[0], 50)
-        time.sleep(0.02)
-        self.r.send_angle(12, middle_arm[1], 50)
-        time.sleep(0.02)
-        self.r.send_angle(13, middle_arm[2], 50)
-        time.sleep(0.02)
+        self.l.send_angles(left_arm, 25)
+        self.r.send_angles(right_arm, 25)
+        self.r.send_angle(11, middle_arm[0], 25)
+        self.r.send_angle(12, middle_arm[1], 25)
+        self.r.send_angle(13, middle_arm[2], 25)
 
 
 def main(args=None):

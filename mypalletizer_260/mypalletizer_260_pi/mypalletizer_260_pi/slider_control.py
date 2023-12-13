@@ -1,9 +1,10 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-# from pymycobot import MyCobotSocket
 from pymycobot.mypalletizer import MyPalletizer
-import math,sys
+import math
+import time
+
 
 class Slider_Subscriber(Node):
     def __init__(self):
@@ -16,19 +17,19 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyPalletizer("/dev/ttyAMA0", 1000000)    
+        self.mc = MyPalletizer("/dev/ttyAMA0", 1000000)
+        time.sleep(0.05)
+        self.mc.set_free_mode(1)
+        time.sleep(0.05)    
 
     def listener_callback(self, msg):
         
-        global old_list   
-        old_list = []
-        # print(msg.position)
-        
         data_list = []
         for _, value in enumerate(msg.position):
-            value = value * 180 / math.pi
-            data_list.append(value)
-        # print ("angles:", data_list)
+            radians_to_angles = round(math.degrees(value), 2)
+            data_list.append(radians_to_angles)
+            
+        print('data_list: {}'.format(data_list))
         
         self.mc.send_angles(data_list, 25)
 

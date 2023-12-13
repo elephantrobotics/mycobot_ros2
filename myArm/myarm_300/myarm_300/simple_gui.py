@@ -10,6 +10,9 @@ class Window:
     def __init__(self, handle):
         
         self.mc = MyArm("/dev/ttyAMA0", 115200)
+        time.sleep(0.05)
+        self.mc.set_free_mode(1)
+        time.sleep(0.05)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
