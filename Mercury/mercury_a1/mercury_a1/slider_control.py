@@ -24,8 +24,8 @@ class Slider_Subscriber(Node):
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = Mercury(port, baud)
         time.sleep(0.05)
-        self.mc.set_fresh_mode(1)
-        time.sleep(0.05)
+        # self.mc.set_fresh_mode(1)
+        # time.sleep(0.05)
 
     def listener_callback(self, msg):
 

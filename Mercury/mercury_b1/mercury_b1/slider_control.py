@@ -30,9 +30,9 @@ class Slider_Subscriber(Node):
         # right arm
         self.r = Mercury(port2, baud)
         time.sleep(0.05)
-        self.l.set_fresh_mode(1)
-        self.r.set_fresh_mode(1)
-        time.sleep(0.05)
+        # self.l.set_fresh_mode(1)
+        # self.r.set_fresh_mode(1)
+        # time.sleep(0.05)
         
     def listener_callback(self, msg):
 
