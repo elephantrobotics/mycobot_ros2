@@ -3,11 +3,23 @@
 import tkinter as tk
 from pymycobot.mycobot import MyCobot
 import time
+import os
 
 
 class Window: 
     def __init__(self, handle):
-        self.mc = MyCobot("/dev/ttyUSB0", 115200)
+        self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
+        self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
+        if self.robot_m5:
+            port = self.robot_m5
+        else:
+            port = self.robot_wio
+            
+        print("port:%s, baud:%d" % (port, 115200))
+        self.mc = MyCobot(port, 115200)
+        time.sleep(0.05)
+        self.mc.set_free_mode(1)
+        time.sleep(0.05)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
@@ -39,7 +51,7 @@ class Window:
         # calculate x and y coordinates for the Tk root window
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("800x600+{}+{}".format(int(x), int(y)))
+        self.win.geometry("440x440+{}+{}".format(int(x), int(y)))
         # 布局
         self.set_layout()
         # 输入部分
@@ -59,10 +71,18 @@ class Window:
 
         # 夹爪开关按钮
         tk.Button(self.frmLB, text="夹爪(开)", command=self.gripper_open, width=5).grid(
-            row=1, column=0, sticky="w", padx=3, pady=50
+            row=1, column=0, sticky="w", padx=3, pady=20
         )
         tk.Button(self.frmLB, text="夹爪(关)", command=self.gripper_close, width=5).grid(
             row=1, column=1, sticky="w", padx=3, pady=2
+        )
+        
+        # 吸泵开关按钮
+        tk.Button(self.frmLB, text=" 吸泵(开)", command=self.pump_open, width=5).grid(
+            row=2, column=0, sticky="w", padx=3, pady=20
+        )
+        tk.Button(self.frmLB, text="吸泵(关)", command=self.pump_close, width=5).grid(
+            row=2, column=1, sticky="w", padx=3, pady=2
         )
 
     def set_layout(self):
@@ -342,15 +362,31 @@ class Window:
 
     def gripper_open(self):
         try:
-            self.switch_gripper(True)
+            self.mc.set_gripper_state(0, 80)
         except Exception as e:
             # 可能由于该方法没有返回值，服务抛出无法处理的错误
             pass
 
     def gripper_close(self):
         try:
-            self.switch_gripper(False)
+            self.mc.set_gripper_state(1, 80)
         except Exception as e:
+            pass
+        
+    def pump_open(self):
+        try:
+            self.mc.set_basic_output(2, 0)
+            self.mc.set_basic_output(5, 0)
+        except Exception:
+            # Probably because the method has no return value, the service throws an unhandled error
+            # 可能由于该方法没有返回值，服务抛出无法处理的错误
+            pass
+
+    def pump_close(self):
+        try:
+            self.mc.set_basic_output(2, 1)
+            self.mc.set_basic_output(5, 1)
+        except Exception:
             pass
 
     def get_coord_input(self):

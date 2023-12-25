@@ -9,6 +9,9 @@ import time
 class Window: 
     def __init__(self, handle):
         self.mc = MyCobot("/dev/ttyAMA0", 1000000)
+        time.sleep(0.05)
+        self.mc.set_free_mode(1)
+        time.sleep(0.05)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
@@ -40,7 +43,7 @@ class Window:
         # calculate x and y coordinates for the Tk root window
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("800x600+{}+{}".format(int(x), int(y)))
+        self.win.geometry("440x440+{}+{}".format(int(x), int(y)))
         # 布局
         self.set_layout()
         # 输入部分

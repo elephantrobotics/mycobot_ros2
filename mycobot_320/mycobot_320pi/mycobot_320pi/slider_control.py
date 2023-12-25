@@ -1,6 +1,7 @@
+import time
+import math
 import rclpy
 from pymycobot.mycobot import MyCobot
-# from pymycobot.mycobotsocket import MyCobotSocket
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
@@ -17,13 +18,18 @@ class Slider_Subscriber(Node):
         self.subscription
 
         self.mc = MyCobot("/dev/ttyAMA0", 115200)
+        time.sleep(0.05)
+        self.mc.set_free_mode(1)
+        time.sleep(0.05)
+        
     def listener_callback(self, msg):
-        print(msg.position)
         data_list = []
         for _, value in enumerate(msg.position):
-            data_list.append(value)
+            radians_to_angles = round(math.degrees(value), 2)
+            data_list.append(radians_to_angles)
 
-        self.mc.send_radians(data_list, 80)
+        print('joint angles: {}'.format(data_list))
+        self.mc.send_angles(data_list, 25)
 
 
 def main(args=None):

@@ -50,6 +50,9 @@ class Raw(object):
 
 def teleop_keyboard():
     mc = MyPalletizer("/dev/ttyUSB0", 115200)
+    time.sleep(0.05)
+    mc.set_free_mode(1)
+    time.sleep(0.05)
 
     model = 0
     speed = 30
