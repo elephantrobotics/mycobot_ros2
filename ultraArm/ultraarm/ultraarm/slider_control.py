@@ -24,10 +24,11 @@ class Slider_Subscriber(Node):
         print(msg.position)
         data_list = []
         for _, value in enumerate(msg.position):
-            data_list.append(round(value, 3))
+            radians_to_angles = round(math.degrees(value), 2)
+            data_list.append(radians_to_angles)
             
-        print('data_list:',data_list)
-        self.ua.set_radians(data_list, 50)
+        print('data_list: {}'.format(data_list))
+        self.ua.set_angles(data_list, 25)
 
 
 def main(args=None):

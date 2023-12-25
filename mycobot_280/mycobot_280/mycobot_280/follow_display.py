@@ -4,6 +4,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
+import os
 
 
 class Talker(Node):
@@ -14,6 +15,13 @@ class Talker(Node):
    
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
+        
+        self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
+        self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
+        if self.robot_m5:
+            port = self.robot_m5
+        else:
+            port = self.robot_wio
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = MyCobot(port, str(baud))
