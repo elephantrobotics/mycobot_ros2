@@ -33,6 +33,7 @@ setup(
         ('share/' + package_name + '/urdf'+'/myarm_300', glob("urdf/myarm_300/*")),
         ('share/' + package_name + '/urdf'+'/mercury_a1', glob("urdf/mercury_a1/*")),
         ('share/' + package_name + '/urdf'+'/mercury_b1', glob("urdf/mercury_b1/*")),
+        ('share/' + package_name + '/urdf'+'/mercury_x1', glob("urdf/mercury_x1/*")),
 
 
     ],
