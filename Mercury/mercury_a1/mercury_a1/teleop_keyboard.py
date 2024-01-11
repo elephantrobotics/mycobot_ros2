@@ -109,6 +109,8 @@ def teleop_keyboard():
     if mc:
         lock = acquire("/tmp/mercury_lock")
         mc.power_on()
+        time.sleep(0.05)
+        mc.go_zero()
         release(lock)
         time.sleep(0.2)
 
@@ -118,19 +120,30 @@ def teleop_keyboard():
         release(lock)
         time.sleep(2)
 
-    while True:
-        if mc:
-            lock = acquire("/tmp/mercury_lock")
-            res = mc.get_coords()
-            release(lock)
-        if res:
-            break
-        time.sleep(0.1)
+    # while True:
+    #     if mc:
+    #         lock = acquire("/tmp/mercury_lock")
+    #         res = mc.get_coords()
+    #         release(lock)
+    #     if res:
+    #         break
+    #     time.sleep(0.1)
 
-    record_coords = [res, speed, model]
-    print(record_coords)
+    # record_coords = [res, speed, model]
+    # print(record_coords)
 
     try:
+        while True:
+            if mc:
+                lock = acquire("/tmp/mercury_lock")
+                res = mc.get_coords()
+                release(lock)
+            if res:
+                break
+            time.sleep(0.1)
+
+        record_coords = [res, speed, model]
+        print(record_coords)
         print(msg)
         print(vels(speed, change_percent))
         while 1:

@@ -113,6 +113,8 @@ class Window:
         if self.mc:
             lock = acquire("/tmp/mercury_lock")
             self.mc.power_on()
+            time.sleep(0.05)
+            self.mc.go_zero()
             release(lock)
             time.sleep(0.2)
         if self.mc:
