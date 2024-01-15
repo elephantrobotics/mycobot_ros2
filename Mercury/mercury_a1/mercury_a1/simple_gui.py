@@ -525,7 +525,7 @@ class Window:
 
 def main():
     window = tk.Tk()
-    window.title("myarm ros GUI")
+    window.title("Mercury A1 ros GUI")
     Window(window).run()
 
 
