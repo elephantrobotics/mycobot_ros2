@@ -17,8 +17,8 @@ class Slider_Subscriber(Node):
         )
         self.subscription
      
-        self.declare_parameter('port1', '/dev/ttyTHS1')
-        self.declare_parameter('port2', '/dev/ttyS0')
+        self.declare_parameter('port1', '/dev/ttyTHS0')
+        self.declare_parameter('port2', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
         port1 = self.get_parameter('port1').get_parameter_value().string_value
         port2 = self.get_parameter('port2').get_parameter_value().string_value

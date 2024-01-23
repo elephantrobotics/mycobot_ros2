@@ -12,8 +12,8 @@ from visualization_msgs.msg import Marker
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        self.declare_parameter('port1', '/dev/ttyTHS1')
-        self.declare_parameter('port2', '/dev/ttyS0')
+        self.declare_parameter('port1', '/dev/ttyTHS0')
+        self.declare_parameter('port2', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
    
         port1 = self.get_parameter("port1").get_parameter_value().string_value
