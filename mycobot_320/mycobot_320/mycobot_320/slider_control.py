@@ -17,7 +17,7 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobot("/dev/ttyUSB0", 115200)
+        self.mc = MyCobot("/dev/ttyACM0", 115200)
         time.sleep(0.05)
         self.mc.set_free_mode(1)
         time.sleep(0.05)

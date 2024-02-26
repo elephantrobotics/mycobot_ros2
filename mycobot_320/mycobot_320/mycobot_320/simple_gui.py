@@ -7,7 +7,7 @@ import time
 
 class Window: 
     def __init__(self, handle):
-        self.mc = MyCobot("/dev/ttyUSB0", 115200)
+        self.mc = MyCobot("/dev/ttyACM0", 115200)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小

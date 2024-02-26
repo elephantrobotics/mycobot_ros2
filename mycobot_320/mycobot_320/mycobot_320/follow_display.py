@@ -9,7 +9,7 @@ from visualization_msgs.msg import Marker
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('port', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
    
         port = self.get_parameter("port").get_parameter_value().string_value

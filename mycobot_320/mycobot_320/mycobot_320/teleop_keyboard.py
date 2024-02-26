@@ -48,7 +48,7 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobot("/dev/ttyUSB0", 115200)
+    mc = MyCobot("/dev/ttyACM0", 115200)
 
     model = 0
     speed = 30
@@ -58,7 +58,7 @@ def teleop_keyboard():
     change_len = 250 * change_percent / 100
 
     init_pose = [[0, 0, 0, 0, 0, 0], speed]
-    home_pose = [[0, 8, -127, 40, 0, 0], speed]
+    home_pose = [[0, 8, -127, 40, 90, 0], speed]
 
     mc.send_angles(*init_pose)
 

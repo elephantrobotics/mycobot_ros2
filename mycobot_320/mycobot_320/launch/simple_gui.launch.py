@@ -14,7 +14,7 @@ def generate_launch_description():
 
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyUSB0"
+        default_value="/dev/ttyACM0"
     )
     res.append(port_launch_arg)
 
