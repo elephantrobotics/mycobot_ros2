@@ -4,6 +4,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
+import math
 
 
 class Talker(Node):
@@ -54,45 +55,47 @@ class Talker(Node):
         while rclpy.ok():
             rclpy.spin_once(self)
             joint_state_send.header.stamp = self.get_clock().now().to_msg()
+            try:
+                angles = self.mc.get_radians()
+                data_list = []
+                for _, value in enumerate(angles):
+                    data_list.append(value)
 
-            angles = self.mc.get_radians()
-            data_list = []
-            for _, value in enumerate(angles):
-                data_list.append(value)
+                
 
-            
+                self.get_logger().info('angles: {}'.format([round(math.degrees(angle), 2) for angle in data_list]))
+                joint_state_send.position = data_list
 
-            # self.get_logger().info('radians: {}'.format(data_list))
-            joint_state_send.position = data_list
+                pub.publish(joint_state_send)
 
-            pub.publish(joint_state_send)
+                coords = self.mc.get_coords()
 
-            coords = self.mc.get_coords()
+                # marker
+                marker_.header.stamp = self.get_clock().now().to_msg()
+                marker_.type = marker_.SPHERE
+                marker_.action = marker_.ADD
+                marker_.scale.x = 0.04
+                marker_.scale.y = 0.04
+                marker_.scale.z = 0.04
 
-            # marker
-            marker_.header.stamp = self.get_clock().now().to_msg()
-            marker_.type = marker_.SPHERE
-            marker_.action = marker_.ADD
-            marker_.scale.x = 0.04
-            marker_.scale.y = 0.04
-            marker_.scale.z = 0.04
+                # marker position initial
+                # self.get_logger().info('{}'.format(coords))
+                
+                if not coords:
+                    coords = [0, 0, 0, 0, 0, 0]
+                    # self.get_logger().info("error [101]: can not get coord values")
 
-            # marker position initial
-            # self.get_logger().info('{}'.format(coords))
-            
-            if not coords:
-                coords = [0, 0, 0, 0, 0, 0]
-                # self.get_logger().info("error [101]: can not get coord values")
+                marker_.pose.position.x = coords[1] / 1000 * -1
+                marker_.pose.position.y = coords[0] / 1000
+                marker_.pose.position.z = coords[2] / 1000
 
-            marker_.pose.position.x = coords[1] / 1000 * -1
-            marker_.pose.position.y = coords[0] / 1000
-            marker_.pose.position.z = coords[2] / 1000
+                marker_.color.a = 1.0
+                marker_.color.g = 1.0
+                pub_marker.publish(marker_)
 
-            marker_.color.a = 1.0
-            marker_.color.g = 1.0
-            pub_marker.publish(marker_)
-
-            rate.sleep()
+                rate.sleep()
+            except Exception as e:
+                print(e)
 
         
 def main(args=None):

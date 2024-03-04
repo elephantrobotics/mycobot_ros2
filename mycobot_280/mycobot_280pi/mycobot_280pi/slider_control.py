@@ -31,7 +31,7 @@ class Slider_Subscriber(Node):
             
         print('data_list: {}'.format(data_list))
 
-        self.mc.send_radians(data_list, 25)
+        self.mc.send_angles(data_list, 25)
 
 
 def main(args=None):
