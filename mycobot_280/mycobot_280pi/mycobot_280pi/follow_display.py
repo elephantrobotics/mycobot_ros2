@@ -4,6 +4,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
+import math
 
 
 class Talker(Node):
@@ -64,7 +65,7 @@ class Talker(Node):
 
             
 
-                # self.get_logger().info('radians: {}'.format(data_list))
+                self.get_logger().info('angles: {}'.format([round(math.degrees(angle), 2) for angle in data_list]))
                 joint_state_send.position = data_list
 
                 pub.publish(joint_state_send)
