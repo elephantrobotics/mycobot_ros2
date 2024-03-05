@@ -17,7 +17,7 @@ class Slider_Subscriber(Node):
         )
         self.subscription
      
-        self.declare_parameter('ip', '192.168.10.159')
+        self.declare_parameter('ip', '192.168.1.159')
         self.declare_parameter('port', 5001)
         ip = self.get_parameter('ip').get_parameter_value().string_value
         port = self.get_parameter('port').get_parameter_value().integer_value
@@ -38,7 +38,7 @@ class Slider_Subscriber(Node):
             data_list.append(angles)
         
         print('current angles:', data_list)
-        self.mc.write_angles(data_list, 1000)
+        self.mc.write_angles(data_list, 800)
 
 
 def main(args=None):

@@ -39,7 +39,7 @@ def generate_launch_description():
     
     serial_ip_arg = DeclareLaunchArgument(
         'ip',
-        default_value='192.168.10.159',
+        default_value='192.168.1.159',
         description='ip to use'
     )
     res.append(serial_ip_arg)
