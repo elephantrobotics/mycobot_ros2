@@ -50,8 +50,8 @@ class Raw(object):
 def teleop_keyboard():
     mc = MyCobot("/dev/ttyACM0", 115200)
 
-    model = 0
-    speed = 30
+    model = 1
+    speed = 40
     change_percent = 3
 
     change_angle = 180 * change_percent / 100
@@ -60,7 +60,8 @@ def teleop_keyboard():
     init_pose = [[0, 0, 0, 0, 0, 0], speed]
     home_pose = [[0, 8, -127, 40, 90, 0], speed]
 
-    mc.send_angles(*init_pose)
+    mc.send_angles(*home_pose)
+    time.sleep(3)
 
     while True:
         res = mc.get_coords()
@@ -79,7 +80,7 @@ def teleop_keyboard():
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
                 if key == "q":
-                    mc.release_all_servos()
+                    # mc.release_all_servos()
                     break
                 elif key in ["w", "W"]:
                     record_coords[0][0] += change_len
@@ -118,14 +119,18 @@ def teleop_keyboard():
                     record_coords[0][5] -= change_angle
                     mc.send_coords(*record_coords)
                 elif key in ["g", "G"]:
-                    mc.switch_gripper(True)
+                    mc.set_gripper_state(0, 90)
                 elif key in ["h", "H"]:
-                    mc.switch_gripper(False)
+                    mc.set_gripper_state(1, 90)
                 elif key == "1":
                     mc.send_angles(*init_pose)
+                    time.sleep(3)
+                    res = mc.get_coords()
                     record_coords = [res, speed, model]
                 elif key in "2":
                     mc.send_angles(*home_pose)
+                    time.sleep(3)
+                    res = mc.get_coords()
                     record_coords = [res, speed, model]
                 elif key in "3":
                     rep = mc.get_angles()
