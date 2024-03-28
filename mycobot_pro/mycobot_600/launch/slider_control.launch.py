@@ -17,7 +17,7 @@ def generate_launch_description():
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/600_urdf/mycobot_600_urdf.urdf"
+            "urdf/mycobot_pro_600/mycobot_pro_600.urdf"
         )
     )
     res.append(model_launch_arg)

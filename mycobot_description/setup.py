@@ -14,24 +14,24 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/urdf'+'/260_pi', glob("urdf/260_pi/*")),
-        ('share/' + package_name + '/urdf'+'/280jn', glob("urdf/280jn/*")),
-        ('share/' + package_name + '/urdf'+'/320_urdf', glob("urdf/320_urdf/*")),
-        ('share/' + package_name + '/urdf'+'/600_urdf', glob("urdf/600_urdf/*")),
-        ('share/' + package_name + '/urdf'+'/mycobot', glob("urdf/mycobot/*")),
-        ('share/' + package_name + '/urdf'+'/mycobot_pi', glob("urdf/mycobot_pi/*")),
-        ('share/' + package_name + '/urdf'+'/mecharm', glob("urdf/mecharm/*")),
+        ('share/' + package_name + '/urdf'+'/mypalletizer_260_pi', glob("urdf/mypalletizer_260_pi/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_280_jn', glob("urdf/mycobot_280_jn/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_320_m5_2022', glob("urdf/mycobot_320_m5_2022/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_600', glob("urdf/mycobot_pro_600/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_280_m5', glob("urdf/mycobot_280_m5/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_280_pi', glob("urdf/mycobot_280_pi/*")),
+        ('share/' + package_name + '/urdf'+'/mecharm_270_m5', glob("urdf/mecharm_270_m5/*")),
 
-        ('share/' + package_name + '/urdf'+'/mecharm_pi', glob("urdf/mecharm_pi/*")),
+        ('share/' + package_name + '/urdf'+'/mecharm_270_pi', glob("urdf/mecharm_270_pi/*")),
 
-        ('share/' + package_name + '/urdf'+'/320_pi',glob("urdf/320_pi/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_320_pi_2022',glob("urdf/mycobot_320_pi_2022/*")),
 
         ('share/' + package_name + '/urdf'+'/mybuddy', glob("urdf/mybuddy/*")),
         
-        ('share/' + package_name + '/urdf'+'/ultraArm_urdf', glob("urdf/ultraArm_urdf/*")),
-        ('share/' + package_name + '/urdf'+'/mycobot_x3pi', glob("urdf/mycobot_x3pi/*")),
-        ('share/' + package_name + '/urdf'+'/myarm_300', glob("urdf/myarm_300/*")),
-        ('share/' + package_name + '/urdf'+'/mycobot_630', glob("urdf/mycobot_630/*")),
+        ('share/' + package_name + '/urdf'+'/ultraArm_p340', glob("urdf/ultraArm_p340/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_280_x3pi', glob("urdf/mycobot_280_x3pi/*")),
+        ('share/' + package_name + '/urdf'+'/myarm_300_pi', glob("urdf/myarm_300_pi/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_630', glob("urdf/mycobot_pro_630/*")),
 
 
 
