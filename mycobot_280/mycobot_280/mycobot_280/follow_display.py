@@ -71,7 +71,7 @@ class Talker(Node):
 
                 
 
-                self.get_logger().info('angles: {}'.format([round(math.degrees(angle), 2) for angle in data_list]))
+                #self.get_logger().info('angles: {}'.format([round(math.degrees(angle), 2) for angle in data_list]))
                 joint_state_send.position = data_list
 
                 pub.publish(joint_state_send)

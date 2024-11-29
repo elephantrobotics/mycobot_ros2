@@ -19,11 +19,11 @@ class Slider_Subscriber(Node):
 
         self.mc = MyCobot("/dev/ttyUSB0", 115200)
         time.sleep(0.05)
-        self.mc.set_free_mode(1)
+        self.mc.set_fresh_mode(1)
         time.sleep(0.05)
 
     def listener_callback(self, msg):
-        print(msg.position)
+        
         data_list = []
         for _, value in enumerate(msg.position):
             radians_to_angles = round(math.degrees(value), 2)

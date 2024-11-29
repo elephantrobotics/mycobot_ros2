@@ -51,14 +51,14 @@ def teleop_keyboard():
     mc = MyCobot("/dev/ttyUSB0", 115200)
 
     model = 0
-    speed = 10
+    speed = 20
     change_percent = 2
 
     change_angle = 180 * change_percent / 100
     change_len = 250 * change_percent / 100
 
     init_pose = [[0, 0, 0, 0, 0, 0], speed]
-    home_pose = [[0, 8, -127, 40, 0, 0], speed]
+    home_pose = [[0, 0, 0, 0, 90, 0], speed]
 
     mc.send_angles(*init_pose)
 
@@ -79,7 +79,7 @@ def teleop_keyboard():
                 print("\r current coords: %s" % record_coords)
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
-                print('key:',key)
+                # print('key:',key)
                 if key == "q":
                     mc.release_all_servos()
                     break

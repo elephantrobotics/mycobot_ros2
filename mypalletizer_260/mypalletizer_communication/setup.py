@@ -1,8 +1,30 @@
-from setuptools import setup
 import os
+from setuptools import setup, __version__ as setuptools_version
+from packaging.version import Version
 from glob import glob
 
 package_name = 'mypalletizer_communication'
+
+# 检查 setuptools 版本
+use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
+
+
+# 动态生成 setup.cfg 内容
+setup_cfg_content = """
+[develop]
+{script_option}=$base/lib/{package_name}
+
+[install]
+{install_scripts_option}=$base/lib/{package_name}
+""".format(
+    package_name=package_name,
+    script_option='script-dir' if use_dash_separated_options else 'script_dir',
+    install_scripts_option='install-scripts' if use_dash_separated_options else 'install_scripts'
+)
+
+# 将内容写入 setup.cfg
+with open("setup.cfg", "w") as f:
+    f.write(setup_cfg_content)
 
 setup(
     name=package_name,

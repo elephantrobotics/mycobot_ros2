@@ -27,7 +27,7 @@ class Slider_Subscriber(Node):
         self.get_logger().info("port:%s, baud:%d" % (port, 115200))
         self.mc = MyCobot(port, 115200)
         time.sleep(0.05)
-        self.mc.set_free_mode(1)
+        self.mc.set_fresh_mode(1)
         time.sleep(0.05)
         # self.declare_parameter('port', '/dev/ttyUSB0')
         # self.declare_parameter('baud', 115200)

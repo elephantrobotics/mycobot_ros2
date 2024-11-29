@@ -25,7 +25,8 @@ class Slider_Subscriber(Node):
         self.mc = ElephantRobot(ip, port)
         # START CLIENT,启动客户端
         res = self.mc.start_client()
-        if res != "":
+        if not res:
+            print('res:', res)
             sys.exit(1)
 
         self.mc.set_speed(90)

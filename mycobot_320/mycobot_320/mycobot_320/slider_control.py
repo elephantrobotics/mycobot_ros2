@@ -19,7 +19,7 @@ class Slider_Subscriber(Node):
 
         self.mc = MyCobot("/dev/ttyACM0", 115200)
         time.sleep(0.05)
-        self.mc.set_free_mode(1)
+        self.mc.set_fresh_mode(1)
         time.sleep(0.05)
 
     def listener_callback(self, msg):

@@ -395,14 +395,14 @@ class Window:
         t = time.time()
         while time.time() - t < 2:
             self.res = self.mc.get_coords()
-            if self.res != []:
+            if self.res != [] or self.res is not None:
                 break
             time.sleep(0.1)
 
         t = time.time()
         while time.time() - t < 2:
             self.angles = self.mc.get_angles()
-            if self.angles != []:
+            if self.angles != [] or self.angles is not None:
                 break
             time.sleep(0.1)
         
