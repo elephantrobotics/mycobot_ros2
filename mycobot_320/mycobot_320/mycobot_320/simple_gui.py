@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import tkinter as tk
-from pymycobot.mycobot import MyCobot
 import time
+import pymycobot
+from packaging import version
+
+# min low version require
+MIN_REQUIRE_VERSION = '3.6.0'
+
+current_verison = pymycobot.__version__
+print('current pymycobot library version: {}'.format(current_verison))
+if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
+    raise RuntimeError('{}The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+else:
+    print('pymycobot library version meets the requirements!')
+    from pymycobot.mycobot320 import MyCobot320
 
 
 class Window: 
     def __init__(self, handle):
-        self.mc = MyCobot("/dev/ttyACM0", 115200)
+        self.mc = MyCobot320("/dev/ttyACM0", 115200)
         
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小

@@ -1,11 +1,22 @@
 import math
 
 import rclpy
-from pymycobot.mycobot import MyCobot
-# from pymycobot.mycobotsocket import MyCobotSocket
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
+import pymycobot
+from packaging import version
+
+# min low version require
+MIN_REQUIRE_VERSION = '3.6.0'
+
+current_verison = pymycobot.__version__
+print('current pymycobot library version: {}'.format(current_verison))
+if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
+    raise RuntimeError('{}The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+else:
+    print('pymycobot library version meets the requirements!')
+    from pymycobot.mycobot320 import MyCobot320
 
 
 class Talker(Node):
@@ -19,7 +30,7 @@ class Talker(Node):
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        self.mc = MyCobot(port, baud)
+        self.mc = MyCobot320(port, baud)
     
 
     def start(self):

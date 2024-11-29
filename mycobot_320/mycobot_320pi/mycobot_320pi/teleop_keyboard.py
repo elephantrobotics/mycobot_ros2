@@ -1,10 +1,21 @@
 from __future__ import print_function
-from pymycobot.mycobot import MyCobot
-# from pymycobot.mycobotsocket import MyCobotSocket
 import sys
 import termios
 import tty
 import time
+import pymycobot
+from packaging import version
+
+# min low version require
+MIN_REQUIRE_VERSION = '3.6.0'
+
+current_verison = pymycobot.__version__
+print('current pymycobot library version: {}'.format(current_verison))
+if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
+    raise RuntimeError('{}The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+else:
+    print('pymycobot library version meets the requirements!')
+    from pymycobot.mycobot320 import MyCobot320
 
 msg = """\
 Mycobot Teleop Keyboard Controller
@@ -49,7 +60,7 @@ class Raw(object):
 
 
 def teleop_keyboard():
-    mc = MyCobot("/dev/ttyAMA0", 115200)
+    mc = MyCobot320("/dev/ttyAMA0", 115200)
 
     model = 0
     speed = 30
