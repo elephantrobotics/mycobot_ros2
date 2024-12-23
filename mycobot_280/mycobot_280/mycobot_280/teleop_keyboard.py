@@ -63,7 +63,7 @@ def teleop_keyboard():
     print("port:%s, baud:%d" % (port, 115200))
     mc = MyCobot(port, 115200)
     time.sleep(0.05)
-    mc.set_free_mode(1)
+    mc.set_fresh_mode(1)
     time.sleep(0.05)
 
     model = 0

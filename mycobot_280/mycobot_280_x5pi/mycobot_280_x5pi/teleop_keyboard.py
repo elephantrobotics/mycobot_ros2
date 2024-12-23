@@ -5,13 +5,19 @@ import termios
 import tty
 import time
 
-from pymycobot.mycobot import MyCobot
+from pymycobot.mycobot280 import MyCobot280
 
+
+LOCK_FILE = "/tmp/mycobot_lock"
 
 # Avoid serial port conflicts and need to be locked
 def acquire(lock_file):
     open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
-    fd = os.open(lock_file, open_mode)
+    try:
+        fd = os.open(lock_file, open_mode)
+    except OSError as e:
+        print(f"Failed to open lock file {lock_file}: {e}")
+        return None
 
     pid = os.getpid()
     lock_file_fd = None
@@ -26,25 +32,29 @@ def acquire(lock_file):
             # when timeout is reached.
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except (IOError, OSError):
-            pass
+            time.sleep(1)
         else:
             lock_file_fd = fd
+            # print(f"Lock acquired by PID: {pid}")
             break
 
         # print('pid waiting for lock:%d'% pid)
 
-        time.sleep(1.0)
         current_time = time.time()
     if lock_file_fd is None:
+        print(f"Failed to acquire lock after {timeout} seconds")
         os.close(fd)
     return lock_file_fd
 
 
 def release(lock_file_fd):
     # Do not remove the lockfile:
-    fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
-    os.close(lock_file_fd)
-    return None
+    try:
+        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
+        os.close(lock_file_fd)
+        # print("Lock released successfully")
+    except OSError as e:
+        print(f"Failed to release lock: {e}")
 
 msg = """\
 Mycobot Teleop Keyboard Controller
@@ -90,13 +100,17 @@ class Raw(object):
 
 class TeleopKeyboard:
     def __init__(self):
-        self.mc = MyCobot('/dev/ttyS3', 1000000)
+        self.mc = MyCobot280('/dev/ttyS1', 1000000)
         time.sleep(0.05)
-        self.mc.set_fresh_mode(1)
+        if self.mc:
+            lock = acquire("/tmp/mycobot_lock")
+            if self.mc.get_fresh_mode() == 0:
+                self.mc.set_fresh_mode(1)
+            release(lock)
         time.sleep(0.05)
 
-        self.model = 0
-        self.speed = 30
+        self.model = 1
+        self.speed = 50
         self.change_percent = 5
 
         self.change_angle = 180 * self.change_percent / 100
