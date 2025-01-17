@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 import time
-# from pymycobot import MyCobotSocket
-from pymycobot.mypalletizer import MyPalletizer
 from mypalletizer_interfaces.srv import (
     SetAngles,
     GetAngles,
@@ -15,6 +13,19 @@ from mypalletizer_interfaces.srv import (
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+import pymycobot
+from packaging import version
+
+# min low version require
+MAX_REQUIRE_VERSION = '3.5.3'
+
+current_verison = pymycobot.__version__
+print('current pymycobot library version: {}'.format(current_verison))
+if version.parse(current_verison) > version.parse(MAX_REQUIRE_VERSION):
+    raise RuntimeError('The version of pymycobot library must be less than {} . The current version is {}. Please downgrade the library version.'.format(MAX_REQUIRE_VERSION, current_verison))
+else:
+    print('pymycobot library version meets the requirements!')
+    from pymycobot.mypalletizer import MyPalletizer
 
 # class Window(Node): 
 class Window(): 
@@ -22,7 +33,7 @@ class Window():
     def __init__(self, handle):
         self.mc = MyPalletizer("/dev/ttyAMA0", 1000000) 
         time.sleep(0.05)
-        self.mc.set_free_mode(1)
+        self.mc.set_fresh_mode(1)
         time.sleep(0.05)   
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小

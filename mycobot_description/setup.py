@@ -35,6 +35,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/urdf'+'/mypalletizer_260_pi', glob("urdf/mypalletizer_260_pi/*")),
+        ('share/' + package_name + '/urdf'+'/mypalletizer_260_m5', glob("urdf/mypalletizer_260_m5/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_280_jn', glob("urdf/mycobot_280_jn/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_320_m5_2022', glob("urdf/mycobot_320_m5_2022/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_pro_600', glob("urdf/mycobot_pro_600/*")),
