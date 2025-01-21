@@ -83,6 +83,10 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![280 jn](./demo_img/280jn/280jn.png)
 
+[mycobot 280 Arduino](./mycobot_description/urdf/mycobot_280_arduino/mycobot_280_arduino.urdf)
+
+![280 jn](./demo_img/280ar/280ar.png)
+
 [mycobot 280 x3pi](./mycobot_description/urdf/mycobot_280_x3pi/mycobot_280_x3pi.urdf)
 
 ![280 x3pi](./demo_img/280pi/280_pi.png)
