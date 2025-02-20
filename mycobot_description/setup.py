@@ -57,6 +57,8 @@ setup(
         ('share/' + package_name + '/urdf'+'/myarm_m750', glob("urdf/myarm_m750/*")),
         
         ('share/' + package_name + '/urdf'+'/mycobot_pro_630', glob("urdf/mycobot_pro_630/*")),
+        
+        ('share/' + package_name + '/urdf'+'/mycobot_280_muse_pi', glob("urdf/mycobot_280_muse_pi/*")),
 
 
 
