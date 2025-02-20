@@ -1,5 +1,7 @@
 from __future__ import print_function
 import sys
+import os
+import fcntl
 import termios
 import tty
 import time
@@ -16,6 +18,53 @@ if version.parse(current_verison) > version.parse(MAX_REQUIRE_VERSION):
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot.mycobot import MyCobot
+
+
+# Avoid serial port conflicts and need to be locked
+def acquire(lock_file):
+    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
+    try:
+        fd = os.open(lock_file, open_mode)
+    except OSError as e:
+        print(f"Failed to open lock file {lock_file}: {e}")
+        return None
+
+    pid = os.getpid()
+    lock_file_fd = None
+
+    timeout = 50.0
+    start_time = current_time = time.time()
+    while current_time < start_time + timeout:
+        try:
+            # The LOCK_EX means that only one process can hold the lock
+            # The LOCK_NB means that the fcntl.flock() is not blocking
+            # and we are able to implement termination of while loop,
+            # when timeout is reached.
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            time.sleep(1)
+        else:
+            lock_file_fd = fd
+            # print(f"Lock acquired by PID: {pid}")
+            break
+
+        # print('pid waiting for lock:%d'% pid)
+
+        current_time = time.time()
+    if lock_file_fd is None:
+        print(f"Failed to acquire lock after {timeout} seconds")
+        os.close(fd)
+    return lock_file_fd
+
+
+def release(lock_file_fd):
+    # Do not remove the lockfile:
+    try:
+        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
+        os.close(lock_file_fd)
+        # print("Lock released successfully")
+    except OSError as e:
+        print(f"Failed to release lock: {e}")
     
 msg = """\
 Mycobot Teleop Keyboard Controller
@@ -59,106 +108,171 @@ class Raw(object):
         termios.tcsetattr(self.stream, termios.TCSANOW, self.original_stty)
 
 
-def teleop_keyboard():
-    mc = MyCobot("/dev/ttyAMA0", 1000000)
-    time.sleep(0.05)
-    mc.set_fresh_mode(1)
-    time.sleep(0.05)
+class TeleopKeyboard:
+    def __init__(self):
+        self.mc = MyCobot('/dev/ttyAMA0', 1000000)
+        time.sleep(0.05)
+        if self.mc:
+            lock = acquire("/tmp/mycobot_lock")
+            if self.mc.get_fresh_mode() == 0:
+                self.mc.set_fresh_mode(1)
+            release(lock)
+        time.sleep(0.05)
 
-    model = 1
-    speed = 50
-    change_percent = 5
+        self.model = 1
+        self.speed = 50
+        self.change_percent = 5
 
-    change_angle = 180 * change_percent / 100
-    change_len = 250 * change_percent / 100
+        self.change_angle = 180 * self.change_percent / 100
+        self.change_len = 250 * self.change_percent / 100
 
-    init_pose = [[0, 0, 0, 0, 0, 0], speed]
-    home_pose = [[0, 8, -127, 40, 0, 0], speed]
+        self.init_pose = [[0, 0, 0, 0, 0, 0], self.speed]
+        self.home_pose = [[0, 8, -127, 40, 0, 0], self.speed]
 
-    mc.send_angles(*init_pose)
+        self.record_coords = self.get_initial_coords()
 
-    while True:
-        res = mc.get_coords()
-        if res:
-            break
-        time.sleep(0.1)
+    def get_initial_coords(self):
+        while True:
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                res = self.mc.get_coords()
+                release(lock)
+                if res:
+                    break
+                time.sleep(0.1)
 
-    record_coords = [res, speed, model]
+        return [res, self.speed, self.model]
 
-    try:
+    def print_status(self):
+        print("\r current coords: %s" % self.record_coords)
+
+    def keyboard_listener(self):
         print(msg)
-        print(vels(speed, change_percent))
-        while 1:
+        print(vels(self.speed, self.change_percent))
+        while True:
             try:
-                print("\r current coords: %s" % record_coords)
+                # print("\r current coords: %s" % self.record_coords)
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
                 if key == "q":
-                    mc.release_all_servos()
                     break
                 elif key in ["w", "W"]:
-                    record_coords[0][0] += change_len
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][0] += self.change_len
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["s", "S"]:
-                    record_coords[0][0] -= change_len
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][0] -= self.change_len
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["a", "A"]:
-                    record_coords[0][1] -= change_len
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][1] -= self.change_len
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["d", "D"]:
-                    record_coords[0][1] += change_len
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][1] += self.change_len
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["z", "Z"]:
-                    record_coords[0][2] -= change_len
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][2] -= self.change_len
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["x", "X"]:
-                    record_coords[0][2] += change_len
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][2] += self.change_len
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["u", "U"]:
-                    record_coords[0][3] += change_angle
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][3] += self.change_angle
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["j", "J"]:
-                    record_coords[0][3] -= change_angle
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][3] -= self.change_angle
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["i", "I"]:
-                    record_coords[0][4] += change_angle
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][4] += self.change_angle
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["k", "K"]:
-                    record_coords[0][4] -= change_angle
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][4] -= self.change_angle
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["o", "O"]:
-                    record_coords[0][5] += change_angle
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][5] += self.change_angle
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["l", "L"]:
-                    record_coords[0][5] -= change_angle
-                    mc.send_coords(*record_coords)
+                    self.record_coords[0][5] -= self.change_angle
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_coords(*self.record_coords)
+                        release(lock)
                 elif key in ["g", "G"]:
-                    mc.set_gripper_state(0, 30)
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.set_gripper_state(0, 30)
+                        release(lock)
                 elif key in ["h", "H"]:
-                    mc.set_gripper_state(1, 30)
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.set_gripper_state(1, 30)
+                        release(lock)
                 elif key == "1":
-                    mc.send_angles(*init_pose)
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_angles(*self.init_pose)
+                        release(lock)
+                    time.sleep(3)
+                    self.record_coords = self.get_initial_coords()
                 elif key in "2":
-                    mc.send_angles(*home_pose)
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        self.mc.send_angles(*self.home_pose)
+                        release(lock)
+                    time.sleep(3)
+                    self.record_coords = self.get_initial_coords()
                 elif key in "3":
-                    rep = mc.get_angles()
-                    home_pose[0] =rep
+                    if self.mc:
+                        lock = acquire("/tmp/mycobot_lock")
+                        rep = self.mc.get_angles()
+                        release(lock)
+                    self.home_pose[0] = rep
                 else:
                     continue
 
+                self.print_status()
+                time.sleep(0.1)
             except Exception as e:
-                # print(e)
+                print(e)
                 continue
-
             time.sleep(1)
-
-    except Exception as e:
-        print(e)
 
 
 def main():
-    teleop_keyboard()
+    teleop_keyboard = TeleopKeyboard()
+    teleop_keyboard.keyboard_listener()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

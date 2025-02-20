@@ -51,12 +51,12 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_node = Node(
         package="mycobot_280_muse_pi",
-        executable="follow_display",
-        name="follow_display",
+        executable="listen_real",
+        name="listen_real",
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(listen_real_node)
 
     return LaunchDescription(res)

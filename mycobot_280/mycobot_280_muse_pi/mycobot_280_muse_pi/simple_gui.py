@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 import time
+import os
+import fcntl
 import pymycobot
 from packaging import version
 
@@ -11,19 +13,72 @@ MAX_REQUIRE_VERSION = '3.5.3'
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
 if version.parse(current_verison) > version.parse(MAX_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be less than {} . The current version is {}. Please downgrade the library version.'.format(MAX_REQUIRE_VERSION, current_verison))
+    raise RuntimeError(
+        'The version of pymycobot library must be less than {} . The current version is {}. Please downgrade the library version.'.format(
+            MAX_REQUIRE_VERSION, current_verison))
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot.mycobot import MyCobot
-    
 
-class Window: 
+
+# Avoid serial port conflicts and need to be locked
+def acquire(lock_file):
+    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
+    try:
+        fd = os.open(lock_file, open_mode)
+    except OSError as e:
+        print(f"Failed to open lock file {lock_file}: {e}")
+        return None
+
+    pid = os.getpid()
+    lock_file_fd = None
+
+    timeout = 50.0
+    start_time = current_time = time.time()
+    while current_time < start_time + timeout:
+        try:
+            # The LOCK_EX means that only one process can hold the lock
+            # The LOCK_NB means that the fcntl.flock() is not blocking
+            # and we are able to implement termination of while loop,
+            # when timeout is reached.
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            time.sleep(1)
+        else:
+            lock_file_fd = fd
+            # print(f"Lock acquired by PID: {pid}")
+            break
+
+        # print('pid waiting for lock:%d'% pid)
+
+        current_time = time.time()
+    if lock_file_fd is None:
+        print(f"Failed to acquire lock after {timeout} seconds")
+        os.close(fd)
+    return lock_file_fd
+
+
+def release(lock_file_fd):
+    # Do not remove the lockfile:
+    try:
+        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
+        os.close(lock_file_fd)
+        # print("Lock released successfully")
+    except OSError as e:
+        print(f"Failed to release lock: {e}")
+
+
+class Window:
     def __init__(self, handle):
         self.mc = MyCobot("/dev/ttyAMA0", 1000000)
         time.sleep(0.05)
-        self.mc.set_fresh_mode(1)
+        if self.mc:
+            lock = acquire("/tmp/mycobot_lock")
+            if self.mc.get_fresh_mode() == 0:
+                self.mc.set_fresh_mode(1)
+            release(lock)
         time.sleep(0.05)
-        
+
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
 
@@ -50,7 +105,7 @@ class Window:
         # get screen width and height
         self.ws = self.win.winfo_screenwidth()  # width of the screen
         self.hs = self.win.winfo_screenheight()  # height of the screen
-        
+
         # calculate x and y coordinates for the Tk root window
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
@@ -357,14 +412,20 @@ class Window:
 
     def gripper_open(self):
         try:
-            self.mc.set_gripper_state(0, 30)
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                self.mc.set_gripper_state(0, 50)
+                release(lock)
         except Exception as e:
             # 可能由于该方法没有返回值，服务抛出无法处理的错误
             pass
 
     def gripper_close(self):
         try:
-            self.mc.set_gripper_state(1, 30)
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                self.mc.set_gripper_state(1, 50)
+                release(lock)
         except Exception as e:
             pass
 
@@ -376,9 +437,12 @@ class Window:
         self.speed = (
             int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
         )
-        
+
         try:
-            self.mc.send_coords(c_value,self.speed, self.model)
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                self.mc.send_coords(c_value, self.speed, self.model)
+                release(lock)
         except Exception as e:
             pass
         self.show_j_date(c_value, "coord")
@@ -388,15 +452,18 @@ class Window:
         j_value = []
         for i in self.all_j:
             j_value.append(float(i.get()))
-            
+
         self.speed = (
             int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
         )
-        
+
         res = [j_value, self.speed]
 
         try:
-            self.mc.send_angles(*res)
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                self.mc.send_angles(*res)
+                release(lock)
         except Exception as e:
             pass
         self.show_j_date(j_value)
@@ -406,21 +473,26 @@ class Window:
         # 拿机械臂的数据，用于展示
         t = time.time()
         while time.time() - t < 2:
-            self.res = self.mc.get_coords()
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                self.res = self.mc.get_coords()
+                release(lock)
             if self.res != []:
                 break
             time.sleep(0.1)
 
         t = time.time()
         while time.time() - t < 2:
-            self.angles = self.mc.get_angles()
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                self.angles = self.mc.get_angles()
+                release(lock)
             if self.angles != []:
                 break
             time.sleep(0.1)
-        
+
         self.record_coords[0] = self.res
         self.res_angles[0] = self.angles
- 
 
     # def send_input(self,dates):
     def show_j_date(self, date, way=""):
