@@ -114,16 +114,14 @@ class Talker(Node):
             try:
                 if self.mc:
                     lock = acquire("/tmp/mycobot_lock")
-                    angles = self.mc.get_radians()
+                    angles = self.mc.get_angles()
                     release(lock)
                 data_list = []
-                for _, value in enumerate(angles):
+                radians = [round(math.radians(angle), 3) for angle in angles]
+                for _, value in enumerate(radians):
                     data_list.append(value)
             
-
-            
-
-                self.get_logger().info('angles: {}'.format([round(math.degrees(angle), 2) for angle in data_list]))
+                # self.get_logger().info('angles: {}'.format([round(math.degrees(angle), 2) for angle in data_list]))
                 joint_state_send.position = data_list
 
                 pub.publish(joint_state_send)
