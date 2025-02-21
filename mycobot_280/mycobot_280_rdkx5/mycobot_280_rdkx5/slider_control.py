@@ -7,7 +7,7 @@ import pymycobot
 from packaging import version
 
 # min low version require
-MIN_REQUIRE_VERSION = '3.6.8'
+MIN_REQUIRE_VERSION = '3.8.0'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
@@ -15,7 +15,7 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
     raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
 else:
     print('pymycobot library version meets the requirements!')
-    from pymycobot.mycobot280 import MyCobot280
+    from pymycobot import MyCobot280RDKX5
 
 
 class Slider_Subscriber(Node):
@@ -34,7 +34,7 @@ class Slider_Subscriber(Node):
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        self.mc = MyCobot280(port, baud)
+        self.mc = MyCobot280RDKX5(port, baud)
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)

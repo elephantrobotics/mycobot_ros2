@@ -17,7 +17,7 @@ def generate_launch_description():
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_280_x5pi/mycobot_280_x5pi.urdf"
+            "urdf/mycobot_280_rdkx5/mycobot_280_rdkx5.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -25,8 +25,8 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         "rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_280_x5pi"),
-            "config/mycobot_x5pi.rviz"
+            get_package_share_directory("mycobot_280_rdkx5"),
+            "config/mycobot_280_rdkx5.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
@@ -78,7 +78,7 @@ def generate_launch_description():
     res.append(rviz_node)
     
     slider_control_node = Node(
-        package="mycobot_280_x5pi",
+        package="mycobot_280_rdkx5",
         executable="slider_control",
         # parameters=[
         #     {'port': LaunchConfiguration('port')},

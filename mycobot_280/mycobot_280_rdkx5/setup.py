@@ -3,7 +3,7 @@ from setuptools import setup, __version__ as setuptools_version
 from packaging.version import Version
 from glob import glob
 
-package_name = 'mycobot_280_x5pi'
+package_name = 'mycobot_280_rdkx5'
 
 # 检查 setuptools 版本
 use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
@@ -52,11 +52,11 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'follow_display = mycobot_280_x5pi.follow_display:main',
-            'listen_real = mycobot_280_x5pi.listen_real:main',
-            'simple_gui = mycobot_280_x5pi.simple_gui:main',
-            'slider_control = mycobot_280_x5pi.slider_control:main',
-            'teleop_keyboard = mycobot_280_x5pi.teleop_keyboard:main',
+            'follow_display = mycobot_280_rdkx5.follow_display:main',
+            'listen_real = mycobot_280_rdkx5.listen_real:main',
+            'simple_gui = mycobot_280_rdkx5.simple_gui:main',
+            'slider_control = mycobot_280_rdkx5.slider_control:main',
+            'teleop_keyboard = mycobot_280_rdkx5.teleop_keyboard:main',
         ],
     },
 )

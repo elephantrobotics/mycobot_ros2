@@ -8,7 +8,7 @@ import pymycobot
 from packaging import version
 
 # min low version require
-MIN_REQUIRE_VERSION = '3.6.8'
+MIN_REQUIRE_VERSION = '3.8.0'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
@@ -16,7 +16,7 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
     raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
 else:
     print('pymycobot library version meets the requirements!')
-    from pymycobot.mycobot280 import MyCobot280
+    from pymycobot import MyCobot280RDKX5
 
 
 LOCK_FILE = "/tmp/mycobot_lock"
@@ -111,7 +111,7 @@ class Raw(object):
 
 class TeleopKeyboard:
     def __init__(self):
-        self.mc = MyCobot280('/dev/ttyS1', 1000000)
+        self.mc = MyCobot280RDKX5('/dev/ttyS1', 1000000)
         time.sleep(0.05)
         if self.mc:
             lock = acquire("/tmp/mycobot_lock")
