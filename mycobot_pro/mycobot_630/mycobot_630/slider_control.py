@@ -36,7 +36,7 @@ class Slider_Subscriber(Node):
         data_list = []
         for _, value in enumerate(msg.position):
             angles = round(math.degrees(value), 2)
-            data_list.apend(angles)
+            data_list.append(angles)
             
         data_list[1] = data_list[1] - 90
         data_list[3] = data_list[3] - 90
