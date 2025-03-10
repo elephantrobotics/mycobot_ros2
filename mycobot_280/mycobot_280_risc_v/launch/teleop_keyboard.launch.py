@@ -16,7 +16,7 @@ def generate_launch_description():
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_280_muse_pi/mycobot_280_muse_pi.urdf"
+            "urdf/mycobot_280_risc_v/mycobot_280_risc_v.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -24,8 +24,8 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         "rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_280_muse_pi"),
-            "config/mycobot_280_muse_pi.rviz"
+            get_package_share_directory("mycobot_280_risc_v"),
+            "config/mycobot_280_risc_v.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
@@ -52,7 +52,7 @@ def generate_launch_description():
     res.append(rviz_node)
 
     listen_real_node = Node(
-        package="mycobot_280_muse_pi",
+        package="mycobot_280_risc_v",
         executable="listen_real",
         name="listen_real",
         output="screen"
