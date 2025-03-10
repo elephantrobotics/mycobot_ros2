@@ -7,13 +7,13 @@
   <link name="g_base">
     <visual>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/G_base.dae"/>
+        <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/G_base.dae"/>
       </geometry>
       <origin xyz = "0.0 0 -0.03" rpy = "0 0 1.5708"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/G_base.dae"/>
+        <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/G_base.dae"/>
       </geometry>
       <origin xyz = "0.0 0 -0.03" rpy = "0 0 1.5708"/>
     </collision>
@@ -22,13 +22,13 @@
   <link name="pump_box">
     <visual>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/pump_box.dae"/>
+        <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/pump_box.dae"/>
       </geometry>
       <origin xyz = "0.0 -0.15 -0.0" rpy = "1.5708 3.14159 0"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/pump_box.dae"/>
+        <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/pump_box.dae"/>
       </geometry>
       <origin xyz = "0.0 0 -0.03" rpy = "0 0 1.5708"/>
     </collision>
@@ -38,14 +38,14 @@
     <visual>
       <geometry>
 	     <!--- 0.0 0 -0.04  1.5708 3.14159-->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint1_pi.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint1_pi.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0 " rpy = " 0 0 0"/>
     </visual>
     <collision>
       <geometry>
 	     <!--- 0.0 0 -0.04  1.5708 3.14159-->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint1_pi.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint1_pi.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0 " rpy = " 0 0 0"/>
     </collision>
@@ -54,13 +54,13 @@
   <link name="joint2">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint2.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint2.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.06096 " rpy = " 0 0 -1.5708"/>
     </visual>
       <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint2.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint2.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.06096 " rpy = " 0 0 -1.5708"/>
     </collision>
@@ -71,13 +71,13 @@
     <visual>
       <geometry>
        
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint3.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint3.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0.03256 " rpy = " 0 -1.5708 0"/>
     </visual>
       <collision>
         <geometry>
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint3.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint3.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0.03256 " rpy = " 0 -1.5708 0"/>
     </collision>
@@ -88,14 +88,14 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint4.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint4.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0.03056 " rpy = " 0 -1.5708 0"/>
     </visual>
       <collision>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint4.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint4.dae"/>
       </geometry>
     <origin xyz = "0.0 0 0.03056 " rpy = " 0 -1.5708 0"/>
     </collision>
@@ -108,14 +108,14 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint5.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint5.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.03356 " rpy = " 0 -1.5708 1.5708"/>
     </visual>
       <collision>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint5.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint5.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.03356 " rpy = " 0 -1.5708 1.5708"/>
     </collision>
@@ -126,14 +126,14 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint6.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint6.dae"/>
       </geometry>
     <origin xyz = "0 0.00 -0.038 " rpy = " 0 0 0"/>
     </visual>
       <collision>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint6.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint6.dae"/>
       </geometry>
     <origin xyz = "0 0.00 -0.038 " rpy = " 0 0 0"/>
     </collision>
@@ -144,14 +144,14 @@
     <visual>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint7.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint7.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.012 " rpy = " 0 0 0"/>
     </visual>
       <collision>
       <geometry>
        <!--- 0.0 0 -0.04 -->
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/joint7.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/joint7.dae"/>
       </geometry>
     <origin xyz = "0.0 0 -0.012 " rpy = " 0 0 0"/>
     </collision>
@@ -160,13 +160,13 @@
   <link name="pump_head">
     <visual>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/pump_head.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/pump_head.dae"/>
       </geometry>
     <origin xyz = "0.0 -0.008 0.0 " rpy = " 0 0 0"/>
     </visual>
     <collision>
       <geometry>
-       <mesh filename="package://mycobot_description/urdf/mycobot_280_muse_pi/pump_head.dae"/>
+       <mesh filename="package://mycobot_description/urdf/mycobot_280_risc_v/pump_head.dae"/>
       </geometry>
     <origin xyz = "0.0 -0.008 0.0 " rpy = " 0 0 0"/>
     </collision>
