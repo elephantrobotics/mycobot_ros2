@@ -60,6 +60,8 @@ setup(
         
         ('share/' + package_name + '/urdf'+'/mycobot_280_risc_v', glob("urdf/mycobot_280_risc_v/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_280_rdkx5', glob("urdf/mycobot_280_rdkx5/*")),
+        
+        ('share/' + package_name + '/urdf'+'/mycobot_320_risc_v',glob("urdf/mycobot_320_risc_v/*")),
 
 
 
