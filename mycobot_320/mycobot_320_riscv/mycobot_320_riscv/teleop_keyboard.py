@@ -234,12 +234,12 @@ class TeleopKeyboard:
                 elif key in ["g", "G"]:
                     if self.mc:
                         lock = acquire("/tmp/mycobot_lock")
-                        self.mc.set_gripper_state(0, 30)
+                        self.mc.set_gripper_state(0, 50)
                         release(lock)
                 elif key in ["h", "H"]:
                     if self.mc:
                         lock = acquire("/tmp/mycobot_lock")
-                        self.mc.set_gripper_state(1, 30)
+                        self.mc.set_gripper_state(1, 50)
                         release(lock)
                 elif key == "1":
                     if self.mc:

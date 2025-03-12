@@ -30,7 +30,8 @@ class Slider_Subscriber(Node):
 
         self.mc = MyCobot320("/dev/ttyAMA0", 115200)
         time.sleep(0.05)
-        self.mc.set_fresh_mode(1)
+        if self.mc.get_fresh_mode() == 0:
+            self.mc.set_fresh_mode(1)
         time.sleep(0.05)
         
     def listener_callback(self, msg):
