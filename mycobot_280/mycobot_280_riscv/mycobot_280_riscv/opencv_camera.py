@@ -10,7 +10,7 @@ class Image_Publisher(Node):
         super().__init__("image_publisher")
 
         # 声明launch参数
-        self.declare_parameter('num', "0")
+        self.declare_parameter('num', "20")
 
         # 获取launch文件中的参数
         self.cap_num = self.get_parameter(

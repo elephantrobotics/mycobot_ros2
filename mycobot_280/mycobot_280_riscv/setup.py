@@ -3,7 +3,7 @@ from setuptools import setup, __version__ as setuptools_version
 from packaging.version import Version
 from glob import glob
 
-package_name = 'mycobot_280_risc_v'
+package_name = 'mycobot_280_riscv'
 
 # 检查 setuptools 版本
 use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
@@ -51,13 +51,13 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'camera_display = mycobot_280_risc_v.camera_display:main',
-            'follow_display = mycobot_280_risc_v.follow_display:main',
-            'listen_real = mycobot_280_risc_v.listen_real:main',
-            'opencv_camera = mycobot_280_risc_v.opencv_camera:main',
-            'simple_gui = mycobot_280_risc_v.simple_gui:main',
-            'slider_control = mycobot_280_risc_v.slider_control:main',
-            'teleop_keyboard = mycobot_280_risc_v.teleop_keyboard:main',
+            'camera_display = mycobot_280_riscv.camera_display:main',
+            'follow_display = mycobot_280_riscv.follow_display:main',
+            'listen_real = mycobot_280_riscv.listen_real:main',
+            'opencv_camera = mycobot_280_riscv.opencv_camera:main',
+            'simple_gui = mycobot_280_riscv.simple_gui:main',
+            'slider_control = mycobot_280_riscv.slider_control:main',
+            'teleop_keyboard = mycobot_280_riscv.teleop_keyboard:main',
         ],
     },
 )

@@ -1,6 +1,6 @@
 import os
 
-from ament_index_python import get_package_share_directory
+from ament_index_python import get_package_share_path
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -14,52 +14,45 @@ def generate_launch_description():
     res = []
 
     model_launch_arg = DeclareLaunchArgument(
-        "model",
+        name="model",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_280_risc_v/mycobot_280_risc_v_with_pump.urdf"
+            get_package_share_path("mycobot_description"),
+            "urdf/mycobot_280_riscv/mycobot_280_riscv_with_camera_flange_pump.urdf"
         )
     )
     res.append(model_launch_arg)
 
     rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
+        name="rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_280_risc_v"),
-            "config/mycobot_280_risc_v.rviz"
+            get_package_share_path("mycobot_280_riscv"),
+            "config/mycobot_280_riscv.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
 
     gui_launch_arg = DeclareLaunchArgument(
-        "gui",
-        default_value="true"
+        name="gui",
+        default_value="false"
     )
     res.append(gui_launch_arg)
-    
-    # serial_port_arg = DeclareLaunchArgument(
-    #     'port',
-    #     default_value='/dev/ttyUSB0',
-    #     description='Serial port to use'
-    # )
-    # res.append(serial_port_arg)
-    # baud_rate_arg = DeclareLaunchArgument(
-    #     'baud',
-    #     default_value='115200',
-    #     description='Baud rate to use'
-    # )
-    # res.append(baud_rate_arg)
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
 
     robot_state_publisher_node = Node(
-        name="robot_state_publisher",
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
         parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
+
+    joint_state_publisher_node = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        condition=UnlessCondition(LaunchConfiguration('gui'))
+    )
+    res.append(joint_state_publisher_node)
 
     joint_state_publisher_gui_node = Node(
         package='joint_state_publisher_gui',
@@ -76,17 +69,5 @@ def generate_launch_description():
         arguments=['-d', LaunchConfiguration("rvizconfig")],
     )
     res.append(rviz_node)
-    
-    slider_control_node = Node(
-        package="mycobot_280_risc_v",
-        executable="slider_control",
-        # parameters=[
-        #     {'port': LaunchConfiguration('port')},
-        #     {'baud': LaunchConfiguration('baud')}
-        # ],
-        name="slider_control",
-        output="screen"
-    )
-    res.append(slider_control_node)
 
     return LaunchDescription(res)

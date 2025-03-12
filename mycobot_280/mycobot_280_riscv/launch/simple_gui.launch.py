@@ -12,23 +12,41 @@ from launch.substitutions import Command, LaunchConfiguration
 def generate_launch_description():
     res = []
 
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyAMA0"
+    )
+    res.append(port_launch_arg)
+
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="1000000"
+    )
+    res.append(baud_launch_arg)
+
     model_launch_arg = DeclareLaunchArgument(
-        "model",
+        name="model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_280_risc_v/mycobot_280_risc_v.urdf"
+            "urdf/mycobot_280_riscv/mycobot_280_riscv.urdf"
         )
     )
     res.append(model_launch_arg)
 
     rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
+        name="rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_280_risc_v"),
-            "config/mycobot_280_risc_v.rviz"
+            get_package_share_directory("mycobot_280_riscv"),
+            "config/mycobot_280_riscv.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
+
+    gui_launch_arg = DeclareLaunchArgument(
+        name="gui",
+        default_value="false"
+    )
+    res.append(gui_launch_arg)
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
@@ -37,8 +55,7 @@ def generate_launch_description():
         name="robot_state_publisher",
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[{'robot_description': robot_description}],
-        arguments=[LaunchConfiguration("model")]
+        parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
 
@@ -52,11 +69,18 @@ def generate_launch_description():
     res.append(rviz_node)
 
     listen_real_node = Node(
-        package="mycobot_280_risc_v",
+        package="mycobot_280_riscv",
         executable="listen_real",
         name="listen_real",
         output="screen"
     )
     res.append(listen_real_node)
+
+    mycobot_280_riscv_node = Node(
+        name="simple_gui",
+        package="mycobot_280_riscv",
+        executable="simple_gui",
+    )
+    res.append(mycobot_280_riscv_node)
 
     return LaunchDescription(res)

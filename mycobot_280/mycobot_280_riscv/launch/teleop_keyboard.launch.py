@@ -11,24 +11,12 @@ from launch.substitutions import Command, LaunchConfiguration
 
 def generate_launch_description():
     res = []
-    
-    port_launch_arg = DeclareLaunchArgument(
-        name="port",
-        default_value="/dev/ttyAMA0"
-    )
-    res.append(port_launch_arg)
-
-    baud_launch_arg = DeclareLaunchArgument(
-        name="baud",
-        default_value="1000000"
-    )
-    res.append(baud_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_280_risc_v/mycobot_280_risc_v.urdf"
+            "urdf/mycobot_280_riscv/mycobot_280_riscv.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -36,8 +24,8 @@ def generate_launch_description():
     rvizconfig_launch_arg = DeclareLaunchArgument(
         "rvizconfig",
         default_value=os.path.join(
-            get_package_share_directory("mycobot_280_risc_v"),
-            "config/mycobot_280_risc_v.rviz"
+            get_package_share_directory("mycobot_280_riscv"),
+            "config/mycobot_280_riscv.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
@@ -46,22 +34,13 @@ def generate_launch_description():
                                        value_type=str)
 
     robot_state_publisher_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
         name="robot_state_publisher",
-        output="screen",
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
         parameters=[{'robot_description': robot_description}],
         arguments=[LaunchConfiguration("model")]
     )
     res.append(robot_state_publisher_node)
-
-    follow_display_node = Node(
-        package="mycobot_280_risc_v",
-        executable="follow_display",
-        name="follow_display",
-        output="screen"
-    )
-    res.append(follow_display_node)
 
     rviz_node = Node(
         name="rviz2",
@@ -71,5 +50,13 @@ def generate_launch_description():
         arguments=['-d', LaunchConfiguration("rvizconfig")],
     )
     res.append(rviz_node)
+
+    listen_real_node = Node(
+        package="mycobot_280_riscv",
+        executable="listen_real",
+        name="listen_real",
+        output="screen"
+    )
+    res.append(listen_real_node)
 
     return LaunchDescription(res)

@@ -1,6 +1,6 @@
 import os
 
-from ament_index_python import get_package_share_path
+from ament_index_python import get_package_share_directory
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -14,26 +14,26 @@ def generate_launch_description():
     res = []
 
     model_launch_arg = DeclareLaunchArgument(
-        name="model",
+        "model",
         default_value=os.path.join(
-            get_package_share_path("mycobot_description"),
-            "urdf/mycobot_280_risc_v/mycobot_280_risc_v_with_camera_flange.urdf"
+            get_package_share_directory("mycobot_description"),
+            "urdf/mycobot_280_riscv/mycobot_280_riscv.urdf"
         )
     )
     res.append(model_launch_arg)
 
     rvizconfig_launch_arg = DeclareLaunchArgument(
-        name="rvizconfig",
+        "rvizconfig",
         default_value=os.path.join(
-            get_package_share_path("mycobot_280_risc_v"),
-            "config/mycobot_280_risc_v.rviz"
+            get_package_share_directory("mycobot_280_riscv"),
+            "config/mycobot_280_riscv.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)
 
     gui_launch_arg = DeclareLaunchArgument(
-        name="gui",
-        default_value="false"
+        "gui",
+        default_value="true"
     )
     res.append(gui_launch_arg)
 
@@ -41,18 +41,12 @@ def generate_launch_description():
                                        value_type=str)
 
     robot_state_publisher_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
+        name="robot_state_publisher",
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
         parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
-
-    joint_state_publisher_node = Node(
-        package='joint_state_publisher',
-        executable='joint_state_publisher',
-        condition=UnlessCondition(LaunchConfiguration('gui'))
-    )
-    res.append(joint_state_publisher_node)
 
     joint_state_publisher_gui_node = Node(
         package='joint_state_publisher_gui',
@@ -69,5 +63,13 @@ def generate_launch_description():
         arguments=['-d', LaunchConfiguration("rvizconfig")],
     )
     res.append(rviz_node)
+    
+    slider_control_node = Node(
+        package="mycobot_280_riscv",
+        executable="slider_control",
+        name="slider_control",
+        output="screen"
+    )
+    res.append(slider_control_node)
 
     return LaunchDescription(res)
