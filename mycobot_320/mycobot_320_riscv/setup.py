@@ -3,7 +3,7 @@ from setuptools import setup, __version__ as setuptools_version
 from packaging.version import Version
 from glob import glob
 
-package_name = 'mycobot_320_risc_v'
+package_name = 'mycobot_320_riscv'
 
 # 检查 setuptools 版本
 use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
@@ -51,12 +51,12 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'follow_display = mycobot_320_risc_v.follow_display:main',
-            'listen_real_of_topic = mycobot_320_risc_v.listen_real_of_topic:main',
-            'listen_real = mycobot_320_risc_v.listen_real:main',
-            'simple_gui = mycobot_320_risc_v.simple_gui:main',
-            'slider_control = mycobot_320_risc_v.slider_control:main',
-            'teleop_keyboard = mycobot_320_risc_v.teleop_keyboard:main',
+            'follow_display = mycobot_320_riscv.follow_display:main',
+            'listen_real_of_topic = mycobot_320_riscv.listen_real_of_topic:main',
+            'listen_real = mycobot_320_riscv.listen_real:main',
+            'simple_gui = mycobot_320_riscv.simple_gui:main',
+            'slider_control = mycobot_320_riscv.slider_control:main',
+            'teleop_keyboard = mycobot_320_riscv.teleop_keyboard:main',
         ],
     },
 )
