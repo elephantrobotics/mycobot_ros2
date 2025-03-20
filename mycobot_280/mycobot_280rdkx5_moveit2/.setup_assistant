@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: mycobot_description
+    relative_path: urdf/mycobot_280_rdkx5/mycobot_280_rdkx5.urdf
+  srdf:
+    relative_path: config/firefighter.srdf
+  package_settings:
+    author_name: weijian
+    author_email: weijian.wang@elephantrobotics.com
+    generated_timestamp: 1742207813
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
