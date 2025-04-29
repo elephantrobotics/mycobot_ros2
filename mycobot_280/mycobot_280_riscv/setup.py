@@ -57,6 +57,7 @@ setup(
             'opencv_camera = mycobot_280_riscv.opencv_camera:main',
             'simple_gui = mycobot_280_riscv.simple_gui:main',
             'slider_control = mycobot_280_riscv.slider_control:main',
+            'listen_real_service = mycobot_280_riscv.listen_real_service:main',
             'teleop_keyboard = mycobot_280_riscv.teleop_keyboard:main',
         ],
     },

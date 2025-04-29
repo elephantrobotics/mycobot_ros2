@@ -51,12 +51,12 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    listen_real_node = Node(
+    listen_real_service_node = Node(
         package="mycobot_280_riscv",
-        executable="listen_real",
-        name="listen_real",
+        executable="listen_real_service",
+        name="listen_real_service",
         output="screen"
     )
-    res.append(listen_real_node)
+    res.append(listen_real_service_node)
 
     return LaunchDescription(res)
