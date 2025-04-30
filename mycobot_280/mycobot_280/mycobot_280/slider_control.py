@@ -30,23 +30,22 @@ class Slider_Subscriber(Node):
         )
         self.subscription
         
-        self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
-        self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
-        if self.robot_m5:
-            port = self.robot_m5
-        else:
-            port = self.robot_wio
-        self.get_logger().info("port:%s, baud:%d" % (port, 115200))
+        # self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
+        # self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
+        # if self.robot_m5:
+        #     port = self.robot_m5
+        # else:
+        #     port = self.robot_wio
+        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('baud', 115200)
+        port = self.get_parameter('port').get_parameter_value().string_value
+        baud = self.get_parameter('baud').get_parameter_value().integer_value
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = MyCobot280(port, 115200)
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)
-        # self.declare_parameter('port', '/dev/ttyUSB0')
-        # self.declare_parameter('baud', 115200)
-        # port = self.get_parameter('port').get_parameter_value().string_value
-        # baud = self.get_parameter('baud').get_parameter_value().integer_value
-        # self.get_logger().info("port:%s, baud:%d" % (port, baud))
-        # self.mc = MyCobot(port, baud)
+        
 
     def listener_callback(self, msg):
 
