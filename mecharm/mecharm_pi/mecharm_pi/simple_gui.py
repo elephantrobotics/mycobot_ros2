@@ -463,7 +463,7 @@ def main(args=None):
     # -----------
     
     # w = threading.Thread(target=Window(window).run())
-    # w.setDaemon(True)
+    # w.daemon = True
     # t.start()
     # w.start()
     # window.mainloop()
