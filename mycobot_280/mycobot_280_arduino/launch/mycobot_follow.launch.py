@@ -20,7 +20,7 @@ def generate_launch_description():
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
-        default_value="115200"
+        default_value="1000000"
     )
     res.append(baud_launch_arg)
 

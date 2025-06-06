@@ -35,8 +35,8 @@ class Slider_Subscriber(Node):
             port = self.robot_m5
         else:
             port = self.robot_wio
-        self.get_logger().info("port:%s, baud:%d" % (port, 115200))
-        self.mc = MyCobot280(port, 115200)
+        self.get_logger().info("port:%s, baud:%d" % (port, 1000000))
+        self.mc = MyCobot280(port, 1000000)
         time.sleep(0.05)
         if self.mc.get_fresh_mode() == 0:
             self.mc.set_fresh_mode(1)

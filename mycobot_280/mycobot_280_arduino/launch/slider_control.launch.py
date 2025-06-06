@@ -45,7 +45,7 @@ def generate_launch_description():
     # res.append(serial_port_arg)
     # baud_rate_arg = DeclareLaunchArgument(
     #     'baud',
-    #     default_value='115200',
+    #     default_value='1000000',
     #     description='Baud rate to use'
     # )
     # res.append(baud_rate_arg)

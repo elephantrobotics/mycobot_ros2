@@ -76,8 +76,8 @@ class Window:
         else:
             port = self.robot_wio
             
-        print("port:%s, baud:%d" % (port, 115200))
-        self.mc = MyCobot280(port, 115200)
+        print("port:%s, baud:%d" % (port, 1000000))
+        self.mc = MyCobot280(port, 1000000)
         time.sleep(0.05)
         if self.mc:
             lock = acquire(LOCK_FILE)

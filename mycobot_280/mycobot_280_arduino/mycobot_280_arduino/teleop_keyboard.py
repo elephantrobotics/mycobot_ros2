@@ -112,7 +112,7 @@ class Raw(object):
 
 class TeleopKeyboard:
     def __init__(self):
-        self.mc = MyCobot280('/dev/ttyUSB0', 115200)
+        self.mc = MyCobot280('/dev/ttyUSB0', 1000000)
         time.sleep(0.05)
         if self.mc:
             lock = acquire("/tmp/mycobot_lock")
