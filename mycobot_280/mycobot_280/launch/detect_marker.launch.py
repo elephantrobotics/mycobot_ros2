@@ -10,7 +10,20 @@ from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     res = []
+    
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyUSB0",
+        description='Serial port to use'
+    )
+    res.append(port_launch_arg)
 
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="115200",
+        description='Baud rate to use'
+    )
+    res.append(baud_launch_arg)
     model_launch_arg = DeclareLaunchArgument(
         "model",
         default_value=os.path.join(
@@ -46,6 +59,11 @@ def generate_launch_description():
         name="follow_display",
         package="mycobot_280",
         executable="follow_display",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(follow_display_node)
 
