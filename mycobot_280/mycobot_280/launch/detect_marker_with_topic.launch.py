@@ -72,6 +72,11 @@ def generate_launch_description():
         name="follow_display",
         package="mycobot_280",
         executable="follow_display",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(follow_display_node)
 

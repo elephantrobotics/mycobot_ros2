@@ -5,7 +5,8 @@ import time
 import os
 import pymycobot
 from packaging import version
-
+import rclpy
+from rclpy.node import Node
 # min low version require
 MIN_REQUIRE_VERSION = '3.6.1'
 
@@ -17,17 +18,23 @@ else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MyCobot280
 
-class Window: 
+class WindowNode(Node): 
     def __init__(self, handle):
-        self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
-        self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
-        if self.robot_m5:
-            port = self.robot_m5
-        else:
-            port = self.robot_wio
+        # self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
+        # self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
+        # if self.robot_m5:
+        #     port = self.robot_m5
+        # else:
+        #     port = self.robot_wio
+        super().__init__('simple_gui')
+        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('baud', 115200)
+   
+        port = self.get_parameter("port").get_parameter_value().string_value
+        baud = self.get_parameter("baud").get_parameter_value().integer_value
             
-        print("port:%s, baud:%d" % (port, 115200))
-        self.mc = MyCobot280(port, 115200)
+        print("port:%s, baud:%d" % (port, baud))
+        self.mc = MyCobot280(port, baud)
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)
@@ -35,7 +42,7 @@ class Window:
         self.win = handle
         self.win.resizable(0, 0)  # 固定窗口大小
 
-        self.model = 0
+        self.model = 1
         self.speed = 50
 
         # 设置默认速度123456
@@ -476,10 +483,19 @@ class Window:
                     raise
 
 
-def main():
+def main(args=None):
+    rclpy.init(args=args)
     window = tk.Tk()
     window.title("mycobot ros GUI")
-    Window(window).run()
+    node = WindowNode(window)
+    # WindowNode(window).run()
+    try:
+        node.run()
+    except KeyboardInterrupt:
+        pass
+    # finally:
+    #     node.destroy_node()
+    #     rclpy.shutdown()
 
 
 if __name__ == "__main__":
