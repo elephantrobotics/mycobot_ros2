@@ -1,6 +1,9 @@
 import math
-
+import os
+import fcntl
+import time
 import rclpy
+import traceback
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
@@ -17,6 +20,52 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MyCobot280
+
+# Avoid serial port conflicts and need to be locked
+def acquire(lock_file):
+    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
+    try:
+        fd = os.open(lock_file, open_mode)
+    except OSError as e:
+        print(f"Failed to open lock file {lock_file}: {e}")
+        return None
+
+    pid = os.getpid()
+    lock_file_fd = None
+
+    timeout = 50.0
+    start_time = current_time = time.time()
+    while current_time < start_time + timeout:
+        try:
+            # The LOCK_EX means that only one process can hold the lock
+            # The LOCK_NB means that the fcntl.flock() is not blocking
+            # and we are able to implement termination of while loop,
+            # when timeout is reached.
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            time.sleep(1)
+            pass
+        else:
+            lock_file_fd = fd
+            # print(f"Lock acquired by PID: {pid}")
+            break
+
+        # print('pid waiting for lock:%d'% pid)
+        current_time = time.time()
+    if lock_file_fd is None:
+        print(f"Failed to acquire lock after {timeout} seconds")
+        os.close(fd)
+    return lock_file_fd
+
+
+def release(lock_file_fd):
+    # Do not remove the lockfile:
+    try:
+        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
+        os.close(lock_file_fd)
+        # print("Lock released successfully")
+    except OSError as e:
+        print(f"Failed to release lock: {e}")
 
 class Talker(Node):
     def __init__(self):
@@ -59,7 +108,10 @@ class Talker(Node):
             
             rclpy.spin_once(self)
             # get real angles from server.
-            res = self.mc.get_angles()
+            if self.mc:
+                lock = acquire("/tmp/mycobot_lock")
+                res = self.mc.get_angles()
+                release(lock)
             try:
                 if res[0] == res[1] == res[2] == 0.0:
                     continue
@@ -71,7 +123,7 @@ class Talker(Node):
                     res[4] * (math.pi / 180),
                     res[5] * (math.pi / 180),
                 ]
-                self.get_logger().info("res: {}".format(radians_list))
+                # self.get_logger().info("res: {}".format(radians_list))
 
                 # publish angles.
                 joint_state_send.header.stamp = self.get_clock().now().to_msg()
@@ -79,6 +131,7 @@ class Talker(Node):
                 pub.publish(joint_state_send)
                 rate.sleep()
             except Exception as e:
+                e = traceback.format_exc()
                 print(e)
             
             
