@@ -1,0 +1,236 @@
+[0.000000] (-) TimerEvent: {}
+[0.002903] (-) JobUnselected: {'identifier': 'mecharm'}
+[0.003588] (-) JobUnselected: {'identifier': 'mecharm_communication'}
+[0.004718] (-) JobUnselected: {'identifier': 'mecharm_interfaces'}
+[0.005814] (-) JobUnselected: {'identifier': 'mecharm_pi'}
+[0.007800] (-) JobUnselected: {'identifier': 'myarm_300'}
+[0.008108] (-) JobUnselected: {'identifier': 'myarm_c650'}
+[0.008226] (-) JobUnselected: {'identifier': 'myarm_m750'}
+[0.008372] (-) JobUnselected: {'identifier': 'mybuddy'}
+[0.008469] (-) JobUnselected: {'identifier': 'mycobot_280'}
+[0.008561] (-) JobUnselected: {'identifier': 'mycobot_280_arduino'}
+[0.008650] (-) JobUnselected: {'identifier': 'mycobot_280_moveit2'}
+[0.008733] (-) JobUnselected: {'identifier': 'mycobot_280_moveit2_control'}
+[0.008814] (-) JobUnselected: {'identifier': 'mycobot_280_rdkx5'}
+[0.008896] (-) JobUnselected: {'identifier': 'mycobot_280_riscv'}
+[0.008977] (-) JobUnselected: {'identifier': 'mycobot_280_x3pi'}
+[0.009059] (-) JobUnselected: {'identifier': 'mycobot_280arduino_moveit2'}
+[0.009141] (-) JobUnselected: {'identifier': 'mycobot_280jn'}
+[0.009228] (-) JobUnselected: {'identifier': 'mycobot_280pi'}
+[0.009364] (-) JobUnselected: {'identifier': 'mycobot_280rdkx5_moveit2'}
+[0.012809] (-) JobUnselected: {'identifier': 'mycobot_320'}
+[0.015953] (-) JobUnselected: {'identifier': 'mycobot_320_riscv'}
+[0.016212] (-) JobUnselected: {'identifier': 'mycobot_320pi'}
+[0.016384] (-) JobUnselected: {'identifier': 'mycobot_600'}
+[0.016571] (-) JobUnselected: {'identifier': 'mycobot_630'}
+[0.016744] (-) JobUnselected: {'identifier': 'mycobot_communication'}
+[0.016909] (-) JobUnselected: {'identifier': 'mycobot_interfaces'}
+[0.017098] (-) JobUnselected: {'identifier': 'mypalletizer_260'}
+[0.017203] (-) JobUnselected: {'identifier': 'mypalletizer_260_pi'}
+[0.017376] (-) JobUnselected: {'identifier': 'mypalletizer_communication'}
+[0.017517] (-) JobUnselected: {'identifier': 'mypalletizer_interfaces'}
+[0.017651] (-) JobUnselected: {'identifier': 'ultraarm'}
+[0.018182] (mycobot_description) JobQueued: {'identifier': 'mycobot_description', 'dependencies': OrderedDict()}
+[0.018485] (mycobot_description) JobStarted: {'identifier': 'mycobot_description'}
+[0.100426] (-) TimerEvent: {}
+[0.211206] (-) TimerEvent: {}
+[0.313836] (-) TimerEvent: {}
+[0.415366] (-) TimerEvent: {}
+[0.516582] (-) TimerEvent: {}
+[0.617881] (-) TimerEvent: {}
+[0.719712] (-) TimerEvent: {}
+[0.821212] (-) TimerEvent: {}
+[0.925090] (-) TimerEvent: {}
+[1.026807] (-) TimerEvent: {}
+[1.129177] (-) TimerEvent: {}
+[1.233203] (-) TimerEvent: {}
+[1.335416] (-) TimerEvent: {}
+[1.437702] (-) TimerEvent: {}
+[1.539839] (-) TimerEvent: {}
+[1.641788] (-) TimerEvent: {}
+[1.743809] (-) TimerEvent: {}
+[1.845856] (-) TimerEvent: {}
+[1.948514] (-) TimerEvent: {}
+[2.051081] (-) TimerEvent: {}
+[2.152676] (-) TimerEvent: {}
+[2.254651] (-) TimerEvent: {}
+[2.356590] (-) TimerEvent: {}
+[2.459051] (-) TimerEvent: {}
+[2.560756] (-) TimerEvent: {}
+[2.661936] (-) TimerEvent: {}
+[2.762924] (-) TimerEvent: {}
+[2.864656] (-) TimerEvent: {}
+[2.974742] (-) TimerEvent: {}
+[3.088551] (-) TimerEvent: {}
+[3.193237] (-) TimerEvent: {}
+[3.294974] (-) TimerEvent: {}
+[3.396895] (-) TimerEvent: {}
+[3.499580] (-) TimerEvent: {}
+[3.601561] (-) TimerEvent: {}
+[3.703588] (-) TimerEvent: {}
+[3.806113] (-) TimerEvent: {}
+[3.909728] (-) TimerEvent: {}
+[4.014698] (-) TimerEvent: {}
+[4.117827] (-) TimerEvent: {}
+[4.220988] (-) TimerEvent: {}
+[4.322449] (-) TimerEvent: {}
+[4.423408] (-) TimerEvent: {}
+[4.525688] (-) TimerEvent: {}
+[4.627641] (-) TimerEvent: {}
+[4.729200] (-) TimerEvent: {}
+[4.831289] (-) TimerEvent: {}
+[4.933168] (-) TimerEvent: {}
+[5.034392] (-) TimerEvent: {}
+[5.135714] (-) TimerEvent: {}
+[5.238256] (-) TimerEvent: {}
+[5.340179] (-) TimerEvent: {}
+[5.442635] (-) TimerEvent: {}
+[5.543880] (-) TimerEvent: {}
+[5.645496] (-) TimerEvent: {}
+[5.747261] (-) TimerEvent: {}
+[5.849137] (-) TimerEvent: {}
+[5.950766] (-) TimerEvent: {}
+[6.053181] (-) TimerEvent: {}
+[6.155557] (-) TimerEvent: {}
+[6.259112] (-) TimerEvent: {}
+[6.361215] (-) TimerEvent: {}
+[6.463397] (-) TimerEvent: {}
+[6.565026] (-) TimerEvent: {}
+[6.666837] (-) TimerEvent: {}
+[6.768598] (-) TimerEvent: {}
+[6.870367] (-) TimerEvent: {}
+[6.973050] (-) TimerEvent: {}
+[7.076378] (-) TimerEvent: {}
+[7.182695] (-) TimerEvent: {}
+[7.287312] (-) TimerEvent: {}
+[7.389129] (-) TimerEvent: {}
+[7.464675] (mycobot_description) Command: {'cmd': ['/usr/bin/python3', 'setup.py', 'egg_info', '--egg-base', '../build/mycobot_description', 'build', '--build-base', '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build', 'install', '--prefix', '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description', '--record', '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log', '--single-version-externally-managed'], 'cwd': '/home/er/colcon_ws/src/mycobot_ros2/mycobot_description', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'QT_SCALE_FACTOR': '1', 'LANGUAGE': 'en_US:en', 'USER': 'er', 'LC_TIME': 'en_US.UTF-8', 'XDG_SEAT': 'seat0', 'SSH_AGENT_PID': '1286', 'XDG_SESSION_TYPE': 'x11', 'COMPIZ_CONFIG_PROFILE': 'mate', 'SHLVL': '1', 'QT4_IM_MODULE': 'fcitx', 'HOME': '/home/er', 'OLDPWD': '/home/er/colcon_ws/src', 'DESKTOP_SESSION': 'mate', 'PYENV_SHELL': 'bash', 'GTK_MODULES': 'appmenu-gtk-module:gail:atk-bridge:canberra-gtk-module', 'XDG_SEAT_PATH': '/org/freedesktop/DisplayManager/Seat0', 'LC_MONETARY': 'en_US.UTF-8', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'UBUNTU_MENUPROXY': '1', 'QT_QPA_PLATFORMTHEME': 'gtk2', 'COLCON_PREFIX_PATH': '/home/er/colcon_ws/src/mycobot_ros2/install', 'GTK_IM_MODULE': 'fcitx', 'LOGNAME': 'er', 'WINDOWID': '81790036', 'QT_AUTO_SCREEN_SCALE_FACTOR': '0', '_': '/usr/bin/colcon', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'GTK_OVERLAY_SCROLLING': '0', 'XDG_SESSION_ID': 'c1', 'PATH': '/home/er/.pyenv/shims:/home/er/.pyenv/bin:/home/er/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'SESSION_MANAGER': 'local/er:@/tmp/.ICE-unix/1140,unix/er:/tmp/.ICE-unix/1140', 'GDM_LANG': 'en_US', 'PAPERSIZE': 'letter', 'XDG_SESSION_PATH': '/org/freedesktop/DisplayManager/Session0', 'LC_ADDRESS': 'en_US.UTF-8', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0.0', 'LANG': 'en_US.UTF-8', 'XDG_CURRENT_DESKTOP': 'MATE', 'LC_TELEPHONE': 'en_US.UTF-8', 'XMODIFIERS': '@im=fcitx', 'XDG_SESSION_DESKTOP': 'mate', 'XAUTHORITY': '/home/er/.Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'XDG_GREETER_DATA_DIR': '/var/lib/lightdm-data/er', 'SHELL': '/bin/bash', 'LC_NAME': 'en_US.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'mate', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'en_US.UTF-8', 'GCC_COLORS': 'error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01', 'GPG_AGENT_INFO': '/run/user/1000/gnupg/S.gpg-agent:0:1', 'LC_IDENTIFICATION': 'en_US.UTF-8', 'QT_IM_MODULE': 'fcitx', 'XDG_VTNR': '7', 'PWD': '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-mate:/etc/xdg', 'CLUTTER_IM_MODULE': 'fcitx', 'PYENV_ROOT': '/home/er/.pyenv', 'XDG_DATA_DIRS': '/usr/share/mate:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'LC_NUMERIC': 'en_US.UTF-8', 'MATE_DESKTOP_SESSION_ID': 'this-is-deprecated', 'LC_PAPER': 'en_US.UTF-8', 'COLCON': '1', 'VTE_VERSION': '6003', 'PYTHONPATH': '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages:'}, 'shell': False}
+[7.502764] (-) TimerEvent: {}
+[7.615455] (-) TimerEvent: {}
+[7.718064] (-) TimerEvent: {}
+[7.819527] (-) TimerEvent: {}
+[7.922032] (-) TimerEvent: {}
+[8.024759] (-) TimerEvent: {}
+[8.126878] (-) TimerEvent: {}
+[8.231731] (-) TimerEvent: {}
+[8.334603] (-) TimerEvent: {}
+[8.437171] (-) TimerEvent: {}
+[8.539733] (-) TimerEvent: {}
+[8.643933] (-) TimerEvent: {}
+[8.746409] (-) TimerEvent: {}
+[8.848416] (-) TimerEvent: {}
+[8.950711] (-) TimerEvent: {}
+[9.053563] (-) TimerEvent: {}
+[9.155514] (-) TimerEvent: {}
+[9.257527] (-) TimerEvent: {}
+[9.360156] (-) TimerEvent: {}
+[9.427567] (mycobot_description) StdoutLine: {'line': b'running egg_info\n'}
+[9.433337] (mycobot_description) StdoutLine: {'line': b'writing ../build/mycobot_description/mycobot_description.egg-info/PKG-INFO\n'}
+[9.437890] (mycobot_description) StdoutLine: {'line': b'writing dependency_links to ../build/mycobot_description/mycobot_description.egg-info/dependency_links.txt\n'}
+[9.441360] (mycobot_description) StdoutLine: {'line': b'writing entry points to ../build/mycobot_description/mycobot_description.egg-info/entry_points.txt\n'}
+[9.444046] (mycobot_description) StdoutLine: {'line': b'writing requirements to ../build/mycobot_description/mycobot_description.egg-info/requires.txt\n'}
+[9.446031] (mycobot_description) StdoutLine: {'line': b'writing top-level names to ../build/mycobot_description/mycobot_description.egg-info/top_level.txt\n'}
+[9.460272] (-) TimerEvent: {}
+[9.561355] (-) TimerEvent: {}
+[9.669219] (-) TimerEvent: {}
+[9.706019] (mycobot_description) StdoutLine: {'line': b"reading manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'\n"}
+[9.737354] (mycobot_description) StdoutLine: {'line': b"writing manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'\n"}
+[9.738904] (mycobot_description) StdoutLine: {'line': b'running build\n'}
+[9.740335] (mycobot_description) StdoutLine: {'line': b'running build_py\n'}
+[9.747521] (mycobot_description) StdoutLine: {'line': b'running install\n'}
+[9.752442] (mycobot_description) StdoutLine: {'line': b'running install_lib\n'}
+[9.765423] (mycobot_description) StdoutLine: {'line': b'running install_data\n'}
+[9.769463] (-) TimerEvent: {}
+[9.850241] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[9.869631] (-) TimerEvent: {}
+[9.909837] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[9.912676] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[9.955915] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[9.958395] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/mycobot_280_rdkx5.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[9.963640] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[9.970095] (-) TimerEvent: {}
+[10.059188] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.070323] (-) TimerEvent: {}
+[10.134496] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.137073] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.165403] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.167766] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.170660] (-) TimerEvent: {}
+[10.173159] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.182732] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.192428] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_280_rdkx5/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5\n'}
+[10.240578] (mycobot_description) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[10.242734] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[10.271139] (-) TimerEvent: {}
+[10.372892] (-) TimerEvent: {}
+[10.474935] (-) TimerEvent: {}
+[10.577206] (-) TimerEvent: {}
+[10.678852] (-) TimerEvent: {}
+[10.780865] (-) TimerEvent: {}
+[10.882421] (-) TimerEvent: {}
+[10.984286] (-) TimerEvent: {}
+[11.085665] (-) TimerEvent: {}
+[11.186938] (-) TimerEvent: {}
+[11.287833] (-) TimerEvent: {}
+[11.389000] (-) TimerEvent: {}
+[11.490573] (-) TimerEvent: {}
+[11.592692] (-) TimerEvent: {}
+[11.694451] (-) TimerEvent: {}
+[11.796251] (-) TimerEvent: {}
+[11.897860] (-) TimerEvent: {}
+[11.965283] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[11.998441] (-) TimerEvent: {}
+[12.100856] (-) TimerEvent: {}
+[12.202872] (-) TimerEvent: {}
+[12.304496] (-) TimerEvent: {}
+[12.406483] (-) TimerEvent: {}
+[12.508231] (-) TimerEvent: {}
+[12.609942] (-) TimerEvent: {}
+[12.612553] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[12.710426] (-) TimerEvent: {}
+[12.812392] (-) TimerEvent: {}
+[12.914154] (-) TimerEvent: {}
+[13.016329] (-) TimerEvent: {}
+[13.117368] (-) TimerEvent: {}
+[13.218606] (-) TimerEvent: {}
+[13.320448] (-) TimerEvent: {}
+[13.376502] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[13.420575] (-) TimerEvent: {}
+[13.521527] (-) TimerEvent: {}
+[13.623287] (-) TimerEvent: {}
+[13.659748] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[13.723629] (-) TimerEvent: {}
+[13.825670] (-) TimerEvent: {}
+[13.927777] (-) TimerEvent: {}
+[14.029973] (-) TimerEvent: {}
+[14.130835] (-) TimerEvent: {}
+[14.232233] (-) TimerEvent: {}
+[14.333784] (-) TimerEvent: {}
+[14.434934] (-) TimerEvent: {}
+[14.536188] (-) TimerEvent: {}
+[14.564989] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[14.636386] (-) TimerEvent: {}
+[14.738371] (-) TimerEvent: {}
+[14.840092] (-) TimerEvent: {}
+[14.847725] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[14.941361] (-) TimerEvent: {}
+[15.046811] (-) TimerEvent: {}
+[15.148052] (-) TimerEvent: {}
+[15.248856] (-) TimerEvent: {}
+[15.349765] (-) TimerEvent: {}
+[15.408241] (mycobot_description) StdoutLine: {'line': b'copying urdf/mycobot_320_riscv/mycobot_320_riscv.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv\n'}
+[15.414881] (mycobot_description) StdoutLine: {'line': b'running install_egg_info\n'}
+[15.437540] (mycobot_description) StdoutLine: {'line': b'Copying ../build/mycobot_description/mycobot_description.egg-info to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages/mycobot_description-0.0.0-py3.8.egg-info\n'}
+[15.450113] (-) TimerEvent: {}
+[15.458228] (mycobot_description) StdoutLine: {'line': b'running install_scripts\n'}
+[15.550415] (-) TimerEvent: {}
+[15.651528] (-) TimerEvent: {}
+[15.662723] (mycobot_description) StdoutLine: {'line': b"writing list of installed files to '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log'\n"}
+[15.752583] (-) TimerEvent: {}
+[15.856311] (-) TimerEvent: {}
+[15.943344] (mycobot_description) CommandEnded: {'returncode': 0}
+[15.956804] (-) TimerEvent: {}
+[16.058952] (-) TimerEvent: {}
+[16.160852] (-) TimerEvent: {}
+[16.195451] (mycobot_description) JobEnded: {'identifier': 'mycobot_description', 'rc': 0}
+[16.210241] (-) EventReactorShutdown: {}

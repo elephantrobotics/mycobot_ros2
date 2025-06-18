@@ -1,0 +1,278 @@
+[7.054s] Invoking command in '/home/er/colcon_ws/src/mycobot_ros2/mycobot_description': PYTHONPATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages: /usr/bin/python3 setup.py egg_info --egg-base ../build/mycobot_description build --build-base /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build install --prefix /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description --record /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log --single-version-externally-managed
+[9.096s] running egg_info
+[9.104s] creating ../build/mycobot_description/mycobot_description.egg-info
+[9.107s] writing ../build/mycobot_description/mycobot_description.egg-info/PKG-INFO
+[9.110s] writing dependency_links to ../build/mycobot_description/mycobot_description.egg-info/dependency_links.txt
+[9.112s] writing entry points to ../build/mycobot_description/mycobot_description.egg-info/entry_points.txt
+[9.113s] writing requirements to ../build/mycobot_description/mycobot_description.egg-info/requires.txt
+[9.115s] writing top-level names to ../build/mycobot_description/mycobot_description.egg-info/top_level.txt
+[9.134s] writing manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+[9.366s] reading manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+[9.382s] writing manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+[9.383s] running build
+[9.384s] running build_py
+[9.386s] creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build
+[9.387s] creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build/lib
+[9.387s] creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build/lib/mycobot_description
+[9.388s] copying mycobot_description/__init__.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build/lib/mycobot_description
+[9.388s] running install
+[9.394s] running install_lib
+[9.399s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages/mycobot_description
+[9.400s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build/lib/mycobot_description/__init__.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages/mycobot_description
+[9.403s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages/mycobot_description/__init__.py to __init__.cpython-38.pyc
+[9.414s] running install_data
+[9.417s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/ament_index
+[9.418s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/ament_index/resource_index
+[9.419s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/ament_index/resource_index/packages
+[9.420s] copying resource/mycobot_description -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/ament_index/resource_index/packages
+[9.421s] copying package.xml -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description
+[9.422s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf
+[9.423s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[9.425s] copying urdf/mypalletizer_260_pi/mypalletizer_260_pi_aikit.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[9.426s] copying urdf/mypalletizer_260_pi/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[9.554s] copying urdf/mypalletizer_260_pi/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[9.650s] copying urdf/mypalletizer_260_pi/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[9.737s] copying urdf/mypalletizer_260_pi/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[9.771s] copying urdf/mypalletizer_260_pi/suit_env.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[10.018s] copying urdf/mypalletizer_260_pi/mypalletizer_260_pi.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[10.020s] copying urdf/mypalletizer_260_pi/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[10.137s] copying urdf/mypalletizer_260_pi/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_pi
+[10.178s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[10.180s] copying urdf/mypalletizer_260_m5/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[10.297s] copying urdf/mypalletizer_260_m5/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[10.438s] copying urdf/mypalletizer_260_m5/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[10.724s] copying urdf/mypalletizer_260_m5/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[10.759s] copying urdf/mypalletizer_260_m5/mypalletizer_260_m5.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[10.761s] copying urdf/mypalletizer_260_m5/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[11.067s] copying urdf/mypalletizer_260_m5/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mypalletizer_260_m5
+[11.198s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.200s] copying urdf/mycobot_280_jn/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.673s] copying urdf/mycobot_280_jn/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.723s] copying urdf/mycobot_280_jn/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.763s] copying urdf/mycobot_280_jn/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.768s] copying urdf/mycobot_280_jn/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.862s] copying urdf/mycobot_280_jn/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.931s] copying urdf/mycobot_280_jn/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.933s] copying urdf/mycobot_280_jn/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.971s] copying urdf/mycobot_280_jn/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[11.977s] copying urdf/mycobot_280_jn/mycobot_280_jn.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[12.144s] copying urdf/mycobot_280_jn/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[12.148s] copying urdf/mycobot_280_jn/joint1_jet.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[12.778s] copying urdf/mycobot_280_jn/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[12.782s] copying urdf/mycobot_280_jn/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_jn
+[12.822s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[12.823s] copying urdf/mycobot_320_m5_2022/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[13.872s] copying urdf/mycobot_320_m5_2022/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[14.944s] copying urdf/mycobot_320_m5_2022/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[16.237s] copying urdf/mycobot_320_m5_2022/mycobot_320_m5_2022.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[16.241s] copying urdf/mycobot_320_m5_2022/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[16.299s] copying urdf/mycobot_320_m5_2022/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[16.403s] copying urdf/mycobot_320_m5_2022/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[16.416s] copying urdf/mycobot_320_m5_2022/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_m5_2022
+[16.484s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[16.486s] copying urdf/mycobot_pro_600/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[16.580s] copying urdf/mycobot_pro_600/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[16.747s] copying urdf/mycobot_pro_600/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[16.802s] copying urdf/mycobot_pro_600/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[16.913s] copying urdf/mycobot_pro_600/mycobot_pro_600.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[16.919s] copying urdf/mycobot_pro_600/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[17.309s] copying urdf/mycobot_pro_600/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[17.454s] copying urdf/mycobot_pro_600/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_600
+[18.107s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.108s] copying urdf/mycobot_280_m5/mycobot_280_m5.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.110s] copying urdf/mycobot_280_m5/pump_head.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.183s] copying urdf/mycobot_280_m5/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.237s] copying urdf/mycobot_280_m5/withenv.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.239s] copying urdf/mycobot_280_m5/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.242s] copying urdf/mycobot_280_m5/mycobot_280_m5_with_pump.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.246s] copying urdf/mycobot_280_m5/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.280s] copying urdf/mycobot_280_m5/noenv.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.326s] copying urdf/mycobot_280_m5/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.452s] copying urdf/mycobot_280_m5/mycobot_with_vision_copy.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.529s] copying urdf/mycobot_280_m5/mycobot_280_m5_with_camera_flange.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.586s] copying urdf/mycobot_280_m5/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[18.679s] copying urdf/mycobot_280_m5/G_base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.120s] copying urdf/mycobot_280_m5/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.192s] copying urdf/mycobot_280_m5/pump_box.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.438s] copying urdf/mycobot_280_m5/camera_flange.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.508s] copying urdf/mycobot_280_m5/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.510s] copying urdf/mycobot_280_m5/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.536s] copying urdf/mycobot_280_m5/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.538s] copying urdf/mycobot_280_m5/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[19.541s] copying urdf/mycobot_280_m5/suit_env.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[20.152s] copying urdf/mycobot_280_m5/mycobot_280_m5_with_camera_flange_pump.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[20.154s] copying urdf/mycobot_280_m5/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[20.162s] copying urdf/mycobot_280_m5/joint1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[20.491s] copying urdf/mycobot_280_m5/mycobot_step.STEP -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[25.111s] copying urdf/mycobot_280_m5/mycobot_with_vision.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[25.135s] copying urdf/mycobot_280_m5/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[25.137s] copying urdf/mycobot_280_m5/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_m5
+[25.321s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.333s] copying urdf/mycobot_280_pi/pump_head.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.699s] copying urdf/mycobot_280_pi/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.755s] copying urdf/mycobot_280_pi/mycobot_280_pi.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.759s] copying urdf/mycobot_280_pi/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.762s] copying urdf/mycobot_280_pi/mycobot_280_pi_with_pump.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.763s] copying urdf/mycobot_280_pi/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.799s] copying urdf/mycobot_280_pi/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[25.805s] copying urdf/mycobot_280_pi/joint1_pi.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[26.284s] copying urdf/mycobot_280_pi/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[26.652s] copying urdf/mycobot_280_pi/G_base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.052s] copying urdf/mycobot_280_pi/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.117s] copying urdf/mycobot_280_pi/pump_box.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.152s] copying urdf/mycobot_280_pi/camera_flange.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.407s] copying urdf/mycobot_280_pi/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.421s] copying urdf/mycobot_280_pi/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.446s] copying urdf/mycobot_280_pi/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.451s] copying urdf/mycobot_280_pi/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.453s] copying urdf/mycobot_280_pi/mycobot_280_pi_with_camera_flange.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.456s] copying urdf/mycobot_280_pi/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.462s] copying urdf/mycobot_280_pi/mycobot_280_pi_with_camera_flange_pump.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.464s] copying urdf/mycobot_280_pi/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.465s] copying urdf/mycobot_280_pi/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_pi
+[27.507s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[27.510s] copying urdf/mecharm_270_m5/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[28.033s] copying urdf/mecharm_270_m5/mecharm_270_m5.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[28.252s] copying urdf/mecharm_270_m5/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[28.419s] copying urdf/mecharm_270_m5/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[28.526s] copying urdf/mecharm_270_m5/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[29.462s] copying urdf/mecharm_270_m5/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[29.547s] copying urdf/mecharm_270_m5/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[29.580s] copying urdf/mecharm_270_m5/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_m5
+[29.627s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[29.628s] copying urdf/mecharm_270_pi/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[29.770s] copying urdf/mecharm_270_pi/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[30.616s] copying urdf/mecharm_270_pi/mecharm_270_pi.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[30.619s] copying urdf/mecharm_270_pi/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[30.726s] copying urdf/mecharm_270_pi/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[30.800s] copying urdf/mecharm_270_pi/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[31.353s] copying urdf/mecharm_270_pi/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[31.389s] copying urdf/mecharm_270_pi/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mecharm_270_pi
+[31.436s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[31.439s] copying urdf/mycobot_320_pi_2022/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[33.364s] copying urdf/mycobot_320_pi_2022/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[34.299s] copying urdf/mycobot_320_pi_2022/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[35.198s] copying urdf/mycobot_320_pi_2022/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[35.524s] copying urdf/mycobot_320_pi_2022/mycobot_320_pi_2022.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[35.529s] copying urdf/mycobot_320_pi_2022/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[36.369s] copying urdf/mycobot_320_pi_2022/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[36.646s] copying urdf/mycobot_320_pi_2022/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_pi_2022
+[36.964s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[36.964s] copying urdf/mybuddy/mybuddy.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[37.175s] copying urdf/mybuddy/joint2_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[37.562s] copying urdf/mybuddy/joint4_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[37.937s] copying urdf/mybuddy/joint1_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.498s] copying urdf/mybuddy/mybuddy-up.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.719s] copying urdf/mybuddy/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.722s] copying urdf/mybuddy/joint5_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.764s] copying urdf/mybuddy/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.766s] copying urdf/mybuddy/mybuddy-down.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.810s] copying urdf/mybuddy/joint2_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.902s] copying urdf/mybuddy/joint3_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[38.928s] copying urdf/mybuddy/joint6_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.121s] copying urdf/mybuddy/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.415s] copying urdf/mybuddy/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.420s] copying urdf/mybuddy/joint1_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.477s] copying urdf/mybuddy/joint4_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.587s] copying urdf/mybuddy/joint3_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.718s] copying urdf/mybuddy/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.725s] copying urdf/mybuddy/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.729s] copying urdf/mybuddy/joint6_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.767s] copying urdf/mybuddy/joint5_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.914s] copying urdf/mybuddy/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mybuddy
+[39.916s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[39.917s] copying urdf/ultraArm_p340/ultraArm-3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[40.023s] copying urdf/ultraArm_p340/ultraArm-base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[40.160s] copying urdf/ultraArm_p340/ultraArm-1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[40.516s] copying urdf/ultraArm_p340/ultraArm-2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[40.681s] copying urdf/ultraArm_p340/suit_env.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[41.860s] copying urdf/ultraArm_p340/ultraArm_p340_aiki.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[41.864s] copying urdf/ultraArm_p340/ultraArm_p340.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/ultraArm_p340
+[41.869s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[41.871s] copying urdf/mycobot_280_x3pi/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[42.311s] copying urdf/mycobot_280_x3pi/mycobot_280_x3pi.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[42.425s] copying urdf/mycobot_280_x3pi/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[42.468s] copying urdf/mycobot_280_x3pi/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[42.658s] copying urdf/mycobot_280_x3pi/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[42.678s] copying urdf/mycobot_280_x3pi/joint1_pi.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[42.979s] copying urdf/mycobot_280_x3pi/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.317s] copying urdf/mycobot_280_x3pi/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.386s] copying urdf/mycobot_280_x3pi/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.391s] copying urdf/mycobot_280_x3pi/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.418s] copying urdf/mycobot_280_x3pi/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.420s] copying urdf/mycobot_280_x3pi/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.424s] copying urdf/mycobot_280_x3pi/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.429s] copying urdf/mycobot_280_x3pi/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.443s] copying urdf/mycobot_280_x3pi/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_x3pi
+[43.631s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[43.633s] copying urdf/myarm_300_pi/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[44.035s] copying urdf/myarm_300_pi/j7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[44.071s] copying urdf/myarm_300_pi/j4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[44.543s] copying urdf/myarm_300_pi/j1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[47.785s] copying urdf/myarm_300_pi/j5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[48.182s] copying urdf/myarm_300_pi/myarm_300_pi.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[48.200s] copying urdf/myarm_300_pi/j2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[48.337s] copying urdf/myarm_300_pi/j6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[48.387s] copying urdf/myarm_300_pi/j3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_300_pi
+[48.677s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[48.678s] copying urdf/myarm_c650/myarm_c_grip_R.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[48.697s] copying urdf/myarm_c650/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[49.695s] copying urdf/myarm_c650/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[50.223s] copying urdf/myarm_c650/myarm_basic_base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[53.354s] copying urdf/myarm_c650/myarm_c650.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[53.370s] copying urdf/myarm_c650/myarm_c650.urdf.xacro -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[53.392s] copying urdf/myarm_c650/endeffector.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[55.353s] copying urdf/myarm_c650/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[57.195s] copying urdf/myarm_c650/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[61.124s] copying urdf/myarm_c650/myarm_c_grip_L.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[61.155s] copying urdf/myarm_c650/myarm_c_grip_Base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[61.468s] copying urdf/myarm_c650/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[61.856s] copying urdf/myarm_c650/joint1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_c650
+[62.447s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[62.449s] copying urdf/myarm_m750/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[63.771s] copying urdf/myarm_m750/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[71.872s] copying urdf/myarm_m750/myarm_m750.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[71.894s] copying urdf/myarm_m750/endeffector.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[72.959s] copying urdf/myarm_m750/finger_holder.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[74.097s] copying urdf/myarm_m750/myarm_m750.urdf.xacro -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[74.122s] copying urdf/myarm_m750/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[76.981s] copying urdf/myarm_m750/myarm_m750_base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[77.164s] copying urdf/myarm_m750/finger_left.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[77.202s] copying urdf/myarm_m750/finger_right.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[77.250s] copying urdf/myarm_m750/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[78.238s] copying urdf/myarm_m750/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/myarm_m750
+[79.924s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[79.931s] copying urdf/mycobot_pro_630/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.167s] copying urdf/mycobot_pro_630/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.283s] copying urdf/mycobot_pro_630/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.340s] copying urdf/mycobot_pro_630/mycobot_pro_630.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.346s] copying urdf/mycobot_pro_630/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.460s] copying urdf/mycobot_pro_630/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.620s] copying urdf/mycobot_pro_630/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[80.728s] copying urdf/mycobot_pro_630/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_pro_630
+[82.838s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[82.840s] copying urdf/mycobot_280_riscv/mycobot_280_riscv_with_camera_flange.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[83.112s] copying urdf/mycobot_280_riscv/pump_head.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[86.568s] copying urdf/mycobot_280_riscv/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[86.625s] copying urdf/mycobot_280_riscv/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[86.628s] copying urdf/mycobot_280_riscv/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[86.662s] copying urdf/mycobot_280_riscv/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[86.663s] copying urdf/mycobot_280_riscv/joint1_pi.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[89.117s] copying urdf/mycobot_280_riscv/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[89.279s] copying urdf/mycobot_280_riscv/G_base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[89.602s] copying urdf/mycobot_280_riscv/mycobot_280_riscv_with_pump.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[89.607s] copying urdf/mycobot_280_riscv/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[89.812s] copying urdf/mycobot_280_riscv/pump_box.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[89.898s] copying urdf/mycobot_280_riscv/camera_flange.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.058s] copying urdf/mycobot_280_riscv/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.080s] copying urdf/mycobot_280_riscv/mycobot_280_riscv.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.084s] copying urdf/mycobot_280_riscv/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.154s] copying urdf/mycobot_280_riscv/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.157s] copying urdf/mycobot_280_riscv/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.165s] copying urdf/mycobot_280_riscv/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.182s] copying urdf/mycobot_280_riscv/mycobot_280_riscv_with_camera_flange_pump.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.189s] copying urdf/mycobot_280_riscv/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.212s] copying urdf/mycobot_280_riscv/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_riscv
+[90.341s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[90.342s] copying urdf/mycobot_280_rdkx5/joint1_rdkx5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[91.021s] Invoked command in '/home/er/colcon_ws/src/mycobot_ros2/mycobot_description' returned '1': PYTHONPATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages: /usr/bin/python3 setup.py egg_info --egg-base ../build/mycobot_description build --build-base /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build install --prefix /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description --record /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log --single-version-externally-managed
