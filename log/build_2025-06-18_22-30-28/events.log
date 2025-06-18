@@ -1,0 +1,37 @@
+[0.000000] (-) TimerEvent: {}
+[0.003977] (-) JobUnselected: {'identifier': 'mecharm'}
+[0.005113] (-) JobUnselected: {'identifier': 'mecharm_communication'}
+[0.007509] (-) JobUnselected: {'identifier': 'mecharm_interfaces'}
+[0.007796] (-) JobUnselected: {'identifier': 'mecharm_pi'}
+[0.009149] (-) JobUnselected: {'identifier': 'myarm_300'}
+[0.011403] (-) JobUnselected: {'identifier': 'myarm_c650'}
+[0.011798] (-) JobUnselected: {'identifier': 'myarm_m750'}
+[0.012167] (-) JobUnselected: {'identifier': 'mybuddy'}
+[0.012304] (-) JobUnselected: {'identifier': 'mycobot_280'}
+[0.012466] (-) JobUnselected: {'identifier': 'mycobot_280_arduino'}
+[0.012572] (-) JobUnselected: {'identifier': 'mycobot_280_moveit2'}
+[0.012730] (-) JobUnselected: {'identifier': 'mycobot_280_moveit2_control'}
+[0.015412] (-) JobUnselected: {'identifier': 'mycobot_280_rdkx5'}
+[0.017747] (-) JobUnselected: {'identifier': 'mycobot_280_riscv'}
+[0.018074] (-) JobUnselected: {'identifier': 'mycobot_280_x3pi'}
+[0.018247] (-) JobUnselected: {'identifier': 'mycobot_280arduino_moveit2'}
+[0.018408] (-) JobUnselected: {'identifier': 'mycobot_280jn'}
+[0.018575] (-) JobUnselected: {'identifier': 'mycobot_280rdkx5_moveit2'}
+[0.018723] (-) JobUnselected: {'identifier': 'mycobot_320'}
+[0.018906] (-) JobUnselected: {'identifier': 'mycobot_320_riscv'}
+[0.019084] (-) JobUnselected: {'identifier': 'mycobot_320pi'}
+[0.019210] (-) JobUnselected: {'identifier': 'mycobot_600'}
+[0.019365] (-) JobUnselected: {'identifier': 'mycobot_630'}
+[0.019805] (-) JobUnselected: {'identifier': 'mycobot_communication'}
+[0.019965] (-) JobUnselected: {'identifier': 'mycobot_description'}
+[0.020080] (-) JobUnselected: {'identifier': 'mycobot_interfaces'}
+[0.020217] (-) JobUnselected: {'identifier': 'mypalletizer_260'}
+[0.020311] (-) JobUnselected: {'identifier': 'mypalletizer_260_pi'}
+[0.020452] (-) JobUnselected: {'identifier': 'mypalletizer_communication'}
+[0.020890] (-) JobUnselected: {'identifier': 'mypalletizer_interfaces'}
+[0.021121] (-) JobUnselected: {'identifier': 'ultraarm'}
+[0.021321] (mycobot_280pi) JobQueued: {'identifier': 'mycobot_280pi', 'dependencies': OrderedDict([('mycobot_description', '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description')])}
+[0.021508] (mycobot_280pi) JobStarted: {'identifier': 'mycobot_280pi'}
+[0.098048] (-) TimerEvent: {}
+[0.116899] (mycobot_280pi) JobEnded: {'identifier': 'mycobot_280pi', 'rc': 1}
+[0.132734] (-) EventReactorShutdown: {}

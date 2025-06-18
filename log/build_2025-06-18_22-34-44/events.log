@@ -1,0 +1,226 @@
+[0.000000] (-) TimerEvent: {}
+[0.002770] (-) JobUnselected: {'identifier': 'mecharm'}
+[0.004106] (-) JobUnselected: {'identifier': 'mecharm_communication'}
+[0.006910] (-) JobUnselected: {'identifier': 'mecharm_interfaces'}
+[0.007966] (-) JobUnselected: {'identifier': 'mecharm_pi'}
+[0.010045] (-) JobUnselected: {'identifier': 'myarm_300'}
+[0.010463] (-) JobUnselected: {'identifier': 'myarm_c650'}
+[0.010613] (-) JobUnselected: {'identifier': 'myarm_m750'}
+[0.010761] (-) JobUnselected: {'identifier': 'mybuddy'}
+[0.010891] (-) JobUnselected: {'identifier': 'mycobot_280'}
+[0.011077] (-) JobUnselected: {'identifier': 'mycobot_280_arduino'}
+[0.011194] (-) JobUnselected: {'identifier': 'mycobot_280_moveit2'}
+[0.011333] (-) JobUnselected: {'identifier': 'mycobot_280_moveit2_control'}
+[0.011441] (-) JobUnselected: {'identifier': 'mycobot_280_rdkx5'}
+[0.011584] (-) JobUnselected: {'identifier': 'mycobot_280_riscv'}
+[0.011682] (-) JobUnselected: {'identifier': 'mycobot_280_x3pi'}
+[0.012193] (-) JobUnselected: {'identifier': 'mycobot_280arduino_moveit2'}
+[0.018587] (-) JobUnselected: {'identifier': 'mycobot_280jn'}
+[0.020406] (-) JobUnselected: {'identifier': 'mycobot_280rdkx5_moveit2'}
+[0.024390] (-) JobUnselected: {'identifier': 'mycobot_320'}
+[0.024835] (-) JobUnselected: {'identifier': 'mycobot_320_riscv'}
+[0.025390] (-) JobUnselected: {'identifier': 'mycobot_320pi'}
+[0.025738] (-) JobUnselected: {'identifier': 'mycobot_600'}
+[0.025875] (-) JobUnselected: {'identifier': 'mycobot_630'}
+[0.026103] (-) JobUnselected: {'identifier': 'mycobot_communication'}
+[0.026209] (-) JobUnselected: {'identifier': 'mycobot_description'}
+[0.026304] (-) JobUnselected: {'identifier': 'mycobot_interfaces'}
+[0.026477] (-) JobUnselected: {'identifier': 'mypalletizer_260'}
+[0.026580] (-) JobUnselected: {'identifier': 'mypalletizer_260_pi'}
+[0.026675] (-) JobUnselected: {'identifier': 'mypalletizer_communication'}
+[0.026760] (-) JobUnselected: {'identifier': 'mypalletizer_interfaces'}
+[0.026843] (-) JobUnselected: {'identifier': 'ultraarm'}
+[0.027031] (mycobot_280pi) JobQueued: {'identifier': 'mycobot_280pi', 'dependencies': OrderedDict([('mycobot_description', '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description')])}
+[0.027197] (mycobot_280pi) JobStarted: {'identifier': 'mycobot_280pi'}
+[0.099461] (-) TimerEvent: {}
+[0.201777] (-) TimerEvent: {}
+[0.312422] (-) TimerEvent: {}
+[0.414275] (-) TimerEvent: {}
+[0.516178] (-) TimerEvent: {}
+[0.619305] (-) TimerEvent: {}
+[0.721509] (-) TimerEvent: {}
+[0.823839] (-) TimerEvent: {}
+[0.927073] (-) TimerEvent: {}
+[1.032817] (-) TimerEvent: {}
+[1.135772] (-) TimerEvent: {}
+[1.237899] (-) TimerEvent: {}
+[1.340014] (-) TimerEvent: {}
+[1.441480] (-) TimerEvent: {}
+[1.542946] (-) TimerEvent: {}
+[1.645076] (-) TimerEvent: {}
+[1.746594] (-) TimerEvent: {}
+[1.849445] (-) TimerEvent: {}
+[1.950984] (-) TimerEvent: {}
+[2.052392] (-) TimerEvent: {}
+[2.154632] (-) TimerEvent: {}
+[2.255881] (-) TimerEvent: {}
+[2.357828] (-) TimerEvent: {}
+[2.460657] (-) TimerEvent: {}
+[2.564811] (-) TimerEvent: {}
+[2.668713] (-) TimerEvent: {}
+[2.771135] (-) TimerEvent: {}
+[2.872134] (-) TimerEvent: {}
+[2.973622] (-) TimerEvent: {}
+[3.076346] (-) TimerEvent: {}
+[3.177903] (-) TimerEvent: {}
+[3.280195] (-) TimerEvent: {}
+[3.382772] (-) TimerEvent: {}
+[3.484789] (-) TimerEvent: {}
+[3.588256] (-) TimerEvent: {}
+[3.690104] (-) TimerEvent: {}
+[3.791640] (-) TimerEvent: {}
+[3.893085] (-) TimerEvent: {}
+[3.994912] (-) TimerEvent: {}
+[4.097724] (-) TimerEvent: {}
+[4.199749] (-) TimerEvent: {}
+[4.302645] (-) TimerEvent: {}
+[4.404252] (-) TimerEvent: {}
+[4.506044] (-) TimerEvent: {}
+[4.607872] (-) TimerEvent: {}
+[4.709958] (-) TimerEvent: {}
+[4.811751] (-) TimerEvent: {}
+[4.913729] (-) TimerEvent: {}
+[5.015742] (-) TimerEvent: {}
+[5.117773] (-) TimerEvent: {}
+[5.219670] (-) TimerEvent: {}
+[5.321765] (-) TimerEvent: {}
+[5.423779] (-) TimerEvent: {}
+[5.526292] (-) TimerEvent: {}
+[5.630145] (-) TimerEvent: {}
+[5.732836] (-) TimerEvent: {}
+[5.836851] (-) TimerEvent: {}
+[5.939897] (-) TimerEvent: {}
+[6.042240] (-) TimerEvent: {}
+[6.149395] (-) TimerEvent: {}
+[6.256007] (-) TimerEvent: {}
+[6.358603] (-) TimerEvent: {}
+[6.412411] (mycobot_280pi) Command: {'cmd': ['/usr/bin/python3', 'setup.py', 'egg_info', '--egg-base', '../../build/mycobot_280pi', 'build', '--build-base', '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build', 'install', '--prefix', '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi', '--record', '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/install.log', '--single-version-externally-managed'], 'cwd': '/home/er/colcon_ws/src/mycobot_ros2/mycobot_280/mycobot_280pi', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'QT_SCALE_FACTOR': '1', 'LANGUAGE': 'en_US:en', 'USER': 'er', 'LC_TIME': 'en_US.UTF-8', 'XDG_SEAT': 'seat0', 'SSH_AGENT_PID': '1286', 'XDG_SESSION_TYPE': 'x11', 'COMPIZ_CONFIG_PROFILE': 'mate', 'SHLVL': '1', 'QT4_IM_MODULE': 'fcitx', 'HOME': '/home/er', 'OLDPWD': '/home/er/colcon_ws/src', 'DESKTOP_SESSION': 'mate', 'PYENV_SHELL': 'bash', 'GTK_MODULES': 'appmenu-gtk-module:gail:atk-bridge:canberra-gtk-module', 'XDG_SEAT_PATH': '/org/freedesktop/DisplayManager/Seat0', 'LC_MONETARY': 'en_US.UTF-8', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'UBUNTU_MENUPROXY': '1', 'QT_QPA_PLATFORMTHEME': 'gtk2', 'COLCON_PREFIX_PATH': '/home/er/colcon_ws/src/mycobot_ros2/install', 'GTK_IM_MODULE': 'fcitx', 'LOGNAME': 'er', 'WINDOWID': '81790036', 'QT_AUTO_SCREEN_SCALE_FACTOR': '0', '_': '/usr/bin/colcon', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'GTK_OVERLAY_SCROLLING': '0', 'XDG_SESSION_ID': 'c1', 'PATH': '/home/er/.pyenv/shims:/home/er/.pyenv/bin:/home/er/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'SESSION_MANAGER': 'local/er:@/tmp/.ICE-unix/1140,unix/er:/tmp/.ICE-unix/1140', 'GDM_LANG': 'en_US', 'PAPERSIZE': 'letter', 'XDG_SESSION_PATH': '/org/freedesktop/DisplayManager/Session0', 'LC_ADDRESS': 'en_US.UTF-8', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0.0', 'LANG': 'en_US.UTF-8', 'XDG_CURRENT_DESKTOP': 'MATE', 'LC_TELEPHONE': 'en_US.UTF-8', 'XMODIFIERS': '@im=fcitx', 'XDG_SESSION_DESKTOP': 'mate', 'XAUTHORITY': '/home/er/.Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'XDG_GREETER_DATA_DIR': '/var/lib/lightdm-data/er', 'AMENT_PREFIX_PATH': '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description', 'SHELL': '/bin/bash', 'LC_NAME': 'en_US.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'mate', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'en_US.UTF-8', 'GCC_COLORS': 'error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01', 'GPG_AGENT_INFO': '/run/user/1000/gnupg/S.gpg-agent:0:1', 'LC_IDENTIFICATION': 'en_US.UTF-8', 'QT_IM_MODULE': 'fcitx', 'XDG_VTNR': '7', 'PWD': '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-mate:/etc/xdg', 'CLUTTER_IM_MODULE': 'fcitx', 'PYENV_ROOT': '/home/er/.pyenv', 'XDG_DATA_DIRS': '/usr/share/mate:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'LC_NUMERIC': 'en_US.UTF-8', 'PYTHONPATH': '/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages:/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages', 'MATE_DESKTOP_SESSION_ID': 'this-is-deprecated', 'LC_PAPER': 'en_US.UTF-8', 'COLCON': '1', 'VTE_VERSION': '6003'}, 'shell': False}
+[6.459618] (-) TimerEvent: {}
+[6.562872] (-) TimerEvent: {}
+[6.665660] (-) TimerEvent: {}
+[6.766919] (-) TimerEvent: {}
+[6.868606] (-) TimerEvent: {}
+[6.970414] (-) TimerEvent: {}
+[7.073360] (-) TimerEvent: {}
+[7.176290] (-) TimerEvent: {}
+[7.277522] (-) TimerEvent: {}
+[7.381845] (-) TimerEvent: {}
+[7.483672] (-) TimerEvent: {}
+[7.585886] (-) TimerEvent: {}
+[7.687520] (-) TimerEvent: {}
+[7.789288] (-) TimerEvent: {}
+[7.890969] (-) TimerEvent: {}
+[7.992874] (-) TimerEvent: {}
+[8.096112] (-) TimerEvent: {}
+[8.198448] (-) TimerEvent: {}
+[8.301709] (-) TimerEvent: {}
+[8.405654] (-) TimerEvent: {}
+[8.423266] (mycobot_280pi) StdoutLine: {'line': b'running egg_info\n'}
+[8.428478] (mycobot_280pi) StdoutLine: {'line': b'creating ../../build/mycobot_280pi/mycobot_280pi.egg-info\n'}
+[8.431406] (mycobot_280pi) StdoutLine: {'line': b'writing ../../build/mycobot_280pi/mycobot_280pi.egg-info/PKG-INFO\n'}
+[8.435990] (mycobot_280pi) StdoutLine: {'line': b'writing dependency_links to ../../build/mycobot_280pi/mycobot_280pi.egg-info/dependency_links.txt\n'}
+[8.440457] (mycobot_280pi) StdoutLine: {'line': b'writing entry points to ../../build/mycobot_280pi/mycobot_280pi.egg-info/entry_points.txt\n'}
+[8.441396] (mycobot_280pi) StdoutLine: {'line': b'writing requirements to ../../build/mycobot_280pi/mycobot_280pi.egg-info/requires.txt\n'}
+[8.441897] (mycobot_280pi) StdoutLine: {'line': b'writing top-level names to ../../build/mycobot_280pi/mycobot_280pi.egg-info/top_level.txt\n'}
+[8.451590] (mycobot_280pi) StdoutLine: {'line': b"writing manifest file '../../build/mycobot_280pi/mycobot_280pi.egg-info/SOURCES.txt'\n"}
+[8.505986] (-) TimerEvent: {}
+[8.607700] (-) TimerEvent: {}
+[8.653947] (mycobot_280pi) StdoutLine: {'line': b"reading manifest file '../../build/mycobot_280pi/mycobot_280pi.egg-info/SOURCES.txt'\n"}
+[8.658398] (mycobot_280pi) StdoutLine: {'line': b"writing manifest file '../../build/mycobot_280pi/mycobot_280pi.egg-info/SOURCES.txt'\n"}
+[8.659187] (mycobot_280pi) StdoutLine: {'line': b'running build\n'}
+[8.659859] (mycobot_280pi) StdoutLine: {'line': b'running build_py\n'}
+[8.660532] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build\n'}
+[8.661212] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib\n'}
+[8.661777] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.662255] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/following_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.663017] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/opencv_camera.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.664370] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/slider_control.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.665712] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/auto_move.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.667201] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/follow_and_pump.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.668757] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/__init__.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.671106] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/listen_real_of_topic.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.673843] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/follow_display.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.678117] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/teleop_keyboard.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.684051] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/simple_gui.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.688644] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/camera_display.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.691066] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/listen_real.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.695165] (mycobot_280pi) StdoutLine: {'line': b'copying mycobot_280pi/detect_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi\n'}
+[8.699599] (mycobot_280pi) StdoutLine: {'line': b'running install\n'}
+[8.706602] (mycobot_280pi) StdoutLine: {'line': b'running install_lib\n'}
+[8.708164] (-) TimerEvent: {}
+[8.715926] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.717849] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/following_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.719177] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/opencv_camera.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.720127] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/slider_control.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.723022] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/auto_move.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.724914] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/follow_and_pump.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.726124] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/__init__.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.728193] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/listen_real_of_topic.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.730609] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/follow_display.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.733542] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/teleop_keyboard.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.737907] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/simple_gui.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.739060] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/camera_display.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.741168] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/listen_real.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.741890] (mycobot_280pi) StdoutLine: {'line': b'copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/detect_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi\n'}
+[8.744212] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/following_marker.py to following_marker.cpython-38.pyc\n'}
+[8.751937] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/opencv_camera.py to opencv_camera.cpython-38.pyc\n'}
+[8.754698] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/slider_control.py to slider_control.cpython-38.pyc\n'}
+[8.761757] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/auto_move.py to auto_move.cpython-38.pyc\n'}
+[8.763969] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/follow_and_pump.py to follow_and_pump.cpython-38.pyc\n'}
+[8.768590] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/__init__.py to __init__.cpython-38.pyc\n'}
+[8.770659] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/listen_real_of_topic.py to listen_real_of_topic.cpython-38.pyc\n'}
+[8.778144] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/follow_display.py to follow_display.cpython-38.pyc\n'}
+[8.786590] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/teleop_keyboard.py to teleop_keyboard.cpython-38.pyc\n'}
+[8.797593] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/simple_gui.py to simple_gui.cpython-38.pyc\n'}
+[8.809371] (-) TimerEvent: {}
+[8.829452] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/camera_display.py to camera_display.cpython-38.pyc\n'}
+[8.837656] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/listen_real.py to listen_real.cpython-38.pyc\n'}
+[8.844184] (mycobot_280pi) StdoutLine: {'line': b'byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/detect_marker.py to detect_marker.cpython-38.pyc\n'}
+[8.848860] (mycobot_280pi) StdoutLine: {'line': b'running install_data\n'}
+[8.852757] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index\n'}
+[8.853710] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index/resource_index\n'}
+[8.854313] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index/resource_index/packages\n'}
+[8.854999] (mycobot_280pi) StdoutLine: {'line': b'copying resource/mycobot_280pi -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index/resource_index/packages\n'}
+[8.855642] (mycobot_280pi) StdoutLine: {'line': b'copying package.xml -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi\n'}
+[8.856559] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.857448] (mycobot_280pi) StdoutLine: {'line': b'copying launch/teleop_keyboard.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.858854] (mycobot_280pi) StdoutLine: {'line': b'copying launch/detect_marker.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.860796] (mycobot_280pi) StdoutLine: {'line': b'copying launch/slider_control_camera_flange.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.862562] (mycobot_280pi) StdoutLine: {'line': b'copying launch/detect_marker_with_topic.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.864007] (mycobot_280pi) StdoutLine: {'line': b'copying launch/test_camera_flange_pump.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.866205] (mycobot_280pi) StdoutLine: {'line': b'copying launch/test_pump.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.868473] (mycobot_280pi) StdoutLine: {'line': b'copying launch/auto_move.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.873211] (mycobot_280pi) StdoutLine: {'line': b'copying launch/test_camera_flange.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.875772] (mycobot_280pi) StdoutLine: {'line': b'copying launch/test.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.878843] (mycobot_280pi) StdoutLine: {'line': b'copying launch/slider_control.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.881006] (mycobot_280pi) StdoutLine: {'line': b'copying launch/slider_control_pump.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.883597] (mycobot_280pi) StdoutLine: {'line': b'copying launch/simple_gui.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.886017] (mycobot_280pi) StdoutLine: {'line': b'copying launch/mycobot_follow.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch\n'}
+[8.888444] (mycobot_280pi) StdoutLine: {'line': b'creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/config\n'}
+[8.889951] (mycobot_280pi) StdoutLine: {'line': b'copying config/mycobot_pi.rviz -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/config\n'}
+[8.891676] (mycobot_280pi) StdoutLine: {'line': b'copying config/mycobot_with_marker.rviz -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/config\n'}
+[8.895378] (mycobot_280pi) StdoutLine: {'line': b'running install_egg_info\n'}
+[8.909611] (-) TimerEvent: {}
+[8.912227] (mycobot_280pi) StdoutLine: {'line': b'Copying ../../build/mycobot_280pi/mycobot_280pi.egg-info to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi-0.0.0-py3.8.egg-info\n'}
+[8.920329] (mycobot_280pi) StdoutLine: {'line': b'running install_scripts\n'}
+[9.009953] (-) TimerEvent: {}
+[9.067909] (mycobot_280pi) StdoutLine: {'line': b'Installing auto_move script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.070336] (mycobot_280pi) StdoutLine: {'line': b'Installing camera_display script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.072982] (mycobot_280pi) StdoutLine: {'line': b'Installing detect_marker script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.075048] (mycobot_280pi) StdoutLine: {'line': b'Installing follow_display script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.078425] (mycobot_280pi) StdoutLine: {'line': b'Installing following_marker script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.082068] (mycobot_280pi) StdoutLine: {'line': b'Installing listen_real script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.085515] (mycobot_280pi) StdoutLine: {'line': b'Installing listen_real_of_topic script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.088059] (mycobot_280pi) StdoutLine: {'line': b'Installing opencv_camera script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.090271] (mycobot_280pi) StdoutLine: {'line': b'Installing simple_gui script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.092332] (mycobot_280pi) StdoutLine: {'line': b'Installing slider_control script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.095305] (mycobot_280pi) StdoutLine: {'line': b'Installing teleop_keyboard script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi\n'}
+[9.098679] (mycobot_280pi) StdoutLine: {'line': b"writing list of installed files to '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/install.log'\n"}
+[9.110804] (-) TimerEvent: {}
+[9.215676] (-) TimerEvent: {}
+[9.320046] (-) TimerEvent: {}
+[9.359092] (mycobot_280pi) CommandEnded: {'returncode': 0}
+[9.420338] (-) TimerEvent: {}
+[9.526454] (-) TimerEvent: {}
+[9.543040] (mycobot_280pi) JobEnded: {'identifier': 'mycobot_280pi', 'rc': 0}
+[9.551580] (-) EventReactorShutdown: {}

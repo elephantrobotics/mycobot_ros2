@@ -1,0 +1,42 @@
+[7.458s] Invoking command in '/home/er/colcon_ws/src/mycobot_ros2/mycobot_description': PYTHONPATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages: /usr/bin/python3 setup.py egg_info --egg-base ../build/mycobot_description build --build-base /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build install --prefix /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description --record /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log --single-version-externally-managed
+[9.411s] running egg_info
+[9.416s] writing ../build/mycobot_description/mycobot_description.egg-info/PKG-INFO
+[9.421s] writing dependency_links to ../build/mycobot_description/mycobot_description.egg-info/dependency_links.txt
+[9.424s] writing entry points to ../build/mycobot_description/mycobot_description.egg-info/entry_points.txt
+[9.426s] writing requirements to ../build/mycobot_description/mycobot_description.egg-info/requires.txt
+[9.428s] writing top-level names to ../build/mycobot_description/mycobot_description.egg-info/top_level.txt
+[9.688s] reading manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+[9.719s] writing manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+[9.721s] running build
+[9.723s] running build_py
+[9.730s] running install
+[9.734s] running install_lib
+[9.747s] running install_data
+[9.833s] copying urdf/mycobot_280_rdkx5/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[9.892s] copying urdf/mycobot_280_rdkx5/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[9.895s] copying urdf/mycobot_280_rdkx5/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[9.938s] copying urdf/mycobot_280_rdkx5/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[9.941s] copying urdf/mycobot_280_rdkx5/mycobot_280_rdkx5.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[9.946s] copying urdf/mycobot_280_rdkx5/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.042s] copying urdf/mycobot_280_rdkx5/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.117s] copying urdf/mycobot_280_rdkx5/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.119s] copying urdf/mycobot_280_rdkx5/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.147s] copying urdf/mycobot_280_rdkx5/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.150s] copying urdf/mycobot_280_rdkx5/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.157s] copying urdf/mycobot_280_rdkx5/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.166s] copying urdf/mycobot_280_rdkx5/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.175s] copying urdf/mycobot_280_rdkx5/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+[10.223s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[10.225s] copying urdf/mycobot_320_riscv/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[11.951s] copying urdf/mycobot_320_riscv/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[12.595s] copying urdf/mycobot_320_riscv/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[13.359s] copying urdf/mycobot_320_riscv/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[13.642s] copying urdf/mycobot_320_riscv/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[14.547s] copying urdf/mycobot_320_riscv/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[14.830s] copying urdf/mycobot_320_riscv/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[15.392s] copying urdf/mycobot_320_riscv/mycobot_320_riscv.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+[15.398s] running install_egg_info
+[15.420s] Copying ../build/mycobot_description/mycobot_description.egg-info to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages/mycobot_description-0.0.0-py3.8.egg-info
+[15.441s] running install_scripts
+[15.645s] writing list of installed files to '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log'
+[15.927s] Invoked command in '/home/er/colcon_ws/src/mycobot_ros2/mycobot_description' returned '0': PYTHONPATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages: /usr/bin/python3 setup.py egg_info --egg-base ../build/mycobot_description build --build-base /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/build install --prefix /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description --record /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log --single-version-externally-managed

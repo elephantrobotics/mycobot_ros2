@@ -1,0 +1,97 @@
+[6.392s] Invoking command in '/home/er/colcon_ws/src/mycobot_ros2/mycobot_280/mycobot_280pi': AMENT_PREFIX_PATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description PYTHONPATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages:/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages /usr/bin/python3 setup.py egg_info --egg-base ../../build/mycobot_280pi build --build-base /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build install --prefix /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi --record /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/install.log --single-version-externally-managed
+[8.397s] running egg_info
+[8.403s] creating ../../build/mycobot_280pi/mycobot_280pi.egg-info
+[8.405s] writing ../../build/mycobot_280pi/mycobot_280pi.egg-info/PKG-INFO
+[8.413s] writing dependency_links to ../../build/mycobot_280pi/mycobot_280pi.egg-info/dependency_links.txt
+[8.414s] writing entry points to ../../build/mycobot_280pi/mycobot_280pi.egg-info/entry_points.txt
+[8.414s] writing requirements to ../../build/mycobot_280pi/mycobot_280pi.egg-info/requires.txt
+[8.415s] writing top-level names to ../../build/mycobot_280pi/mycobot_280pi.egg-info/top_level.txt
+[8.425s] writing manifest file '../../build/mycobot_280pi/mycobot_280pi.egg-info/SOURCES.txt'
+[8.627s] reading manifest file '../../build/mycobot_280pi/mycobot_280pi.egg-info/SOURCES.txt'
+[8.631s] writing manifest file '../../build/mycobot_280pi/mycobot_280pi.egg-info/SOURCES.txt'
+[8.632s] running build
+[8.633s] running build_py
+[8.634s] creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build
+[8.634s] creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib
+[8.635s] creating /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.635s] copying mycobot_280pi/following_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.636s] copying mycobot_280pi/opencv_camera.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.637s] copying mycobot_280pi/slider_control.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.639s] copying mycobot_280pi/auto_move.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.640s] copying mycobot_280pi/follow_and_pump.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.643s] copying mycobot_280pi/__init__.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.644s] copying mycobot_280pi/listen_real_of_topic.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.647s] copying mycobot_280pi/follow_display.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.652s] copying mycobot_280pi/teleop_keyboard.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.658s] copying mycobot_280pi/simple_gui.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.662s] copying mycobot_280pi/camera_display.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.664s] copying mycobot_280pi/listen_real.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.669s] copying mycobot_280pi/detect_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi
+[8.673s] running install
+[8.680s] running install_lib
+[8.690s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.691s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/following_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.692s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/opencv_camera.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.694s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/slider_control.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.697s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/auto_move.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.698s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/follow_and_pump.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.699s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/__init__.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.702s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/listen_real_of_topic.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.704s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/follow_display.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.707s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/teleop_keyboard.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.711s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/simple_gui.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.712s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/camera_display.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.714s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/listen_real.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.715s] copying /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build/lib/mycobot_280pi/detect_marker.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi
+[8.717s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/following_marker.py to following_marker.cpython-38.pyc
+[8.725s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/opencv_camera.py to opencv_camera.cpython-38.pyc
+[8.728s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/slider_control.py to slider_control.cpython-38.pyc
+[8.735s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/auto_move.py to auto_move.cpython-38.pyc
+[8.737s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/follow_and_pump.py to follow_and_pump.cpython-38.pyc
+[8.742s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/__init__.py to __init__.cpython-38.pyc
+[8.744s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/listen_real_of_topic.py to listen_real_of_topic.cpython-38.pyc
+[8.752s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/follow_display.py to follow_display.cpython-38.pyc
+[8.760s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/teleop_keyboard.py to teleop_keyboard.cpython-38.pyc
+[8.772s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/simple_gui.py to simple_gui.cpython-38.pyc
+[8.803s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/camera_display.py to camera_display.cpython-38.pyc
+[8.812s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/listen_real.py to listen_real.cpython-38.pyc
+[8.818s] byte-compiling /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi/detect_marker.py to detect_marker.cpython-38.pyc
+[8.822s] running install_data
+[8.826s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index
+[8.827s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index/resource_index
+[8.827s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index/resource_index/packages
+[8.828s] copying resource/mycobot_280pi -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/ament_index/resource_index/packages
+[8.829s] copying package.xml -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi
+[8.830s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.830s] copying launch/teleop_keyboard.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.832s] copying launch/detect_marker.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.834s] copying launch/slider_control_camera_flange.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.836s] copying launch/detect_marker_with_topic.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.837s] copying launch/test_camera_flange_pump.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.840s] copying launch/test_pump.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.842s] copying launch/auto_move.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.847s] copying launch/test_camera_flange.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.850s] copying launch/test.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.852s] copying launch/slider_control.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.854s] copying launch/slider_control_pump.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.857s] copying launch/simple_gui.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.859s] copying launch/mycobot_follow.launch.py -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/launch
+[8.862s] creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/config
+[8.863s] copying config/mycobot_pi.rviz -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/config
+[8.865s] copying config/mycobot_with_marker.rviz -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/share/mycobot_280pi/config
+[8.870s] running install_egg_info
+[8.885s] Copying ../../build/mycobot_280pi/mycobot_280pi.egg-info to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages/mycobot_280pi-0.0.0-py3.8.egg-info
+[8.894s] running install_scripts
+[9.041s] Installing auto_move script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.044s] Installing camera_display script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.047s] Installing detect_marker script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.050s] Installing follow_display script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.053s] Installing following_marker script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.056s] Installing listen_real script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.060s] Installing listen_real_of_topic script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.062s] Installing opencv_camera script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.064s] Installing simple_gui script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.066s] Installing slider_control script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.070s] Installing teleop_keyboard script to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/mycobot_280pi
+[9.074s] writing list of installed files to '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/install.log'
+[9.333s] Invoked command in '/home/er/colcon_ws/src/mycobot_ros2/mycobot_280/mycobot_280pi' returned '0': AMENT_PREFIX_PATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description PYTHONPATH=/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi/lib/python3.8/site-packages:/home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages /usr/bin/python3 setup.py egg_info --egg-base ../../build/mycobot_280pi build --build-base /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/build install --prefix /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_280pi --record /home/er/colcon_ws/src/mycobot_ros2/build/mycobot_280pi/install.log --single-version-externally-managed

@@ -1,0 +1,40 @@
+running egg_info
+writing ../build/mycobot_description/mycobot_description.egg-info/PKG-INFO
+writing dependency_links to ../build/mycobot_description/mycobot_description.egg-info/dependency_links.txt
+writing entry points to ../build/mycobot_description/mycobot_description.egg-info/entry_points.txt
+writing requirements to ../build/mycobot_description/mycobot_description.egg-info/requires.txt
+writing top-level names to ../build/mycobot_description/mycobot_description.egg-info/top_level.txt
+reading manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+writing manifest file '../build/mycobot_description/mycobot_description.egg-info/SOURCES.txt'
+running build
+running build_py
+running install
+running install_lib
+running install_data
+copying urdf/mycobot_280_rdkx5/joint2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint4.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint7.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint3.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/mycobot_280_rdkx5.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint2.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint5.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint6.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint1.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint7.png -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+copying urdf/mycobot_280_rdkx5/joint6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_280_rdkx5
+creating /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/base.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/link2.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/link1.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/link4.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/link3.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/link6.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/link5.dae -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+copying urdf/mycobot_320_riscv/mycobot_320_riscv.urdf -> /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/share/mycobot_description/urdf/mycobot_320_riscv
+running install_egg_info
+Copying ../build/mycobot_description/mycobot_description.egg-info to /home/er/colcon_ws/src/mycobot_ros2/install/mycobot_description/lib/python3.8/site-packages/mycobot_description-0.0.0-py3.8.egg-info
+running install_scripts
+writing list of installed files to '/home/er/colcon_ws/src/mycobot_ros2/build/mycobot_description/install.log'
