@@ -1,41 +1,32 @@
 import rclpy
 from rclpy.node import Node
 import time
+from pymycobot import MyCobot280
 import math
 
-from pymycobot import MyCobot280
-
-class AutoMover(Node):
+class MoveToPosition(Node):
     def __init__(self):
-        super().__init__('auto_mover')
-        self.mc = MyCobot280('/dev/ttyAMA0', 1000000)
+        super().__init__('move_to_position')
+        self.mc = MyCobot280("/dev/ttyAMA0", 1000000)
         time.sleep(0.1)
         self.mc.set_fresh_mode(1)
         time.sleep(0.1)
 
-        self.run_sequence()
+        
+        initial_pos = [0, 0, 0, 0, 0, 0]
+        self.mc.send_angles([math.degrees(x) for x in initial_pos], 50)
+        time.sleep(3)
 
-    def run_sequence(self):
-        self.get_logger().info('🚀 Starting 2-position movement sequence...')
+        # degrés -> radians
+        target_pos = [-0.00, -0.78, 0.78, 1.59, -1.59, -0.00]
+        target_deg = [round(math.degrees(angle), 2) for angle in target_pos]
 
-        # Liste des positions en RADIANS → conversion en DEGRÉS pour send_angles
-        pos_init = [0, 0, 0, 0, 0, 0]
-        pos_target_radians = [-0.00, -0.78, 0.78, 1.59, -1.59, -0.00]
-        pos_target_degrees = [round(math.degrees(x), 2) for x in pos_target_radians]
-
-        positions = [pos_init, pos_target_degrees]
-
-        for i, pos in enumerate(positions):
-            self.get_logger().info(f'📍 Moving to position {i}: {pos}')
-            self.mc.send_angles(pos, 30)
-            time.sleep(3)
-
-        self.get_logger().info('✅ Sequence complete.')
+        self.mc.send_angles(target_deg, 50)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = AutoMover()
-    rclpy.spin_once(node, timeout_sec=0.1)
+    node = MoveToPosition()
+    rclpy.spin_once(node, timeout_sec=5)
     node.destroy_node()
     rclpy.shutdown()
 
