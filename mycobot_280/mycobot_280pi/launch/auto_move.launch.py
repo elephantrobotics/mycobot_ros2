@@ -50,7 +50,7 @@ def generate_launch_description():
     )
     res.append(robot_state_publisher_node)
 
-        follow_display_node = Node(
+    follow_display_node = Node(
         package="mycobot_280pi",
         executable="follow_display",
         name="follow_display",
