@@ -31,12 +31,6 @@ def generate_launch_description():
     )
     res.append(rvizconfig_launch_arg)
 
-    gui_launch_arg = DeclareLaunchArgument(
-        "gui",
-        default_value="true"
-    )
-    res.append(gui_launch_arg)
-
     robot_description = ParameterValue(
         Command(['xacro ', LaunchConfiguration('model')]),
         value_type=str
