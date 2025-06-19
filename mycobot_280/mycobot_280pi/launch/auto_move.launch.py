@@ -6,6 +6,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration
 
 
@@ -30,25 +31,39 @@ def generate_launch_description():
     )
     res.append(rvizconfig_launch_arg)
 
+    gui_launch_arg = DeclareLaunchArgument(
+        "gui",
+        default_value="true"
+    )
+    res.append(gui_launch_arg)
+
     robot_description = ParameterValue(
         Command(['xacro ', LaunchConfiguration('model')]),
         value_type=str
     )
 
     robot_state_publisher_node = Node(
-        name="robot_state_publisher",
         package="robot_state_publisher",
         executable="robot_state_publisher",
+        name="robot_state_publisher",
         parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
 
+        follow_display_node = Node(
+        package="mycobot_280pi",
+        executable="follow_display",
+        name="follow_display",
+        output="screen"
+    )
+    res.append(follow_display_node)
+
     rviz_node = Node(
-        name="rviz2",
         package="rviz2",
         executable="rviz2",
+        name="rviz2",
         output="screen",
-        arguments=['-d', LaunchConfiguration("rvizconfig")],
+        arguments=['-d', LaunchConfiguration("rvizconfig")]
     )
     res.append(rviz_node)
 
