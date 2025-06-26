@@ -14,6 +14,9 @@ myCobot ROS2 package
   * Ubuntu 20.04 / ROS2 Foxy - branch `foxy`
   * Ubuntu 20.04 / ROS2 Galactic - branch `galactic`
   * Ubuntu 22.04 / ROS2 Humble - branch `humble`
+  * Orin Nano Ubunut 20.04 / ROS2 Foxy
+  * LimoPro Orin Nano Ubunut 20.04 / ROS2 Foxy
+  * PC Virtual Machine Ubunut 20.04 / ROS2 Foxy
 
 ## Installation
 
