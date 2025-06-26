@@ -75,7 +75,7 @@ class MyCobotDriver(Node):
             lock = acquire('/tmp/mycobot_lock')
             angles = self.mc.get_angles()
             release(lock)
-            if not angles or angles[0:3] == [0.0, 0.0, 0.0] or len(angles) != 6:
+            if not angles or not isinstance(angles, list) or angles[0:3] == [0.0, 0.0, 0.0] or len(angles) != 6:
                 return
             js = JointState()
             js.header = Header()
