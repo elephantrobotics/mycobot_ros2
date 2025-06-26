@@ -246,6 +246,27 @@ class WindowNode(Node):
         ).grid(row=0, column=0)
         self.get_speed = tk.Entry(self.frmLB, textvariable=self.speed_d, width=10)
         self.get_speed.grid(row=0, column=1)
+    
+    def safe_get_angle(self, angle_list, index, default="-1°"):
+        try:
+            if angle_list and len(angle_list[0]) > index:
+                return f"{angle_list[0][index]}°"
+        except Exception as e:
+            # pass
+            self.get_logger().warn(f"safe_get_angle error: {e}")
+        return default
+
+    
+    def safe_get_coord(self, coords_list, index, default="0.0"):
+        try:
+            if coords_list and len(coords_list) > 0:
+                value = coords_list[0][index]
+                if value != -1:
+                    return str(value)
+        except Exception:
+            # pass
+            self.get_logger().warn(f"safe_get_coord error: {e}")
+        return default
 
     def show_init(self):
         # 显示
@@ -260,17 +281,17 @@ class WindowNode(Node):
 
         # ，展示出来
         self.cont_1 = tk.StringVar(self.frmLC)
-        self.cont_1.set(str(self.res_angles[0][0]) + "°")
+        self.cont_1.set(self.safe_get_angle(self.res_angles, 0))
         self.cont_2 = tk.StringVar(self.frmLC)
-        self.cont_2.set(str(self.res_angles[0][1]) + "°")
+        self.cont_2.set(self.safe_get_angle(self.res_angles, 1))
         self.cont_3 = tk.StringVar(self.frmLC)
-        self.cont_3.set(str(self.res_angles[0][2]) + "°")
+        self.cont_3.set(self.safe_get_angle(self.res_angles, 2))
         self.cont_4 = tk.StringVar(self.frmLC)
-        self.cont_4.set(str(self.res_angles[0][3]) + "°")
+        self.cont_4.set(self.safe_get_angle(self.res_angles, 3))
         self.cont_5 = tk.StringVar(self.frmLC)
-        self.cont_5.set(str(self.res_angles[0][4]) + "°")
+        self.cont_5.set(self.safe_get_angle(self.res_angles, 4))
         self.cont_6 = tk.StringVar(self.frmLC)
-        self.cont_6.set(str(self.res_angles[0][5]) + "°")
+        self.cont_6.set(self.safe_get_angle(self.res_angles, 5))
         self.cont_all = [
             self.cont_1,
             self.cont_2,
@@ -349,17 +370,17 @@ class WindowNode(Node):
         tk.Label(self.frmLC, text="  ry ").grid(row=4, column=3)
         tk.Label(self.frmLC, text="  rz ").grid(row=5, column=3)
         self.coord_x = tk.StringVar()
-        self.coord_x.set(str(self.record_coords[0][0]))
+        self.coord_x.set(self.safe_get_coord(self.record_coords, 0))
         self.coord_y = tk.StringVar()
-        self.coord_y.set(str(self.record_coords[0][1]))
+        self.coord_y.set(self.safe_get_coord(self.record_coords, 1))
         self.coord_z = tk.StringVar()
-        self.coord_z.set(str(self.record_coords[0][2]))
+        self.coord_z.set(self.safe_get_coord(self.record_coords, 2))
         self.coord_rx = tk.StringVar()
-        self.coord_rx.set(str(self.record_coords[0][3]))
+        self.coord_rx.set(self.safe_get_coord(self.record_coords, 3))
         self.coord_ry = tk.StringVar()
-        self.coord_ry.set(str(self.record_coords[0][4]))
+        self.coord_ry.set(self.safe_get_coord(self.record_coords, 4))
         self.coord_rz = tk.StringVar()
-        self.coord_rz.set(str(self.record_coords[0][5]))
+        self.coord_rz.set(self.safe_get_coord(self.record_coords, 5))
 
         self.coord_all = [
             self.coord_x,

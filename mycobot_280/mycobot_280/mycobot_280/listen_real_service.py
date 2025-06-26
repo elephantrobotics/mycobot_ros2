@@ -141,7 +141,7 @@ class MyCobotDriver(Node):
             release(lock)
             if not coords or len(coords) != 6:
                 return
-            if coords:
+            if coords and all(c!=-1 for c in coords)and len(coords)== 6:
                 response.x = coords[0]
                 response.y = coords[1]
                 response.z = coords[2]
@@ -161,7 +161,7 @@ class MyCobotDriver(Node):
             angles = self.mc.get_angles()
             release(lock)
 
-            if angles:
+            if angles and all(a!=-1 for a in angles)and len(angles)== 6:
                 response.joint_1 = angles[0]
                 response.joint_2 = angles[1]
                 response.joint_3 = angles[2]
