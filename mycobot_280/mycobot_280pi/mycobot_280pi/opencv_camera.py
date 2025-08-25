@@ -9,10 +9,10 @@ class Image_Publisher(Node):
     def __init__(self):
         super().__init__("image_publisher")
 
-        # 声明launch参数
+        # Declaring launch parameters
         self.declare_parameter('num', "0")
 
-        # 获取launch文件中的参数
+        # Get the parameters in the launch file
         self.cap_num = self.get_parameter(
             'num').get_parameter_value().integer_value
 
@@ -27,17 +27,17 @@ class Image_Publisher(Node):
         self.i = 1
 
     def timer_callback(self):
-        # 开启摄像头
+        # open camera
         cap = cv2.VideoCapture(self.cap_num)
         if not cap.isOpened():
             cap.open(1)
         if self.i == 1:
-            self.get_logger().info("{} 摄像头开启成功！".format(self.cap_num))
+            self.get_logger().info("{} The camera was successfully turned on!".format(self.cap_num))
 
         _, frame = cap.read()
 
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, 'bgr8'))
-        self.get_logger().info("第{}次发布数据中...".format(self.i))
+        self.get_logger().info("The {}th data release...".format(self.i))
         self.i += 1
 
 
