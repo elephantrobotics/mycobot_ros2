@@ -53,9 +53,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_display = mycobot_280_x3pi.camera_display:main',
-            'detect_marker = mycobot_280_x3pi.detect_marker:main',
             'follow_display = mycobot_280_x3pi.follow_display:main',
-            'following_marker = mycobot_280_x3pi.following_marker:main',
             'listen_real_of_topic = mycobot_280_x3pi.listen_real_of_topic:main',
             'listen_real = mycobot_280_x3pi.listen_real:main',
             'opencv_camera = mycobot_280_x3pi.opencv_camera:main',

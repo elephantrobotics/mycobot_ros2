@@ -52,9 +52,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_display = mycobot_320.camera_display:main',
-            'detect_marker = mycobot_320.detect_marker:main',
             'follow_display = mycobot_320.follow_display:main',
-            'following_marker = mycobot_320.following_marker:main',
             'listen_real_of_topic = mycobot_320.listen_real_of_topic:main',
             'listen_real = mycobot_320.listen_real:main',
             'opencv_camera = mycobot_320.opencv_camera:main',

@@ -50,9 +50,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'detect_marker = mecharm_pi.detect_marker:main',
             'follow_display = mecharm_pi.follow_display:main',
-            'following_marker = mecharm_pi.following_marker:main',
             'listen_real_of_topic = mecharm_pi.listen_real_of_topic:main',
             'listen_real = mecharm_pi.listen_real:main',
             'simple_gui = mecharm_pi.simple_gui:main',
