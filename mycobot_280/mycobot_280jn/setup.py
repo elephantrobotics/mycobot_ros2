@@ -58,7 +58,7 @@ setup(
             'opencv_camera = mycobot_280jn.opencv_camera:main',
             'simple_gui = mycobot_280jn.simple_gui:main',
             'slider_control = mycobot_280jn.slider_control:main',
-            'listen_real_service = mycobot_280.listen_real_service:main',
+            'listen_real_service = mycobot_280jn.listen_real_service:main',
             'teleop_keyboard = mycobot_280jn.teleop_keyboard:main',
             'slider_control_adaptive_gripper = mycobot_280jn.slider_control_adaptive_gripper:main',
         ],

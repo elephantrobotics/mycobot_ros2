@@ -37,7 +37,7 @@ class Slider_Subscriber(Node):
         #     port = self.robot_m5
         # else:
         #     port = self.robot_wio
-        self.declare_parameter('port', '/dev/ttyTHS0')
+        self.declare_parameter('port', '/dev/ttyTHS1')
         self.declare_parameter('baud', 1000000)
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value

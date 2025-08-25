@@ -51,12 +51,16 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_service_node = Node(
         package="mycobot_280jn",
-        executable="follow_display",
-        name="follow_display",
-        output="screen"
+        executable="listen_real_service",
+        name="listen_real_service",
+        output="screen",
+        # parameters=[{
+        # "port": LaunchConfiguration("port"),
+        # "baud": LaunchConfiguration("baud")
+        # }]
     )
-    res.append(follow_display_node)
+    res.append(listen_real_service_node)
 
     return LaunchDescription(res)

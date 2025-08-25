@@ -55,7 +55,7 @@ def release(fd):
 class MyCobotDriver(Node):
     def __init__(self):
         super().__init__('mycobot_driver_node')
-        self.declare_parameter('port', '/dev/ttyAMA0')
+        self.declare_parameter('port', '/dev/ttyTHS1')
         self.declare_parameter('baud', 1000000)
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
