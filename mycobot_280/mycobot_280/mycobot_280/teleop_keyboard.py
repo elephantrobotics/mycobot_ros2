@@ -40,13 +40,14 @@ Other:
 """
 
 COORD_LIMITS = {
-    'x': (-350, 350),
-    'y': (-350, 350),
-    'z': (-70, 523.9),
+    'x': (-281.45, 281.45),
+    'y': (-281.45, 281.45),
+    'z': (-70, 412.67),
     'rx': (-180, 180),
     'ry': (-180, 180),
     'rz': (-180, 180)
 }
+
 
 def vels(speed, turn):
     return "currently:\tspeed: %s\tchange percent: %s  " % (speed, turn)
@@ -64,6 +65,7 @@ class Raw(object):
     def __exit__(self, type, value, traceback):
         termios.tcsetattr(self.stream, termios.TCSANOW, self.original_stty)
 
+
 class TeleopKeyboardNode(Node):
     def __init__(self):
         super().__init__('teleop_keyboard_client')
@@ -71,16 +73,18 @@ class TeleopKeyboardNode(Node):
         # client request
         self.set_angles_client = self.create_client(SetAngles, '/set_angles')
         self.set_coords_client = self.create_client(SetCoords, '/set_coords')
-        self.set_gripper_client = self.create_client(GripperStatus, '/set_gripper')
+        self.set_gripper_client = self.create_client(
+            GripperStatus, '/set_gripper')
         self.get_coords_client = self.create_client(GetCoords, '/get_coords')
         self.get_angles_client = self.create_client(GetAngles, '/get_angles')
-        self.set_pump_client = self.create_client(PumpStatus, '/set_pump_status')
+        self.set_pump_client = self.create_client(
+            PumpStatus, '/set_pump_status')
 
         # Waiting for the service to go online
         while not self.set_angles_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Service not available, waiting again...')
 
-        self.speed = 50 
+        self.speed = 50
         self.model = 1  # Sport Mode
         self.change_percent = 5  # Percentage of change
 
@@ -111,14 +115,15 @@ class TeleopKeyboardNode(Node):
         rclpy.spin_until_future_complete(self, future)
         if future.result() is not None:
             return [future.result().joint_1, future.result().joint_2, future.result().joint_3, future.result().joint_4,
-                     future.result().joint_5, future.result().joint_6]
+                    future.result().joint_5, future.result().joint_6]
         else:
             self.get_logger().error("Failed to get angles")
             return [-1, -1, -1, -1, -1, -1]
 
     def print_status(self):
         coords = self.record_coords[0]
-        print("\r current coords: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]" % tuple(coords))
+        print(
+            "\r current coords: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]" % tuple(coords))
 
     def send_coords(self):
         coords = self.record_coords[0]
@@ -126,7 +131,8 @@ class TeleopKeyboardNode(Node):
         for i, axis in enumerate(['x', 'y', 'z', 'rx', 'ry', 'rz']):
             min_limit, max_limit = COORD_LIMITS[axis]
             if coords[i] < min_limit or coords[i] > max_limit:
-                self.get_logger().warn(f"{axis} value {coords[i]} exceeds the limit range [{min_limit}, {max_limit}], unable to send coordinates")
+                self.get_logger().warn(
+                    f"{axis} value {coords[i]} exceeds the limit range [{min_limit}, {max_limit}], unable to send coordinates")
                 return
         request = SetCoords.Request()
         request.x = coords[0]
@@ -175,7 +181,7 @@ class TeleopKeyboardNode(Node):
             # self.get_logger().info(f"Gripper status set: {status}")
         else:
             self.get_logger().error('Failed to control gripper')
-            
+
     def set_pump_status(self, status, pin1, pin2):
         request = PumpStatus.Request()
         request.status = status
@@ -187,7 +193,8 @@ class TeleopKeyboardNode(Node):
 
         if future.result() is not None:
             if future.result().flag:
-                self.get_logger().info(f"Pump status set to {status}, pin1: {pin1}, pin2: {pin2}")
+                self.get_logger().info(
+                    f"Pump status set to {status}, pin1: {pin1}, pin2: {pin2}")
             else:
                 self.get_logger().error("Pump service returned failure.")
         else:
@@ -255,18 +262,21 @@ class TeleopKeyboardNode(Node):
                     time.sleep(2)
                     self.record_coords = self.get_initial_coords()
                 elif key == "3":
-                    self.home_pose = self.get_initial_angles()  # Save the current posture as the new home posture
+                    # Save the current posture as the new home posture
+                    self.home_pose = self.get_initial_angles()
                     print(f"New home pose saved: {self.home_pose}")
                 elif key == '+':
                     self.change_percent = min(self.change_percent + 1, 20)
                     self.change_angle = 180 * self.change_percent / 100
                     self.change_len = 250 * self.change_percent / 100
-                    print("Increase change_percent to %d%%, move step: %.1f mm" % (self.change_percent, self.change_len))
+                    print("Increase change_percent to %d%%, move step: %.1f mm" % (
+                        self.change_percent, self.change_len))
                 elif key == '-':
                     self.change_percent = max(self.change_percent - 1, 1)
                     self.change_angle = 180 * self.change_percent / 100
                     self.change_len = 250 * self.change_percent / 100
-                    print("Decrease change_percent to %d%%, move step: %.1f mm" % (self.change_percent, self.change_len))
+                    print("Decrease change_percent to %d%%, move step: %.1f mm" % (
+                        self.change_percent, self.change_len))
                 else:
                     continue
 

@@ -14,12 +14,15 @@ MIN_REQUIRE_VERSION = '3.6.1'
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(
+        MIN_REQUIRE_VERSION, current_verison))
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MyCobot280
 
 # Avoid serial port conflicts and need to be locked
+
+
 def acquire(lock_file):
     open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
     try:
@@ -65,7 +68,8 @@ def release(lock_file_fd):
     except OSError as e:
         print(f"Failed to release lock: {e}")
 
-class WindowNode(Node): 
+
+class WindowNode(Node):
     def __init__(self, handle):
         # self.robot_m5 = os.popen("ls /dev/ttyUSB*").readline()[:-1]
         # self.robot_wio = os.popen("ls /dev/ttyACM*").readline()[:-1]
@@ -76,10 +80,10 @@ class WindowNode(Node):
         super().__init__('simple_gui')
         self.declare_parameter('port', '/dev/ttyUSB0')
         self.declare_parameter('baud', 115200)
-   
+
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
-            
+
         print("port:%s, baud:%d" % (port, baud))
         self.mc = MyCobot280(port, baud)
         time.sleep(0.05)
@@ -89,18 +93,18 @@ class WindowNode(Node):
                 self.mc.set_fresh_mode(1)
             release(lock)
         time.sleep(0.05)
-        
+
         self.win = handle
-        self.win.resizable(0, 0)  # 固定窗口大小
+        self.win.resizable(0, 0)  # Fixed window size
 
         self.model = 1
         self.speed = 50
 
-        # 设置默认速度123456
+        # Set the default speed
         self.speed_d = tk.StringVar()
         self.speed_d.set(str(self.speed))
 
-        # 获取机械臂数据
+        # Get robotic arm data
         self.record_coords = [
             [0, 0, 0, 0, 0, 0],
             self.speed,
@@ -116,37 +120,37 @@ class WindowNode(Node):
         # get screen width and height
         self.ws = self.win.winfo_screenwidth()  # width of the screen
         self.hs = self.win.winfo_screenheight()  # height of the screen
-        
+
         # calculate x and y coordinates for the Tk root window
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
         self.win.geometry("440x440+{}+{}".format(int(x), int(y)))
-        # 布局
+        # layout
         self.set_layout()
-        # 输入部分
+        # Input section
         self.need_input()
-        # 展示部分
+        # Display section
         self.show_init()
 
-        # joint 设置按钮
+        # joint set button
         tk.Button(self.frmLT, text="设置", width=5, command=self.get_joint_input).grid(
             row=6, column=1, sticky="w", padx=3, pady=2
         )
 
-        # coordination 设置按钮
+        # coordination setting button
         tk.Button(self.frmRT, text="设置", width=5, command=self.get_coord_input).grid(
             row=6, column=1, sticky="w", padx=3, pady=2
         )
 
-        # 夹爪开关按钮
+        # Gripper switch button
         tk.Button(self.frmLB, text="夹爪(开)", command=self.gripper_open, width=5).grid(
             row=1, column=0, sticky="w", padx=3, pady=20
         )
         tk.Button(self.frmLB, text="夹爪(关)", command=self.gripper_close, width=5).grid(
             row=1, column=1, sticky="w", padx=3, pady=2
         )
-        
-        # 吸泵开关按钮
+
+        # Suction pump switch button
         tk.Button(self.frmLB, text=" 吸泵(开)", command=self.pump_open, width=5).grid(
             row=2, column=0, sticky="w", padx=3, pady=20
         )
@@ -165,22 +169,22 @@ class WindowNode(Node):
         self.frmRT.grid(row=0, column=1, padx=2, pady=3)
 
     def need_input(self):
-        # 输入提示
+        # Input prompt
         tk.Label(self.frmLT, text="Joint 1 ").grid(row=0)
-        tk.Label(self.frmLT, text="Joint 2 ").grid(row=1)  # 第二行
+        tk.Label(self.frmLT, text="Joint 2 ").grid(row=1)
         tk.Label(self.frmLT, text="Joint 3 ").grid(row=2)
         tk.Label(self.frmLT, text="Joint 4 ").grid(row=3)
         tk.Label(self.frmLT, text="Joint 5 ").grid(row=4)
         tk.Label(self.frmLT, text="Joint 6 ").grid(row=5)
 
         tk.Label(self.frmRT, text=" x ").grid(row=0)
-        tk.Label(self.frmRT, text=" y ").grid(row=1)  # 第二行
+        tk.Label(self.frmRT, text=" y ").grid(row=1)
         tk.Label(self.frmRT, text=" z ").grid(row=2)
         tk.Label(self.frmRT, text=" rx ").grid(row=3)
         tk.Label(self.frmRT, text=" ry ").grid(row=4)
         tk.Label(self.frmRT, text=" rz ").grid(row=5)
 
-        # 设置输入框的默认值
+        # Set the default value of the input box
         self.j1_default = tk.StringVar()
         self.j1_default.set(self.res_angles[0][0])
         self.j2_default = tk.StringVar()
@@ -207,7 +211,7 @@ class WindowNode(Node):
         self.rz_default = tk.StringVar()
         self.rz_default.set(self.record_coords[0][5])
 
-        # joint 输入框
+        # joint Input Box
         self.J_1 = tk.Entry(self.frmLT, textvariable=self.j1_default)
         self.J_1.grid(row=0, column=1, pady=3)
         self.J_2 = tk.Entry(self.frmLT, textvariable=self.j2_default)
@@ -221,7 +225,7 @@ class WindowNode(Node):
         self.J_6 = tk.Entry(self.frmLT, textvariable=self.j6_default)
         self.J_6.grid(row=5, column=1, pady=3)
 
-        # coord 输入框
+        # coord Input Box
         self.x = tk.Entry(self.frmRT, textvariable=self.x_default)
         self.x.grid(row=0, column=1, pady=3, padx=0)
         self.y = tk.Entry(self.frmRT, textvariable=self.y_default)
@@ -235,18 +239,20 @@ class WindowNode(Node):
         self.rz = tk.Entry(self.frmRT, textvariable=self.rz_default)
         self.rz.grid(row=5, column=1, pady=3)
 
-        # 所有输入框，用于拿输入的数据
-        self.all_j = [self.J_1, self.J_2, self.J_3, self.J_4, self.J_5, self.J_6]
+        # All input boxes are used to get the input data
+        self.all_j = [self.J_1, self.J_2,
+                      self.J_3, self.J_4, self.J_5, self.J_6]
         self.all_c = [self.x, self.y, self.z, self.rx, self.ry, self.rz]
 
-        # 速度输入框
+        # Speed ​​input box
         tk.Label(
             self.frmLB,
             text="speed",
         ).grid(row=0, column=0)
-        self.get_speed = tk.Entry(self.frmLB, textvariable=self.speed_d, width=10)
+        self.get_speed = tk.Entry(
+            self.frmLB, textvariable=self.speed_d, width=10)
         self.get_speed.grid(row=0, column=1)
-    
+
     def safe_get_angle(self, angle_list, index, default="-1°"):
         try:
             if angle_list and len(angle_list[0]) > index:
@@ -256,7 +262,6 @@ class WindowNode(Node):
             self.get_logger().warn(f"safe_get_angle error: {e}")
         return default
 
-    
     def safe_get_coord(self, coords_list, index, default="0.0"):
         try:
             if coords_list and len(coords_list) > 0:
@@ -269,7 +274,7 @@ class WindowNode(Node):
         return default
 
     def show_init(self):
-        # 显示
+        # display
         tk.Label(self.frmLC, text="Joint 1 ").grid(row=0)
         tk.Label(self.frmLC, text="Joint 2 ").grid(row=1)  # 第二行
         tk.Label(self.frmLC, text="Joint 3 ").grid(row=2)
@@ -277,9 +282,7 @@ class WindowNode(Node):
         tk.Label(self.frmLC, text="Joint 5 ").grid(row=4)
         tk.Label(self.frmLC, text="Joint 6 ").grid(row=5)
 
-        # get数据
-
-        # ，展示出来
+        # Get data display
         self.cont_1 = tk.StringVar(self.frmLC)
         self.cont_1.set(self.safe_get_angle(self.res_angles, 0))
         self.cont_2 = tk.StringVar(self.frmLC)
@@ -362,9 +365,9 @@ class WindowNode(Node):
             self.show_j6,
         ]
 
-        # 显示
+        # display
         tk.Label(self.frmLC, text="  x ").grid(row=0, column=3)
-        tk.Label(self.frmLC, text="  y ").grid(row=1, column=3)  # 第二行
+        tk.Label(self.frmLC, text="  y ").grid(row=1, column=3)  # second row
         tk.Label(self.frmLC, text="  z ").grid(row=2, column=3)
         tk.Label(self.frmLC, text="  rx ").grid(row=3, column=3)
         tk.Label(self.frmLC, text="  ry ").grid(row=4, column=3)
@@ -442,7 +445,7 @@ class WindowNode(Node):
             bg="white",
         ).grid(row=5, column=4, padx=5, pady=5)
 
-        # mm 单位展示
+        # mm Unit Display
         self.unit = tk.StringVar()
         self.unit.set("mm")
         for i in range(6):
@@ -457,7 +460,7 @@ class WindowNode(Node):
                 self.mc.set_gripper_state(0, 80)
                 release(acquire)
         except Exception as e:
-            # 可能由于该方法没有返回值，服务抛出无法处理的错误
+            # Probably because the method has no return value, the service throws an unhandled error
             pass
 
     def gripper_close(self):
@@ -468,7 +471,7 @@ class WindowNode(Node):
                 release(lock)
         except Exception as e:
             pass
-        
+
     def pump_open(self):
         try:
             if self.mc:
@@ -478,7 +481,6 @@ class WindowNode(Node):
                 time.sleep(0.05)
         except Exception:
             # Probably because the method has no return value, the service throws an unhandled error
-            # 可能由于该方法没有返回值，服务抛出无法处理的错误
             pass
 
     def pump_close(self):
@@ -496,33 +498,35 @@ class WindowNode(Node):
             pass
 
     def get_coord_input(self):
-        # 获取 coord 输入的数据，发送给机械臂
+        # Get the coord input data and send it to the robotic arm
         c_value = []
         for i in self.all_c:
             c_value.append(float(i.get()))
         self.speed = (
-            int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
+            int(float(self.get_speed.get())
+                ) if self.get_speed.get() else self.speed
         )
-        
+
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.send_coords(c_value,self.speed, self.model)
+                self.mc.send_coords(c_value, self.speed, self.model)
                 release(lock)
         except Exception as e:
             pass
         self.show_j_date(c_value, "coord")
 
     def get_joint_input(self):
-        # 获取joint输入的数据，发送给机械臂
+        # Take the joint input data and send it to the robotic arm
         j_value = []
         for i in self.all_j:
             j_value.append(float(i.get()))
-            
+
         self.speed = (
-            int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
+            int(float(self.get_speed.get())
+                ) if self.get_speed.get() else self.speed
         )
-        
+
         res = [j_value, self.speed]
 
         try:
@@ -536,7 +540,7 @@ class WindowNode(Node):
         # return j_value,c_value,speed
 
     def get_date(self):
-        # 拿机械臂的数据，用于展示
+        # Get the data of the robotic arm for display
         t = time.time()
         while time.time() - t < 2:
             if self.mc:
@@ -556,14 +560,14 @@ class WindowNode(Node):
             if self.angles != []:
                 break
             time.sleep(0.1)
-        
+
         self.record_coords[0] = self.res
         self.res_angles[0] = self.angles
- 
 
     # def send_input(self,dates):
+
     def show_j_date(self, date, way=""):
-        # 展示数据
+        # display data
         if way == "coord":
             for i, j in zip(date, self.coord_all):
                 j.set(str(i))

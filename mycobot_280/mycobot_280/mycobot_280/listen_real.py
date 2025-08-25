@@ -16,12 +16,15 @@ MIN_REQUIRE_VERSION = '3.6.1'
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(
+        MIN_REQUIRE_VERSION, current_verison))
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MyCobot280
 
 # Avoid serial port conflicts and need to be locked
+
+
 def acquire(lock_file):
     open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
     try:
@@ -67,13 +70,14 @@ def release(lock_file_fd):
     except OSError as e:
         print(f"Failed to release lock: {e}")
 
+
 class Talker(Node):
     def __init__(self):
         super().__init__("real_listener")
-        
+
         self.declare_parameter('port', '/dev/ttyUSB0')
         self.declare_parameter('baud', 115200)
-   
+
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
@@ -100,12 +104,12 @@ class Talker(Node):
             "joint6_to_joint5",
             "joint6output_to_joint6",
         ]
-        
+
         joint_state_send.velocity = [0.0, ]
         joint_state_send.effort = []
-        
+
         while rclpy.ok():
-            
+
             rclpy.spin_once(self)
             # get real angles from server.
             if self.mc:
@@ -133,20 +137,17 @@ class Talker(Node):
             except Exception as e:
                 e = traceback.format_exc()
                 print(e)
-            
-            
 
 
 def main(args=None):
     rclpy.init(args=args)
-    
+
     talker = Talker()
     talker.start()
     rclpy.spin(talker)
-    
+
     talker.destroy_node()
     rclpy.shutdown()
-    
 
 
 if __name__ == "__main__":
