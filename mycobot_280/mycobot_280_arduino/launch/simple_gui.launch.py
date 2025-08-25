@@ -20,7 +20,7 @@ def generate_launch_description():
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
-        default_value="1000000"
+        default_value="115200"
     )
     res.append(baud_launch_arg)
 
@@ -72,6 +72,10 @@ def generate_launch_description():
         package="mycobot_280_arduino",
         executable="listen_real",
         name="listen_real",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
     res.append(listen_real_node)
@@ -80,6 +84,11 @@ def generate_launch_description():
         name="simple_gui",
         package="mycobot_280_arduino",
         executable="simple_gui",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(mycobot_280_arduino_node)
 
