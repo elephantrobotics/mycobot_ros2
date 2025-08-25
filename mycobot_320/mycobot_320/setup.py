@@ -55,7 +55,6 @@ setup(
             'follow_display = mycobot_320.follow_display:main',
             'listen_real_of_topic = mycobot_320.listen_real_of_topic:main',
             'listen_real = mycobot_320.listen_real:main',
-            'opencv_camera = mycobot_320.opencv_camera:main',
             'simple_gui = mycobot_320.simple_gui:main',
             'slider_control = mycobot_320.slider_control:main',
             'teleop_keyboard = mycobot_320.teleop_keyboard:main',

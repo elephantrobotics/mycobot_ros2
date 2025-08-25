@@ -37,13 +37,13 @@ class Slider_Subscriber(Node):
             port = self.robot_m5
         else:
             port = self.robot_wio
-        self.get_logger().info("port:%s, baud:%d" % (port, 115200))
-        self.mc = MyCobot280(port, 115200)
+        self.get_logger().info("port:%s, baud:%d" % (port, 1000000))
+        self.mc = MyCobot280(port, 1000000)
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)
         # self.declare_parameter('port', '/dev/ttyUSB0')
-        # self.declare_parameter('baud', 115200)
+        # self.declare_parameter('baud', 1000000)
         # port = self.get_parameter('port').get_parameter_value().string_value
         # baud = self.get_parameter('baud').get_parameter_value().integer_value
         # self.get_logger().info("port:%s, baud:%d" % (port, baud))

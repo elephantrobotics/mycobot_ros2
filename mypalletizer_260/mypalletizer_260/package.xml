@@ -11,13 +11,9 @@
   <build_depend>rclcpp</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>actionlib</build_depend>
-  <build_depend>mypalletizer_communication</build_depend>
   <build_depend>mycobot_description</build_depend>
 
-
-  <build_export_depend>mypalletizer_communication</build_export_depend>
   <build_export_depend>mycobot_description</build_export_depend>
-  <build_export_depend>mypalletizer_interfaces</build_export_depend>
 
 
   <exec_depend>rclpy</exec_depend>
@@ -33,8 +29,6 @@
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>python-tk</exec_depend>
   <exec_depend>mycobot_description</exec_depend>
-  <exec_depend>mypalletizer_communication</exec_depend>
-  <exec_depend>mypalletizer_interfaces</exec_depend>
 
 
   <test_depend>ament_copyright</test_depend>

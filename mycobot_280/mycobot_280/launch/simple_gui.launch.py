@@ -14,13 +14,15 @@ def generate_launch_description():
 
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyUSB0"
+        default_value="/dev/ttyUSB0",
+        description='Serial port to use'
     )
     res.append(port_launch_arg)
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
-        default_value="115200"
+        default_value="115200",
+        description='Baud rate to use'
     )
     res.append(baud_launch_arg)
 
@@ -68,18 +70,27 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_node = Node(
         package="mycobot_280",
-        executable="follow_display",
-        name="follow_display",
+        executable="listen_real",
+        name="listen_real",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(listen_real_node)
 
     mycobot_280_node = Node(
         name="simple_gui",
         package="mycobot_280",
         executable="simple_gui",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(mycobot_280_node)
 

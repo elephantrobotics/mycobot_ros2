@@ -86,17 +86,17 @@ class MypalTopics(Node):
         sg = threading.Thread(target=self.sub_gripper_status)
         sp = threading.Thread(target=self.sub_pump_status)
 
-        pa.setDaemon(True)
+        pa.daemon = True
         pa.start()
-        pb.setDaemon(True)
+        pb.daemon = True
         pb.start()
-        sa.setDaemon(True)
+        sa.daemon = True
         sa.start()
-        sb.setDaemon(True)
+        sb.daemon = True
         sb.start()
-        sg.setDaemon(True)
+        sg.daemon = True
         sg.start()
-        sp.setDaemon(True)
+        sp.daemon = True
         sp.start()
 
         pa.join()

@@ -1,8 +1,20 @@
 import rclpy
 from sensor_msgs.msg import JointState
 from rclpy.node import Node
-from pymycobot.ultraArm import ultraArm
 import math
+import pymycobot
+from packaging import version
+# min low version require
+MAX_REQUIRE_VERSION = '3.9.1'
+current_verison = pymycobot.__version__
+print('current pymycobot library version: {}'.format(current_verison))
+if version.parse(current_verison) > version.parse(MAX_REQUIRE_VERSION):
+    from pymycobot.ultraArmP340 import ultraArmP340
+    class_name = 'new'
+else:
+    from pymycobot.ultraArm import ultraArm
+    class_name = 'old'
+    print("Note: This class is no longer maintained since v3.6.0, please refer to the project documentation: https://github.com/elephantrobotics/pymycobot/blob/main/README.md")
 
 
 class Slider_Subscriber(Node):
@@ -15,8 +27,10 @@ class Slider_Subscriber(Node):
             10
         )
         self.subscription
-
-        self.ua = ultraArm("/dev/ttyUSB0", 115200)
+        if class_name == 'old':
+            self.ua = ultraArm("/dev/ttyUSB0", 115200)
+        else:
+            self.ua = ultraArmP340('/dev/ttyUSB0', 115200)
         self.ua.go_zero()
 
 

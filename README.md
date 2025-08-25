@@ -14,6 +14,9 @@ myCobot ROS2 package
   * Ubuntu 20.04 / ROS2 Foxy - branch `foxy`
   * Ubuntu 20.04 / ROS2 Galactic - branch `galactic`
   * Ubuntu 22.04 / ROS2 Humble - branch `humble`
+  * Orin Nano Ubunut 20.04 / ROS2 Foxy
+  * LimoPro Orin Nano Ubunut 20.04 / ROS2 Foxy
+  * PC Virtual Machine Ubunut 20.04 / ROS2 Foxy
 
 ## Installation
 
@@ -90,6 +93,10 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 [mycobot 280 x3pi](./mycobot_description/urdf/mycobot_280_x3pi/mycobot_280_x3pi.urdf)
 
 ![280 x3pi](./demo_img/280pi/280_pi.png)
+
+[mycobot 280 x5pi](./mycobot_description/urdf/mycobot_280_x5pi/mycobot_280_x5pi.urdf)
+
+![280 x5pi](./demo_img/280pi/280_pi.png)
 
 [mechArm 270 m5](./mycobot_description/urdf/mecharm_270_m5/mecharm_270_m5.urdf)
 
