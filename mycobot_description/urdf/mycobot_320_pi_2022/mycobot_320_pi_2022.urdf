@@ -33,7 +33,7 @@
      <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_320_pi_2022/link1.dae"/>
       </geometry>
-      <origin xyz = "0.115 -0.172 -0.09 " rpy = " 0 0 3.1415926"/>
+      <origin xyz = "0.115 -0.172 -0.086 " rpy = " 0 0 3.1415926"/>
     </collision>
   </link>
 
