@@ -2,71 +2,12 @@ from __future__ import print_function
 import sys
 import termios
 import tty
+import traceback
 import time
-import fcntl
-import os
-import pymycobot
-from packaging import version
+import rclpy
+from rclpy.node import Node
+from mycobot_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles, PumpStatus
 
-# min low version require
-# MAX_REQUIRE_VERSION = '3.7.0'
-MIN_REQUIRE_VERSION = '3.6.6'
-
-current_verison = pymycobot.__version__
-print('current pymycobot library version: {}'.format(current_verison))
-if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be less than {} . The current version is {}. Please downgrade the library version.'.format(MAX_REQUIRE_VERSION, current_verison))
-else:
-    print('pymycobot library version meets the requirements!')
-    from pymycobot import MyCobot280
-
-LOCK_FILE = "/tmp/mycobot_lock"
-
-# Avoid serial port conflicts and need to be locked
-def acquire(lock_file):
-    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
-    try:
-        fd = os.open(lock_file, open_mode)
-    except OSError as e:
-        print(f"Failed to open lock file {lock_file}: {e}")
-        return None
-
-    pid = os.getpid()
-    lock_file_fd = None
-    
-    timeout = 15.0
-    start_time = current_time = time.time()
-    while current_time < start_time + timeout:
-        try:
-            # The LOCK_EX means that only one process can hold the lock
-            # The LOCK_NB means that the fcntl.flock() is not blocking
-            # and we are able to implement termination of while loop,
-            # when timeout is reached.
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (IOError, OSError):
-            time.sleep(0.1)
-        else:
-            lock_file_fd = fd
-            # print(f"Lock acquired by PID: {pid}")
-            break
-
-        # print('pid waiting for lock:%d'% pid)
-
-        current_time = time.time()
-    if lock_file_fd is None:
-        print(f"Failed to acquire lock after {timeout} seconds")
-        os.close(fd)
-    return lock_file_fd
-
-
-def release(lock_file_fd):
-    # Do not remove the lockfile:
-    try:
-        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
-        os.close(lock_file_fd)
-        # print("Lock released successfully")
-    except OSError as e:
-        print(f"Failed to release lock: {e}")
 
 msg = """\
 Mycobot Teleop Keyboard Controller
@@ -81,9 +22,15 @@ Movimg options(control coordinations [x,y,z,rx,ry,rz]):
 u(rx+)   i(ry+)   o(rz+)
 j(rx-)   k(ry-)   l(rz-)
 
++/- : Increase/decrease movement step size
+
 Gripper control:
     g - open
     h - close
+
+Pump control:
+    b - open
+    m - close
 
 Other:
     1 - Go to init pose
@@ -91,6 +38,15 @@ Other:
     3 - Resave home pose
     q - Quit
 """
+
+COORD_LIMITS = {
+    'x': (-281.45, 281.45),
+    'y': (-281.45, 281.45),
+    'z': (-70, 412.67),
+    'rx': (-180, 180),
+    'ry': (-180, 180),
+    'rz': (-180, 180)
+}
 
 
 def vels(speed, turn):
@@ -110,172 +66,234 @@ class Raw(object):
         termios.tcsetattr(self.stream, termios.TCSANOW, self.original_stty)
 
 
-class TeleopKeyboard:
+class TeleopKeyboardNode(Node):
     def __init__(self):
-        self.mc = MyCobot280('/dev/ttyUSB0', 115200)
-        time.sleep(0.05)
-        if self.mc:
-            lock = acquire("/tmp/mycobot_lock")
-            if self.mc.get_fresh_mode() == 0:
-                self.mc.set_fresh_mode(1)
-            release(lock)
-        time.sleep(0.05)
+        super().__init__('teleop_keyboard_client')
 
-        self.model = 1
+        # client request
+        self.set_angles_client = self.create_client(SetAngles, '/set_angles')
+        self.set_coords_client = self.create_client(SetCoords, '/set_coords')
+        self.set_gripper_client = self.create_client(
+            GripperStatus, '/set_gripper')
+        self.get_coords_client = self.create_client(GetCoords, '/get_coords')
+        self.get_angles_client = self.create_client(GetAngles, '/get_angles')
+        self.set_pump_client = self.create_client(
+            PumpStatus, '/set_pump_status')
+
+        # Waiting for the service to go online
+        while not self.set_angles_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Service not available, waiting again...')
+
         self.speed = 50
-        self.change_percent = 5
+        self.model = 1  # Sport Mode
+        self.change_percent = 5  # Percentage of change
 
         self.change_angle = 180 * self.change_percent / 100
         self.change_len = 250 * self.change_percent / 100
 
-        self.init_pose = [[0, 0, 0, 0, 0, 0], self.speed]
-        self.home_pose = [[0, 8, -127, 40, 0, 0], self.speed]
-
+        self.init_pose = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.home_pose = [0.0, 8.0, -127.0, 40.0, 0.0, 0.0]
 
         self.record_coords = self.get_initial_coords()
 
     def get_initial_coords(self):
-        while True:
-            if self.mc:
-                lock = acquire("/tmp/mycobot_lock")
-                res = self.mc.get_coords()
-                release(lock)
-                if res:
-                    break
-                time.sleep(0.1)
+        # get coords service
+        request = GetCoords.Request()
+        future = self.get_coords_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is not None:
+            return [[future.result().x, future.result().y, future.result().z,
+                     future.result().rx, future.result().ry, future.result().rz], self.speed, self.model]
+        else:
+            self.get_logger().error('Failed to get coordinates')
+            return [[-1, -1, -1, -1, -1, -1], self.speed, self.model]
 
-        return [res, self.speed, self.model]
+    def get_initial_angles(self):
+        # get angles service
+        request = GetAngles.Request()
+        future = self.get_angles_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is not None:
+            return [future.result().joint_1, future.result().joint_2, future.result().joint_3, future.result().joint_4,
+                    future.result().joint_5, future.result().joint_6]
+        else:
+            self.get_logger().error("Failed to get angles")
+            return [-1, -1, -1, -1, -1, -1]
 
     def print_status(self):
-        print("\r current coords: %s" % self.record_coords)
+        coords = self.record_coords[0]
+        print(
+            "\r current coords: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]" % tuple(coords))
+
+    def send_coords(self):
+        coords = self.record_coords[0]
+        # Check if the coordinates are out of limit
+        for i, axis in enumerate(['x', 'y', 'z', 'rx', 'ry', 'rz']):
+            min_limit, max_limit = COORD_LIMITS[axis]
+            if coords[i] < min_limit or coords[i] > max_limit:
+                self.get_logger().warn(
+                    f"{axis} value {coords[i]} exceeds the limit range [{min_limit}, {max_limit}], unable to send coordinates")
+                return
+        request = SetCoords.Request()
+        request.x = coords[0]
+        request.y = coords[1]
+        request.z = coords[2]
+        request.rx = coords[3]
+        request.ry = coords[4]
+        request.rz = coords[5]
+        request.speed = self.record_coords[1]
+        request.model = self.record_coords[2]
+
+        future = self.set_coords_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is not None:
+            pass
+            # self.get_logger().info(f"Coords set: {request}")
+        else:
+            self.get_logger().error('Failed to set coordinates')
+
+    def send_angles(self, angles):
+        request = SetAngles.Request()
+        request.joint_1 = angles[0]
+        request.joint_2 = angles[1]
+        request.joint_3 = angles[2]
+        request.joint_4 = angles[3]
+        request.joint_5 = angles[4]
+        request.joint_6 = angles[5]
+        request.speed = self.speed
+
+        future = self.set_angles_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is not None:
+            pass
+            # self.get_logger().info(f"Angles set: {request}")
+        else:
+            self.get_logger().error('Failed to set angles')
+
+    def set_gripper(self, status):
+        request = GripperStatus.Request()
+        request.status = status
+
+        future = self.set_gripper_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is not None:
+            pass
+            # self.get_logger().info(f"Gripper status set: {status}")
+        else:
+            self.get_logger().error('Failed to control gripper')
+
+    def set_pump_status(self, status, pin1, pin2):
+        request = PumpStatus.Request()
+        request.status = status
+        request.pin1 = pin1
+        request.pin2 = pin2
+
+        future = self.set_pump_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+
+        if future.result() is not None:
+            if future.result().flag:
+                self.get_logger().info(
+                    f"Pump status set to {status}, pin1: {pin1}, pin2: {pin2}")
+            else:
+                self.get_logger().error("Pump service returned failure.")
+        else:
+            self.get_logger().error('Failed to call pump service.')
 
     def keyboard_listener(self):
         print(msg)
-        print(vels(self.speed, self.change_len))
-        while True:
+        print(vels(self.speed, self.change_percent))
+        while rclpy.ok():
             try:
-                # print("\r current coords: %s" % self.record_coords)
                 with Raw(sys.stdin):
                     key = sys.stdin.read(1)
                 if key == "q":
                     break
                 elif key in ["w", "W"]:
                     self.record_coords[0][0] += self.change_len
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["s", "S"]:
                     self.record_coords[0][0] -= self.change_len
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["a", "A"]:
                     self.record_coords[0][1] -= self.change_len
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["d", "D"]:
                     self.record_coords[0][1] += self.change_len
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["z", "Z"]:
                     self.record_coords[0][2] -= self.change_len
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["x", "X"]:
                     self.record_coords[0][2] += self.change_len
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["u", "U"]:
                     self.record_coords[0][3] += self.change_angle
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["j", "J"]:
                     self.record_coords[0][3] -= self.change_angle
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["i", "I"]:
                     self.record_coords[0][4] += self.change_angle
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["k", "K"]:
                     self.record_coords[0][4] -= self.change_angle
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["o", "O"]:
                     self.record_coords[0][5] += self.change_angle
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["l", "L"]:
                     self.record_coords[0][5] -= self.change_angle
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_coords(*self.record_coords)
-                        release(lock)
+                    self.send_coords()
                 elif key in ["g", "G"]:
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.set_gripper_state(0, 30)
-                        release(lock)
+                    self.set_gripper(True)  # open
                 elif key in ["h", "H"]:
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.set_gripper_state(1, 30)
-                        release(lock)
+                    self.set_gripper(False)  # close
+                elif key in ["b", "B"]:
+                    self.set_pump_status(True, 2, 5)
+                elif key in ["m", "M"]:
+                    self.set_pump_status(False, 2, 5)
                 elif key == "1":
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_angles(*self.init_pose)
-                        release(lock)
-                    time.sleep(3)
+                    self.send_angles(self.init_pose)
+                    time.sleep(2)
                     self.record_coords = self.get_initial_coords()
-                elif key in "2":
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        self.mc.send_angles(*self.home_pose)
-                        release(lock)
-                    time.sleep(3)
+                elif key == "2":
+                    self.send_angles(self.home_pose)
+                    time.sleep(2)
                     self.record_coords = self.get_initial_coords()
-                elif key in "3":
-                    if self.mc:
-                        lock = acquire("/tmp/mycobot_lock")
-                        rep = self.mc.get_angles()
-                        release(lock)
-                    self.home_pose[0] =rep
+                elif key == "3":
+                    # Save the current posture as the new home posture
+                    self.home_pose = self.get_initial_angles()
+                    print(f"New home pose saved: {self.home_pose}")
+                elif key == '+':
+                    self.change_percent = min(self.change_percent + 1, 20)
+                    self.change_angle = 180 * self.change_percent / 100
+                    self.change_len = 250 * self.change_percent / 100
+                    print("Increase change_percent to %d%%, move step: %.1f mm" % (
+                        self.change_percent, self.change_len))
+                elif key == '-':
+                    self.change_percent = max(self.change_percent - 1, 1)
+                    self.change_angle = 180 * self.change_percent / 100
+                    self.change_len = 250 * self.change_percent / 100
+                    print("Decrease change_percent to %d%%, move step: %.1f mm" % (
+                        self.change_percent, self.change_len))
                 else:
                     continue
-                
-                self.print_status()
-                time.sleep(0.03)
+
             except Exception as e:
-                print(e)
+                e = traceback.format_exc()
+                self.get_logger().error(f"Error in key processing: {e}")
                 continue
-            time.sleep(0.05)
-            
-            
-def main():
-    teleop_keyboard = TeleopKeyboard()
+
+            time.sleep(0.02)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    teleop_keyboard = TeleopKeyboardNode()
     teleop_keyboard.keyboard_listener()
-    
-    
-if __name__ == '__main__':
+    rclpy.shutdown()
+
+
+if __name__ == "__main__":
     main()

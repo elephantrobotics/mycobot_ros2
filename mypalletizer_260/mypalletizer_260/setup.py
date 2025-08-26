@@ -50,9 +50,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'detect_marker = mypalletizer_260.detect_marker:main',
             'follow_display = mypalletizer_260.follow_display:main',
-            'following_marker = mypalletizer_260.following_marker:main',
             'listen_real_of_topic = mypalletizer_260.listen_real_of_topic:main',
             'listen_real = mypalletizer_260.listen_real:main',
             'simple_gui = mypalletizer_260.simple_gui:main',

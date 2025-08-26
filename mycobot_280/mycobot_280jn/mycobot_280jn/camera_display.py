@@ -20,9 +20,9 @@ class image_Subscription(Node):
 
     def img_callback(self, msg):
         cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        
+
         cv2.imshow("sub window", cv_image)
-        
+
         cv2.waitKey(10)
 
 

@@ -11,6 +11,19 @@ from launch.substitutions import Command, LaunchConfiguration
 
 def generate_launch_description():
     res = []
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyUSB0",
+        description='Serial port to use'
+    )
+    res.append(port_launch_arg)
+
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="115200",
+        description='Baud rate to use'
+    )
+    res.append(baud_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
         "model",
@@ -51,12 +64,16 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_service_node = Node(
         package="mycobot_280",
-        executable="follow_display",
-        name="follow_display",
-        output="screen"
+        executable="listen_real_service",
+        name="listen_real_service",
+        output="screen",
+        parameters=[{
+        "port": LaunchConfiguration("port"),
+        "baud": LaunchConfiguration("baud")
+        }]
     )
-    res.append(follow_display_node)
+    res.append(listen_real_service_node)
 
     return LaunchDescription(res)

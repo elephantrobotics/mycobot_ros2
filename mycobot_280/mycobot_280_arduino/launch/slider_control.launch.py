@@ -37,18 +37,18 @@ def generate_launch_description():
     )
     res.append(gui_launch_arg)
     
-    # serial_port_arg = DeclareLaunchArgument(
-    #     'port',
-    #     default_value='/dev/ttyUSB0',
-    #     description='Serial port to use'
-    # )
-    # res.append(serial_port_arg)
-    # baud_rate_arg = DeclareLaunchArgument(
-    #     'baud',
-    #     default_value='115200',
-    #     description='Baud rate to use'
-    # )
-    # res.append(baud_rate_arg)
+    serial_port_arg = DeclareLaunchArgument(
+        'port',
+        default_value='/dev/ttyUSB0',
+        description='Serial port to use'
+    )
+    res.append(serial_port_arg)
+    baud_rate_arg = DeclareLaunchArgument(
+        'baud',
+        default_value='1000000',
+        description='Baud rate to use'
+    )
+    res.append(baud_rate_arg)
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
@@ -80,10 +80,10 @@ def generate_launch_description():
     slider_control_node = Node(
         package="mycobot_280_arduino",
         executable="slider_control",
-        # parameters=[
-        #     {'port': LaunchConfiguration('port')},
-        #     {'baud': LaunchConfiguration('baud')}
-        # ],
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         name="slider_control",
         output="screen"
     )

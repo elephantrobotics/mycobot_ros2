@@ -66,7 +66,7 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
         build_mes = 'start build...'
         self.textBrowser.append('[' + str(current_time) + ']' + ' ' + build_mes)
         t1 = threading.Thread(target=self.start_bulid)
-        t1.setDaemon(True)
+        t1.daemon = True
         t1.start()
         
     def start_bulid(self):
@@ -80,25 +80,25 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
                 if self.comboBox.currentText() == 'rviz2':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'start test.....')
                     t1 = threading.Thread(target=self.rviz_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
                     
                 elif self.comboBox.currentText() == '滑块控制':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' '+ 'start slider control......')
                     t1 = threading.Thread(target=self.rviz_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
             else:
                 if self.comboBox.currentText() == 'rviz2':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'start test.....')
                     t1 = threading.Thread(target=self.rviz_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
                     
                 elif self.comboBox.currentText() == 'slider control':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' '+ 'start slider control......')
                     t1 = threading.Thread(target=self.rviz_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
                 
         except Exception as e:
@@ -127,23 +127,23 @@ class Ultraarm_Window(ultraArm_window, QMainWindow):
                 if self.comboBox.currentText() == 'rviz2':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'rviz2 test closed ! ! !')
                     t1 = threading.Thread(target=self.close_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
                 elif self.comboBox.currentText() == '滑块控制':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'slider control closed ! ! !')
                     t1 = threading.Thread(target=self.close_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
             else:
                 if self.comboBox.currentText() == 'rviz2':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'rviz2 test closed ! ! !')
                     t1 = threading.Thread(target=self.close_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
                 elif self.comboBox.currentText() == 'slider control':
                     self.textBrowser.append('[' + str(current_time) + ']' + ' ' + 'slider control closed ! ! !')
                     t1 = threading.Thread(target=self.close_test)
-                    t1.setDaemon(True)
+                    t1.daemon = True
                     t1.start()
         
         except Exception as e:

@@ -50,11 +50,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'listen_real_of_topic = ultraarm.listen_real_of_topic:main',
-            'listen_real = ultraarm.listen_real:main',
-            'simple_gui = ultraarm.simple_gui:main',
             'slider_control = ultraarm.slider_control:main',
-            'teleop_keyboard = ultraarm.teleop_keyboard:main',
         ],
     },
 )

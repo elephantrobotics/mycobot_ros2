@@ -57,7 +57,9 @@ setup(
             'opencv_camera = mycobot_280_arduino.opencv_camera:main',
             'simple_gui = mycobot_280_arduino.simple_gui:main',
             'slider_control = mycobot_280_arduino.slider_control:main',
+            'listen_real_service = mycobot_280_arduino.listen_real_service:main',
             'teleop_keyboard = mycobot_280_arduino.teleop_keyboard:main',
+            'slider_control_adaptive_gripper = mycobot_280_arduino.slider_control_adaptive_gripper:main',
         ],
     },
 )

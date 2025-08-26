@@ -28,7 +28,8 @@ with open("setup.cfg", "w") as f:
 
 # 动态生成文件列表
 data_files = [
-    ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
+    ('share/ament_index/resource_index/packages',
+     ['resource/' + package_name]),
     ('share/' + package_name, ['package.xml']),
     (os.path.join('share', package_name, "launch"), glob('launch/*.launch.py')),
     (os.path.join('share', package_name, "config"), glob('config/*')),
@@ -49,15 +50,15 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_display = mycobot_280.camera_display:main',
-            'detect_marker = mycobot_280.detect_marker:main',
             'follow_display = mycobot_280.follow_display:main',
-            'following_marker = mycobot_280.following_marker:main',
             'listen_real_of_topic = mycobot_280.listen_real_of_topic:main',
             'listen_real = mycobot_280.listen_real:main',
             'opencv_camera = mycobot_280.opencv_camera:main',
             'simple_gui = mycobot_280.simple_gui:main',
             'slider_control = mycobot_280.slider_control:main',
+            'listen_real_service = mycobot_280.listen_real_service:main',
             'teleop_keyboard = mycobot_280.teleop_keyboard:main',
+            'slider_control_adaptive_gripper = mycobot_280.slider_control_adaptive_gripper:main',
         ],
     },
 )

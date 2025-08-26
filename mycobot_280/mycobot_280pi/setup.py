@@ -52,15 +52,15 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_display = mycobot_280pi.camera_display:main',
-            'detect_marker = mycobot_280pi.detect_marker:main',
             'follow_display = mycobot_280pi.follow_display:main',
-            'following_marker = mycobot_280pi.following_marker:main',
             'listen_real_of_topic = mycobot_280pi.listen_real_of_topic:main',
             'listen_real = mycobot_280pi.listen_real:main',
             'opencv_camera = mycobot_280pi.opencv_camera:main',
             'simple_gui = mycobot_280pi.simple_gui:main',
             'slider_control = mycobot_280pi.slider_control:main',
+            'listen_real_service = mycobot_280.listen_real_service:main',
             'teleop_keyboard = mycobot_280pi.teleop_keyboard:main',
+            'slider_control_adaptive_gripper = mycobot_280.slider_control_adaptive_gripper:main',
         ],
     },
 )
