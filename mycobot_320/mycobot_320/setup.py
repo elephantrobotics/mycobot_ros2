@@ -60,6 +60,7 @@ setup(
             'teleop_keyboard = mycobot_320.teleop_keyboard:main',
             'slider_control_adaptive_gripper = mycobot_320.slider_control_adaptive_gripper:main',
             'listen_real_service = mycobot_320.listen_real_service:main',
+            'slider_control_force_gripper = mycobot_320.slider_control_force_gripper:main',
         ],
     },
 )
