@@ -68,18 +68,27 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_node = Node(
         package="mycobot_320pi",
-        executable="follow_display",
-        name="follow_display",
+        executable="listen_real",
+        name="listen_real",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(listen_real_node)
 
     mycobot_320pi_node = Node(
         name="simple_gui",
         package="mycobot_320pi",
         executable="simple_gui",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(mycobot_320pi_node)
 

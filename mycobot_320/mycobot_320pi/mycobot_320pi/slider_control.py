@@ -28,7 +28,12 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MyCobot320("/dev/ttyAMA0", 115200)
+        self.declare_parameter('port', '/dev/ttyAMA0')
+        self.declare_parameter('baud', 115200)
+        port = self.get_parameter('port').get_parameter_value().string_value
+        baud = self.get_parameter('baud').get_parameter_value().integer_value
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        self.mc = MyCobot320(port, baud)
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)

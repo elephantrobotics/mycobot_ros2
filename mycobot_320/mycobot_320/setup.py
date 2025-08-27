@@ -36,7 +36,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         # launch file path
         (os.path.join('share', package_name, "launch"), glob('launch/*.launch.py')),
-        # python 文件
+        # python file
         # (os.path.join('lib',package_name),glob(package_name+'/*.py')),
         # Configuration File
         (os.path.join('share', package_name, "config"), glob('config/*')),
