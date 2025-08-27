@@ -252,7 +252,7 @@ class WindowNode(Node):
                 value = coords_list[0][index]
                 if value != -1:
                     return str(value)
-        except Exception:
+        except Exception as e:
             # pass
             self.get_logger().warn(f"safe_get_coord error: {e}")
         return default
@@ -260,7 +260,7 @@ class WindowNode(Node):
     def show_init(self):
         # display
         tk.Label(self.frmLC, text="Joint 1 ").grid(row=0)
-        tk.Label(self.frmLC, text="Joint 2 ").grid(row=1)  # 第二行
+        tk.Label(self.frmLC, text="Joint 2 ").grid(row=1)
         tk.Label(self.frmLC, text="Joint 3 ").grid(row=2)
         tk.Label(self.frmLC, text="Joint 4 ").grid(row=3)
         tk.Label(self.frmLC, text="Joint 5 ").grid(row=4)
