@@ -14,9 +14,9 @@ myCobot ROS2 package
   * Ubuntu 20.04 / ROS2 Foxy - branch `foxy`
   * Ubuntu 20.04 / ROS2 Galactic - branch `galactic`
   * Ubuntu 22.04 / ROS2 Humble - branch `humble`
-  * Orin Nano Ubunut 20.04 / ROS2 Foxy
-  * LimoPro Orin Nano Ubunut 20.04 / ROS2 Foxy
-  * PC Virtual Machine Ubunut 20.04 / ROS2 Foxy
+  * Orin Nano Ubunut 20.04 / ROS2 Foxy - branch `foxy`
+  * LimoPro Orin Nano Ubunut 20.04 / ROS2 Foxy - branch `foxy`
+  * PC Virtual Machine Ubunut 20.04 / ROS2 Foxy - branch `foxy`
 
 ## Installation
 
@@ -66,6 +66,9 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![280 m5 camera flange & pump](./demo_img/280m5/280_m5_camera_flange_pump.png)
 
+[mycobot 280 m5 adaptive gripper](./mycobot_description/urdf/mycobot_280_m5/mycobot_280_m5_adaptive_gripper.urdf)
+![280 m5 adaptive gripper](./demo_img/280m5/280_m5_adaptive_gripper.png)
+
 [mycobot 280 pi](./mycobot_description/urdf/mycobot_280_pi/mycobot_280_pi.urdf)
 
 ![280 pi](./demo_img/280pi/280_pi.png)
@@ -82,13 +85,25 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![280 pi camera flange pump](./demo_img/280pi/280_pi_camera_flange_pump.png)
 
+[mycobot 280 pi adaptive gripper](./mycobot_description/urdf/mycobot_280_pi/mycobot_280_pi_adaptive_gripper.urdf)
+![280 pi adaptive gripper](./demo_img/280pi/280_pi_adaptive_gripper.png)
+
+
 [mycobot 280 JetsonNano](./mycobot_description/urdf/mycobot_280_jn/mycobot_280_jn.urdf)
 
 ![280 jn](./demo_img/280jn/280jn.png)
 
+[mycobot 280 JetsonNano adaptive gripper](./mycobot_description/urdf/mycobot_280_jn/mycobot_280_jn_adaptive_gripper.urdf)
+![280 m5 adaptive gripper](./demo_img/280jn/280jn_adaptive_gripper.png)
+
+
 [mycobot 280 Arduino](./mycobot_description/urdf/mycobot_280_arduino/mycobot_280_arduino.urdf)
 
 ![280 jn](./demo_img/280ar/280ar.png)
+
+[mycobot 280 Arduino adaptive gripper](./mycobot_description/urdf/mycobot_280_arduino/mycobot_280_arduino_adaptive_gripper.urdf)
+![280 AR adaptive gripper](./demo_img/280ar/280ar_adaptive_gripper.png)
+
 
 [mycobot 280 x3pi](./mycobot_description/urdf/mycobot_280_x3pi/mycobot_280_x3pi.urdf)
 
@@ -118,9 +133,25 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![320 m5 2022](./demo_img/320m5_2022/320m5_2022.png)
 
+[mycobot 320 m5 2022 adaptive gripper](./mycobot_description/urdf/mycobot_320_m5_2022/mycobot_320_m5_2022_adaptive_gripper.urdf)
+
+![320 m5 2022 adaptive gripper](./demo_img/320m5_2022/320m5_adaptive_gripper.png)
+
+[mycobot 320 m5 2022 force gripper](./mycobot_description/urdf/mycobot_320_m5_2022/mycobot_320_m5_2022_force_gripper.urdf)
+
+![320 m5 2022 force gripper](./demo_img/320m5_2022/320m5_force_gripper.png)
+
 [mycobot 320 pi 2022](./mycobot_description/urdf/mycobot_320_pi_2022/mycobot_320_pi_2022.urdf)
 
 ![320 pi 2022](./demo_img/320pi_2022/320pi_2022.png)
+
+[mycobot 320 pi 2022 adaptive gripper](./mycobot_description/urdf/mycobot_320_pi_2022/mycobot_320_pi_2022_adaptive_gripper.urdf)
+
+![320 pi 2022 force gripper](./demo_img/320pi_2022/320pi_force_gripper.png)
+
+[mycobot 320 pi 2022 force gripper](./mycobot_description/urdf/mycobot_320_pi_2022/mycobot_320_pi_2022_force_gripper.urdf)
+
+![320 pi 2022 force gripper](./demo_img/320pi_2022/320pi_force_gripper.png)
 
 [ultraArm P340](./mycobot_description/urdf/ultraArm_p340/ultraArm_p340.urdf)
 
