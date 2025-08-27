@@ -17,6 +17,7 @@ else:
     print('pymycobot library version meets the requirements!')
     from pymycobot.mycobot320 import MyCobot320
 
+
 class Slider_Subscriber(Node):
     def __init__(self):
         super().__init__("control_slider")
@@ -27,7 +28,6 @@ class Slider_Subscriber(Node):
             10
         )
         self.subscription
-
         self.declare_parameter('port', '/dev/ttyAMA0')
         self.declare_parameter('baud', 115200)
         port = self.get_parameter('port').get_parameter_value().string_value
@@ -37,15 +37,23 @@ class Slider_Subscriber(Node):
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)
-        
+
     def listener_callback(self, msg):
         data_list = []
-        for _, value in enumerate(msg.position):
-            radians_to_angles = round(math.degrees(value), 2)
-            data_list.append(radians_to_angles)
-
-        self.get_logger().info('joint_angles: {}'.format(data_list))
+        gripper_value = 0
+        for i, value in enumerate(msg.position):
+            if i < 6:
+                radians_to_angles = round(math.degrees(value), 2)
+                data_list.append(radians_to_angles)
+            else:
+                min_val = 0
+                max_val = 1
+                mapped_value = (value - min_val) / (max_val - min_val) * 100
+                gripper_value = int(round(mapped_value, 2))
+            
+        self.get_logger().info('joint_list: {} gripper_value: {} '.format(data_list, gripper_value))
         self.mc.send_angles(data_list, 25)
+        self.mc.set_pro_gripper_angle(gripper_value)
 
 
 def main(args=None):
