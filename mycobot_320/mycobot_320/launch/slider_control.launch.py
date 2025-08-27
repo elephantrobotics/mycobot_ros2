@@ -37,6 +37,20 @@ def generate_launch_description():
     )
     res.append(gui_launch_arg)
 
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyACM0",
+        description='Serial port to use'
+    )
+    res.append(port_launch_arg)
+
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="115200",
+        description='Baud rate to use'
+    )
+    res.append(baud_launch_arg)
+
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
 
@@ -68,6 +82,10 @@ def generate_launch_description():
         package="mycobot_320",
         executable="slider_control",
         name="slider_control",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
     res.append(slider_control_node)
