@@ -458,7 +458,7 @@ class WindowNode(Node):
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 self.mc.set_gripper_state(0, 80)
-                release(acquire)
+                release(lock)
         except Exception as e:
             # Probably because the method has no return value, the service throws an unhandled error
             pass
