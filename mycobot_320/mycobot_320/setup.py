@@ -5,11 +5,11 @@ from glob import glob
 
 package_name = 'mycobot_320'
 
-# 检查 setuptools 版本
+# Checking the setuptools version
 use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
 
 
-# 动态生成 setup.cfg 内容
+# Dynamically generate setup.cfg content
 setup_cfg_content = """
 [develop]
 {script_option}=$base/lib/{package_name}
@@ -22,7 +22,7 @@ setup_cfg_content = """
     install_scripts_option='install-scripts' if use_dash_separated_options else 'install_scripts'
 )
 
-# 将内容写入 setup.cfg
+# Write the contents to setup.cfg
 with open("setup.cfg", "w") as f:
     f.write(setup_cfg_content)
 
@@ -34,11 +34,11 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # launch 文件路径
+        # launch file path
         (os.path.join('share', package_name, "launch"), glob('launch/*.launch.py')),
         # python 文件
         # (os.path.join('lib',package_name),glob(package_name+'/*.py')),
-        # 配置文件
+        # Configuration File
         (os.path.join('share', package_name, "config"), glob('config/*')),
 
     ],
@@ -58,6 +58,8 @@ setup(
             'simple_gui = mycobot_320.simple_gui:main',
             'slider_control = mycobot_320.slider_control:main',
             'teleop_keyboard = mycobot_320.teleop_keyboard:main',
+            'slider_control_adaptive_gripper = mycobot_320.slider_control_adaptive_gripper:main',
+            'listen_real_service = mycobot_320.listen_real_service:main',
         ],
     },
 )
