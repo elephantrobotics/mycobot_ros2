@@ -64,6 +64,8 @@ setup(
         ('share/' + package_name + '/urdf'+'/mycobot_320_riscv',glob("urdf/mycobot_320_riscv/*")),
         ('share/' + package_name + '/urdf'+'/adaptive_gripper', glob("urdf/adaptive_gripper/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_280_arduino', glob("urdf/mycobot_280_arduino/*")),
+        ('share/' + package_name + '/urdf'+'/pro_adaptive_gripper', glob("urdf/pro_adaptive_gripper/*")),
+        ('share/' + package_name + '/urdf'+'/pro_force_gripper', glob("urdf/pro_force_gripper/*")),
 
 
 

@@ -1,5 +1,4 @@
 import rclpy
-# from pymycobot.mycobotsocket import MyCobotSocket
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
@@ -13,10 +12,11 @@ MIN_REQUIRE_VERSION = '3.6.0'
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
-else:
-    print('pymycobot library version meets the requirements!')
-    from pymycobot.mycobot320 import MyCobot320
+    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(
+        MIN_REQUIRE_VERSION, current_verison))
+
+print('pymycobot library version meets the requirements!')
+from pymycobot.mycobot320 import MyCobot320
 
 
 class Talker(Node):
@@ -24,7 +24,7 @@ class Talker(Node):
         super().__init__("follow_display")
         self.declare_parameter('port', '/dev/ttyAMA0')
         self.declare_parameter('baud', 115200)
-   
+
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
@@ -56,8 +56,8 @@ class Talker(Node):
             "joint5_to_joint4",
             "joint6_to_joint5",
             "joint6output_to_joint6",
-        ] 
-        joint_state_send.velocity = [0.0,]
+        ]
+        joint_state_send.velocity = [0.0, ]
         joint_state_send.effort = []
 
         marker_ = Marker()
@@ -74,7 +74,6 @@ class Talker(Node):
                 for _, value in enumerate(angles):
                     data_list.append(value)
 
-                
                 # self.get_logger().info('radians: {}'.format(data_list))
                 joint_state_send.position = data_list
 
@@ -93,7 +92,7 @@ class Talker(Node):
 
                 # marker position initial
                 # self.get_logger().info('{}'.format(coords))
-                
+
                 if not coords:
                     coords = [0, 0, 0, 0, 0, 0]
                     # self.get_logger().info("error [101]: can not get coord values")
@@ -110,18 +109,17 @@ class Talker(Node):
             except Exception as e:
                 pass
 
-        
+
 def main(args=None):
     rclpy.init(args=args)
-    
+
     talker = Talker()
     talker.start()
     rclpy.spin(talker)
-    
+
     talker.destroy_node()
     rclpy.shutdown()
-    
+
 
 if __name__ == "__main__":
     main()
-
