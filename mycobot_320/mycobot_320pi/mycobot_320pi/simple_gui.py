@@ -503,7 +503,7 @@ class WindowNode(Node):
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.set_gripper_state(0, 80)
+                self.mc.set_gripper_state(0, 80, 1)
                 release(lock)
         except Exception:
             pass
@@ -521,7 +521,7 @@ class WindowNode(Node):
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.set_gripper_state(1, 80)
+                self.mc.set_gripper_state(1, 80, 1)
                 release(lock)
         except Exception:
             pass

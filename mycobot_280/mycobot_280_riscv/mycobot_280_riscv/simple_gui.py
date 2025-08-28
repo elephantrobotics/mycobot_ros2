@@ -412,7 +412,7 @@ class Window:
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.set_gripper_state(0, 50)
+                self.mc.set_gripper_state(0, 50, 1)
                 release(lock)
         except Exception as e:
             # 可能由于该方法没有返回值，服务抛出无法处理的错误
@@ -422,7 +422,7 @@ class Window:
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.set_gripper_state(1, 50)
+                self.mc.set_gripper_state(1, 50, 1)
                 release(lock)
         except Exception as e:
             pass

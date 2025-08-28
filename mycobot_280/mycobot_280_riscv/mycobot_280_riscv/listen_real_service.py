@@ -175,9 +175,9 @@ class MyCobotDriver(Node):
 
             # 根据状态控制夹爪
             if request.status:
-                self.mc.set_gripper_state(0, speed)  # 打开夹爪
+                self.mc.set_gripper_state(0, speed, 1)  # 打开夹爪
             else:
-                self.mc.set_gripper_state(1, speed)  # 关闭夹爪
+                self.mc.set_gripper_state(1, speed, 1)  # 关闭夹爪
             release(lock)
             response.flag = True
         except Exception as e:
