@@ -20,7 +20,7 @@ def generate_launch_description():
 
     baud_launch_arg = DeclareLaunchArgument(
         name="baud",
-        default_value="115200"
+        default_value="1000000"
     )
     res.append(baud_launch_arg)
 
@@ -45,7 +45,6 @@ def generate_launch_description():
     gui_launch_arg = DeclareLaunchArgument(
         name="gui",
         default_value="false"
-        # default_value="true"
         
     )
     res.append(gui_launch_arg)
@@ -70,25 +69,27 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_node = Node(
         package="mecharm_pi",
-        executable="follow_display",
-        name="follow_display",
+        executable="listen_real",
+        name="listen_real",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
-    res.append(follow_display_node)
-    
-    # service_node = Node(
-    #     name="mecharm_services",
-    #     package="mecharm_communication",
-    #     executable="mecharm_services",
-    # )
-    # res.append(service_node)
-    
+    res.append(listen_real_node)
+
     mecharm_node = Node(
         name="simple_gui",
         package="mecharm_pi",
         executable="simple_gui",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(mecharm_node)
 

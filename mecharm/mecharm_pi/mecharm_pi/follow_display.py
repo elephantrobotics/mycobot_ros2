@@ -63,7 +63,7 @@ class Talker(Node):
         joint_state_send.effort = []
 
         marker_ = Marker()
-        marker_.header.frame_id = "/joint1"
+        marker_.header.frame_id = "/base"
         marker_.ns = "my_namespace"
 
         while rclpy.ok():

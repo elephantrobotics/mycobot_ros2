@@ -26,7 +26,7 @@ def generate_launch_description():
         name="rvizconfig",
         default_value=os.path.join(
             get_package_share_path("mecharm"),
-            "config/mecharm.rviz"
+            "config/mecharm_pi.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)

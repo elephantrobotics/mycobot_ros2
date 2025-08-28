@@ -58,6 +58,7 @@ setup(
             'slider_control = mecharm_pi.slider_control:main',
             'teleop_keyboard = mecharm_pi.teleop_keyboard:main',
             'slider_control_adaptive_gripper = mecharm_pi.slider_control_adaptive_gripper:main',
+            'listen_real_service = mecharm.listen_real_service:main',
         ],
     },
 )
