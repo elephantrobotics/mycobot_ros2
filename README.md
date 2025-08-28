@@ -34,7 +34,12 @@ Install ros package in your src folder of your Colcon workspace.
 
 ```bash
 $ cd ~/colcon_ws/src
-$ git clone --depth 1 https://github.com/elephantrobotics/mycobot_ros2.git
+# For the humble branch
+$ git clone -b humble --depth 1 https://github.com/elephantrobotics/mycobot_ros2.git
+# For the foxy branch
+$ git clone -b foxy --depth 1 https://github.com/elephantrobotics/mycobot_ros2.git
+# For the galactic branch
+$ git clone -b galactic --depth 1 https://github.com/elephantrobotics/mycobot_ros2.git
 $ cd ~/colcon_ws
 $ colcon build
 $ source ~/colcon_ws/install/setup.bash
@@ -117,9 +122,17 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![270 m5](./demo_img/270m5/270m5.png)
 
+[mechArm 270 m5 adaptive gripper](./mycobot_description/urdf/mecharm_270_m5/mecharm_270_m5_adaptive_gripper.urdf)
+
+![270 m5 gripper](./demo_img/270m5/270m5_adaptive_gripper.png)
+
 [mechArm 270 pi](./mycobot_description/urdf/mecharm_270_pi/mecharm_270_pi.urdf)
 
 ![270 pi](./demo_img/270pi/270pi.png)
+
+[mechArm 270 pi adaptive gripper](./mycobot_description/urdf/mecharm_270_pi/mecharm_270_pi_adaptive_gripper.urdf)
+
+![270 pi gripper](./demo_img/270pi/270PI_adaptive_gripper.png)
 
 [myPalletizer 260 m5](./mycobot_description/urdf/mypalletizer_260_m5/mypalletizer_260_m5.urdf)
 
