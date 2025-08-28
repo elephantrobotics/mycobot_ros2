@@ -8,71 +8,83 @@ import pymycobot
 from packaging import version
 import rclpy
 from rclpy.node import Node
-# min low version require
+
+# Minimum required pymycobot version
 MIN_REQUIRE_VERSION = '3.6.1'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
+
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(
-        MIN_REQUIRE_VERSION, current_verison))
+    raise RuntimeError(
+        'The version of pymycobot library must be greater than {} or higher. '
+        'Current version is {}. Please upgrade the library version.'.format(
+            MIN_REQUIRE_VERSION, current_verison
+        )
+    )
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MechArm270
 
-# Avoid serial port conflicts and need to be locked
-
 
 def acquire(lock_file):
-    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
+    """Acquire a file lock to prevent concurrent access.
+
+    Args:
+        lock_file (str): Path to the lock file.
+
+    Returns:
+        int | None: File descriptor if lock acquired, None if failed.
+    """
     try:
-        fd = os.open(lock_file, open_mode)
-    except OSError as e:
-        print(f"Failed to open lock file {lock_file}: {e}")
+        file_descriptor = os.open(lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+    except OSError as erro_info:
+        print(f"Failed to open lock file {lock_file}: {erro_info}")
         return None
-
-    pid = os.getpid()
-    lock_file_fd = None
-
     timeout = 50.0
     start_time = current_time = time.time()
     while current_time < start_time + timeout:
         try:
-            # The LOCK_EX means that only one process can hold the lock
-            # The LOCK_NB means that the fcntl.flock() is not blocking
-            # and we are able to implement termination of while loop,
-            # when timeout is reached.
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (IOError, OSError):
+            fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return file_descriptor
+        except:
             time.sleep(1)
-            pass
-        else:
-            lock_file_fd = fd
-            # print(f"Lock acquired by PID: {pid}")
-            break
-
-        # print('pid waiting for lock:%d'% pid)
-        current_time = time.time()
-    if lock_file_fd is None:
-        print(f"Failed to acquire lock after {timeout} seconds")
-        os.close(fd)
-    return lock_file_fd
+            current_time = time.time()
+    os.close(file_descriptor)
+    return None
 
 
-def release(lock_file_fd):
-    # Do not remove the lockfile:
+def release(fd):
+    """Release a previously acquired file lock.
+
+    Args:
+        fd (int): File descriptor of the lock file.
+    """
     try:
-        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
-        os.close(lock_file_fd)
-        # print("Lock released successfully")
-    except OSError as e:
-        print(f"Failed to release lock: {e}")
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+    except:
+        pass
+
 
 
 class WindowNode(Node):
+    """ROS2 node for controlling MyCobot via a simple GUI window.
+
+    This class initializes the robot connection, sets up Tkinter GUI layout,
+    and provides buttons to control joints, coordinates, gripper, and suction pump.
+    """
+
     def __init__(self, handle):
+        """Initialize the WindowNode.
+
+        Args:
+            handle (tk.Tk): The root Tkinter window handle.
+        """
         super().__init__('simple_gui')
-        self.declare_parameter('port', '/dev/ttyUSB0')
+
+        # Declare ROS2 parameters
+        self.declare_parameter('port', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
 
         port = self.get_parameter("port").get_parameter_value().string_value
@@ -81,6 +93,8 @@ class WindowNode(Node):
         print("port:%s, baud:%d" % (port, baud))
         self.mc = MechArm270(port, baud)
         time.sleep(0.05)
+
+        # Ensure robot is in fresh mode
         if self.mc:
             lock = acquire("/tmp/mycobot_lock")
             if self.mc.get_fresh_mode() != 1:
@@ -88,17 +102,18 @@ class WindowNode(Node):
             release(lock)
         time.sleep(0.05)
 
+        # Tkinter window setup
         self.win = handle
         self.win.resizable(0, 0)  # Fixed window size
 
         self.model = 1
         self.speed = 50
 
-        # Set the default speed
+        # Default speed variable
         self.speed_d = tk.StringVar()
         self.speed_d.set(str(self.speed))
 
-        # Get robotic arm data
+        # Robotic arm data
         self.record_coords = [
             [0, 0, 0, 0, 0, 0],
             self.speed,
@@ -109,34 +124,33 @@ class WindowNode(Node):
             self.speed,
             self.model
         ]
-        self.get_date()
+        self.get_date()  # Initialize data from the robot
 
-        # get screen width and height
-        self.ws = self.win.winfo_screenwidth()  # width of the screen
-        self.hs = self.win.winfo_screenheight()  # height of the screen
+        # Screen dimensions
+        self.ws = self.win.winfo_screenwidth()
+        self.hs = self.win.winfo_screenheight()
 
-        # calculate x and y coordinates for the Tk root window
+        # Calculate window position
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
         self.win.geometry("440x440+{}+{}".format(int(x), int(y)))
-        # layout
+
+        # GUI layout and widgets
         self.set_layout()
-        # Input section
         self.need_input()
-        # Display section
         self.show_init()
 
-        # joint set button
+        # Buttons for joint settings
         tk.Button(self.frmLT, text="设置", width=5, command=self.get_joint_input).grid(
             row=6, column=1, sticky="w", padx=3, pady=2
         )
 
-        # coordination setting button
+        # Buttons for coordinate settings
         tk.Button(self.frmRT, text="设置", width=5, command=self.get_coord_input).grid(
             row=6, column=1, sticky="w", padx=3, pady=2
         )
 
-        # Gripper switch button
+        # Gripper control buttons
         tk.Button(self.frmLB, text="夹爪(开)", command=self.gripper_open, width=5).grid(
             row=1, column=0, sticky="w", padx=3, pady=20
         )
@@ -144,7 +158,7 @@ class WindowNode(Node):
             row=1, column=1, sticky="w", padx=3, pady=2
         )
 
-        # Suction pump switch button
+        # Suction pump control buttons
         tk.Button(self.frmLB, text=" 吸泵(开)", command=self.pump_open, width=5).grid(
             row=2, column=0, sticky="w", padx=3, pady=20
         )
@@ -153,6 +167,7 @@ class WindowNode(Node):
         )
 
     def set_layout(self):
+        """Set the interface layout"""
         self.frmLT = tk.Frame(width=200, height=200)
         self.frmLC = tk.Frame(width=200, height=200)
         self.frmLB = tk.Frame(width=200, height=200)
@@ -163,6 +178,7 @@ class WindowNode(Node):
         self.frmRT.grid(row=0, column=1, padx=2, pady=3)
 
     def need_input(self):
+        """Display the input angle coordinate data of the robot arm"""
         # Input prompt
         tk.Label(self.frmLT, text="Joint 1 ").grid(row=0)
         tk.Label(self.frmLT, text="Joint 2 ").grid(row=1)
@@ -248,26 +264,54 @@ class WindowNode(Node):
         self.get_speed.grid(row=0, column=1)
 
     def safe_get_angle(self, angle_list, index, default="-1°"):
+        """Safely get an angle from a nested list.
+
+        This method attempts to retrieve an angle value from `angle_list[0][index]`.
+        If the list is empty, the index is out of range, or an error occurs,
+        it returns a default value.
+
+        Args:
+            angle_list (list[list[float]]): Nested list of angles.
+            index (int): Index of the angle to retrieve.
+            default (str, optional): Default value to return if retrieval fails. Defaults to "-1°".
+
+        Returns:
+            str: The angle as a string with a degree symbol, or the default value.
+        """
         try:
             if angle_list and len(angle_list[0]) > index:
-                return f"{angle_list[0][index]}°"
+                return "{}°".format(angle_list[0][index])
         except Exception as e:
-            # pass
-            self.get_logger().warn(f"safe_get_angle error: {e}")
+            self.get_logger().warn("safe_get_angle error: {}".format(e))
         return default
 
+
     def safe_get_coord(self, coords_list, index, default="0.0"):
+        """Safely get a coordinate from a nested list.
+
+        This method attempts to retrieve a coordinate value from `coords_list[0][index]`.
+        If the list is empty, the index is out of range, the value is -1, or an error occurs,
+        it returns a default value.
+
+        Args:
+            coords_list (list[list[float]]): Nested list of coordinates.
+            index (int): Index of the coordinate to retrieve.
+            default (str, optional): Default value to return if retrieval fails. Defaults to "0.0".
+
+        Returns:
+            str: The coordinate as a string, or the default value.
+        """
         try:
             if coords_list and len(coords_list) > 0:
                 value = coords_list[0][index]
                 if value != -1:
                     return str(value)
         except Exception as e:
-            # pass
-            self.get_logger().warn(f"safe_get_coord error: {e}")
+            self.get_logger().warn("safe_get_coord error: {}".format(e))
         return default
 
     def show_init(self):
+        """Display the robot arm angle coordinate data"""
         # display
         tk.Label(self.frmLC, text="Joint 1 ").grid(row=0)
         tk.Label(self.frmLC, text="Joint 2 ").grid(row=1)
@@ -448,25 +492,49 @@ class WindowNode(Node):
             )
 
     def gripper_open(self):
+        """Open the robotic arm gripper.
+
+        Acquires a lock to ensure exclusive access to the robotic arm and
+        sends the command to open the gripper.
+
+        Note:
+            If an exception occurs, it is silently ignored.
+        """
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 self.mc.set_gripper_state(0, 80, 1)
                 release(lock)
-        except Exception as e:
-            # Probably because the method has no return value, the service throws an unhandled error
+        except Exception:
             pass
 
+
     def gripper_close(self):
+        """Close the robotic arm gripper.
+
+        Acquires a lock to ensure exclusive access to the robotic arm and
+        sends the command to close the gripper.
+
+        Note:
+            If an exception occurs, it is silently ignored.
+        """
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 self.mc.set_gripper_state(1, 80, 1)
                 release(lock)
-        except Exception as e:
+        except Exception:
             pass
 
     def pump_open(self):
+        """Turn on the suction pump.
+
+        Acquires a lock to ensure exclusive access and sets the pump output to ON.
+        A small delay is added to ensure proper command execution.
+
+        Note:
+            If an exception occurs, it is silently ignored.
+        """
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
@@ -478,6 +546,14 @@ class WindowNode(Node):
             pass
 
     def pump_close(self):
+        """Turn off the suction pump.
+
+        Acquires a lock to ensure exclusive access and sets the pump output to OFF.
+        A small delay is added to ensure proper command execution.
+
+        Note:
+            If an exception occurs, it is silently ignored.
+        """
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
@@ -492,49 +568,55 @@ class WindowNode(Node):
             pass
 
     def get_coord_input(self):
-        # Get the coord input data and send it to the robotic arm
-        c_value = []
-        for i in self.all_c:
-            c_value.append(float(i.get()))
-        self.speed = (
-            int(float(self.get_speed.get())
-                ) if self.get_speed.get() else self.speed
-        )
+        """Read coordinate input from the GUI and send it to the robotic arm.
+
+        The coordinates are retrieved from the GUI input fields, the speed
+        is updated if specified, and the coordinates are sent to the robotic arm.
+        The GUI is updated to reflect the new coordinates.
+        """
+        c_value = [float(i.get()) for i in self.all_c]
+        self.speed = int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
 
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 self.mc.send_coords(c_value, self.speed, self.model)
                 release(lock)
-        except Exception as e:
+        except Exception:
             pass
+
         self.show_j_date(c_value, "coord")
 
-    def get_joint_input(self):
-        # Take the joint input data and send it to the robotic arm
-        j_value = []
-        for i in self.all_j:
-            j_value.append(float(i.get()))
 
-        self.speed = (
-            int(float(self.get_speed.get())
-                ) if self.get_speed.get() else self.speed
-        )
+    def get_joint_input(self):
+        """Read joint angles input from the GUI and send it to the robotic arm.
+
+        The joint angles are retrieved from the GUI input fields, the speed
+        is updated if specified, and the angles are sent to the robotic arm.
+        The GUI is updated to reflect the new angles.
+        """
+        j_value = [float(i.get()) for i in self.all_j]
+        self.speed = int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
 
         res = [j_value, self.speed]
-
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 self.mc.send_angles(*res)
                 release(lock)
-        except Exception as e:
+        except Exception:
             pass
+
         self.show_j_date(j_value)
-        # return j_value,c_value,speed
+
 
     def get_date(self):
-        # Get the data of the robotic arm for display
+        """Retrieve current coordinates and joint angles from the robotic arm.
+
+        Queries the robotic arm up to 2 seconds for coordinates and angles,
+        acquiring a lock for safe access. The results are stored internally
+        for display or further processing.
+        """
         t = time.time()
         while time.time() - t < 2:
             if self.mc:
@@ -558,10 +640,14 @@ class WindowNode(Node):
         self.record_coords[0] = self.res
         self.res_angles[0] = self.angles
 
-    # def send_input(self,dates):
 
     def show_j_date(self, date, way=""):
-        # display data
+        """Update the GUI with current joint or coordinate data.
+
+        Args:
+            date (list[float]): List of joint angles or coordinates.
+            way (str, optional): "coord" to indicate coordinates, otherwise joint angles.
+        """
         if way == "coord":
             for i, j in zip(date, self.coord_all):
                 j.set(str(i))
@@ -569,7 +655,13 @@ class WindowNode(Node):
             for i, j in zip(date, self.cont_all):
                 j.set(str(i) + "°")
 
+
     def run(self):
+        """Run the GUI main loop.
+
+        Continuously updates the Tkinter window and handles GUI events.
+        The loop exits if the window is destroyed.
+        """
         while True:
             try:
                 self.win.update()
@@ -581,16 +673,29 @@ class WindowNode(Node):
                     raise
 
 
+
 def main(args=None):
+    """Run the MyCobot ROS GUI application.
+
+    Initializes ROS2, creates the Tkinter window and the WindowNode,
+    and starts the GUI main loop.
+
+    Args:
+        args (list, optional): Command-line arguments passed to ROS2.
+            Defaults to None.
+    """
     rclpy.init(args=args)
     window = tk.Tk()
     window.title("mycobot ros GUI")
     node = WindowNode(window)
-    # WindowNode(window).run()
+
     try:
         node.run()
     except KeyboardInterrupt:
+        # Allow graceful exit on Ctrl+C
         pass
+    # Note: The destroy_node() and shutdown() calls are commented out in
+    # the original code. They can be added if proper ROS2 shutdown is needed.
     # finally:
     #     node.destroy_node()
     #     rclpy.shutdown()
@@ -598,3 +703,4 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
+
