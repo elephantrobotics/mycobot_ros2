@@ -167,6 +167,7 @@ class WindowNode(Node):
         )
 
     def set_layout(self):
+        """Set the interface layout"""
         self.frmLT = tk.Frame(width=200, height=200)
         self.frmLC = tk.Frame(width=200, height=200)
         self.frmLB = tk.Frame(width=200, height=200)
