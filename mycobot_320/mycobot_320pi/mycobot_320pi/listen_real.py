@@ -10,69 +10,69 @@ from std_msgs.msg import Header
 import pymycobot
 from packaging import version
 
-# min low version require
+# Minimum required pymycobot version
 MIN_REQUIRE_VERSION = '3.6.0'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
+
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(
-        MIN_REQUIRE_VERSION, current_verison))
+    raise RuntimeError(
+        'The version of pymycobot library must be greater than {} or higher. '
+        'Current version is {}. Please upgrade the library version.'.format(
+            MIN_REQUIRE_VERSION, current_verison
+        )
+    )
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot.mycobot320 import MyCobot320
 
-# Avoid serial port conflicts and need to be locked
-
 
 def acquire(lock_file):
-    open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
+    """Acquire a file lock to prevent concurrent access.
+
+    Args:
+        lock_file (str): Path to the lock file.
+
+    Returns:
+        int | None: File descriptor if lock acquired, None if failed.
+    """
     try:
-        fd = os.open(lock_file, open_mode)
-    except OSError as e:
-        print(f"Failed to open lock file {lock_file}: {e}")
+        file_descriptor = os.open(lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+    except OSError as erro_info:
+        print(f"Failed to open lock file {lock_file}: {erro_info}")
         return None
-
-    # pid = os.getpid()
-    lock_file_fd = None
-
     timeout = 50.0
     start_time = current_time = time.time()
     while current_time < start_time + timeout:
         try:
-            # The LOCK_EX means that only one process can hold the lock
-            # The LOCK_NB means that the fcntl.flock() is not blocking
-            # and we are able to implement termination of while loop,
-            # when timeout is reached.
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (IOError, OSError):
+            fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return file_descriptor
+        except:
             time.sleep(1)
-            pass
-        else:
-            lock_file_fd = fd
-            # print(f"Lock acquired by PID: {pid}")
-            break
-
-        # print('pid waiting for lock:%d'% pid)
-        current_time = time.time()
-    if lock_file_fd is None:
-        print(f"Failed to acquire lock after {timeout} seconds")
-        os.close(fd)
-    return lock_file_fd
+            current_time = time.time()
+    os.close(file_descriptor)
+    return None
 
 
-def release(lock_file_fd):
-    # Do not remove the lockfile:
+def release(fd):
+    """Release a previously acquired file lock.
+
+    Args:
+        fd (int): File descriptor of the lock file.
+    """
     try:
-        fcntl.flock(lock_file_fd, fcntl.LOCK_UN)
-        os.close(lock_file_fd)
-        # print("Lock released successfully")
-    except OSError as e:
-        print(f"Failed to release lock: {e}")
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+    except:
+        pass
 
 
 class Talker(Node):
+    """ROS2 node that publishes real-time joint angles from MyCobot320."""
+
     def __init__(self):
+        """Initialize the Talker node and connect to the MyCobot320 robot."""
         super().__init__("real_listener")
 
         self.declare_parameter('port', '/dev/ttyAMA0')
@@ -85,17 +85,22 @@ class Talker(Node):
         self.mc = MyCobot320(port, str(baud))
 
     def start(self):
+        """Start publishing joint states at 30 Hz.
+
+        Publishes:
+            JointState messages to the 'joint_states' topic with
+            current angles in radians for all six joints.
+        """
         pub = self.create_publisher(
             msg_type=JointState,
             topic="joint_states",
             qos_profile=10
         )
-        rate = self.create_rate(30)  # 30hz
+        rate = self.create_rate(30)  # 30 Hz
 
-        # pub joint state
+        # Initialize joint state message
         joint_state_send = JointState()
         joint_state_send.header = Header()
-
         joint_state_send.name = [
             "joint2_to_joint1",
             "joint3_to_joint2",
@@ -104,21 +109,24 @@ class Talker(Node):
             "joint6_to_joint5",
             "joint6output_to_joint6",
         ]
-
-        joint_state_send.velocity = [0.0, ]
+        joint_state_send.velocity = [0.0]
         joint_state_send.effort = []
 
         while rclpy.ok():
-
             rclpy.spin_once(self)
-            # get real angles from server.
+
+            # Get real angles from MyCobot320
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 res = self.mc.get_angles()
                 release(lock)
+
             try:
+                # Skip invalid readings
                 if res[0] == res[1] == res[2] == 0.0:
                     continue
+
+                # Convert angles to radians
                 radians_list = [
                     res[0] * (math.pi / 180),
                     res[1] * (math.pi / 180),
@@ -127,9 +135,8 @@ class Talker(Node):
                     res[4] * (math.pi / 180),
                     res[5] * (math.pi / 180),
                 ]
-                # self.get_logger().info("res: {}".format(radians_list))
 
-                # publish angles.
+                # Publish joint states
                 joint_state_send.header.stamp = self.get_clock().now().to_msg()
                 joint_state_send.position = radians_list
                 pub.publish(joint_state_send)
@@ -139,6 +146,11 @@ class Talker(Node):
 
 
 def main(args=None):
+    """Main function to run the Talker node.
+
+    Args:
+        args (list, optional): Command-line arguments for ROS2. Defaults to None.
+    """
     rclpy.init(args=args)
 
     talker = Talker()
