@@ -8,8 +8,7 @@ import rclpy
 from rclpy.node import Node
 from mycobot_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles, PumpStatus
 
-
-msg = """\
+MSG = """\
 Mycobot Teleop Keyboard Controller
 ---------------------------
 Movimg options(control coordinations [x,y,z,rx,ry,rz]):
@@ -28,6 +27,10 @@ Gripper control:
     g - open
     h - close
 
+Force Gripper control:
+    t - open
+    y - close
+    
 Pump control:
     b - open
     m - close
@@ -50,24 +53,45 @@ COORD_LIMITS = {
 
 
 def vels(speed, turn):
+    """Return current speed and percent change information.
+
+    Args:
+        speed (int): Movement speed value.
+        turn (int): Percentage change for movement step size.
+
+    Returns:
+        str: Formatted string with current speed and change percent.
+    """
     return "currently:\tspeed: %s\tchange percent: %s  " % (speed, turn)
 
 
 class Raw(object):
+    """Context manager for raw terminal input mode."""
+
     def __init__(self, stream):
+        """Initialize Raw input handler.
+
+        Args:
+            stream (file): Input stream (usually sys.stdin).
+        """
         self.stream = stream
         self.fd = self.stream.fileno()
 
     def __enter__(self):
+        """Enable raw terminal input mode."""
         self.original_stty = termios.tcgetattr(self.stream)
         tty.setcbreak(self.stream)
 
     def __exit__(self, type, value, traceback):
+        """Restore original terminal settings."""
         termios.tcsetattr(self.stream, termios.TCSANOW, self.original_stty)
 
 
 class TeleopKeyboardNode(Node):
+    """ROS2 node for controlling MyCobot via keyboard inputs."""
+
     def __init__(self):
+        """Initialize TeleopKeyboardNode and create service clients."""
         super().__init__('teleop_keyboard_client')
 
         # client request
@@ -79,6 +103,8 @@ class TeleopKeyboardNode(Node):
         self.get_angles_client = self.create_client(GetAngles, '/get_angles')
         self.set_pump_client = self.create_client(
             PumpStatus, '/set_pump_status')
+        self.set_force_gripper_client = self.create_client(
+            GripperStatus, '/set_force_gripper')
 
         # Waiting for the service to go online
         while not self.set_angles_client.wait_for_service(timeout_sec=1.0):
@@ -97,7 +123,11 @@ class TeleopKeyboardNode(Node):
         self.record_coords = self.get_initial_coords()
 
     def get_initial_coords(self):
-        # get coords service
+        """Fetch current coordinates from the robot.
+
+        Returns:
+            list: [[x, y, z, rx, ry, rz], speed, model]
+        """
         request = GetCoords.Request()
         future = self.get_coords_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
@@ -109,25 +139,30 @@ class TeleopKeyboardNode(Node):
             return [[-1, -1, -1, -1, -1, -1], self.speed, self.model]
 
     def get_initial_angles(self):
-        # get angles service
+        """Fetch current joint angles from the robot.
+
+        Returns:
+            list: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+        """
         request = GetAngles.Request()
         future = self.get_angles_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.result() is not None:
-            return [future.result().joint_1, future.result().joint_2, future.result().joint_3, future.result().joint_4,
-                    future.result().joint_5, future.result().joint_6]
+            return [future.result().joint_1, future.result().joint_2, future.result().joint_3,
+                    future.result().joint_4, future.result().joint_5, future.result().joint_6]
         else:
             self.get_logger().error("Failed to get angles")
             return [-1, -1, -1, -1, -1, -1]
 
     def print_status(self):
+        """Print the current coordinates to console."""
         coords = self.record_coords[0]
         print(
             "\r current coords: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]" % tuple(coords))
 
     def send_coords(self):
+        """Send coordinates to the robot, ensuring they are within limits."""
         coords = self.record_coords[0]
-        # Check if the coordinates are out of limit
         for i, axis in enumerate(['x', 'y', 'z', 'rx', 'ry', 'rz']):
             min_limit, max_limit = COORD_LIMITS[axis]
             if coords[i] < min_limit or coords[i] > max_limit:
@@ -135,54 +170,65 @@ class TeleopKeyboardNode(Node):
                     f"{axis} value {coords[i]} exceeds the limit range [{min_limit}, {max_limit}], unable to send coordinates")
                 return
         request = SetCoords.Request()
-        request.x = coords[0]
-        request.y = coords[1]
-        request.z = coords[2]
-        request.rx = coords[3]
-        request.ry = coords[4]
-        request.rz = coords[5]
+        request.x, request.y, request.z, request.rx, request.ry, request.rz = coords
         request.speed = self.record_coords[1]
         request.model = self.record_coords[2]
 
         future = self.set_coords_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
-        if future.result() is not None:
-            pass
-            # self.get_logger().info(f"Coords set: {request}")
-        else:
+        if future.result() is None:
             self.get_logger().error('Failed to set coordinates')
 
     def send_angles(self, angles):
+        """Send joint angles to the robot.
+
+        Args:
+            angles (list): List of 6 joint angle values.
+        """
         request = SetAngles.Request()
-        request.joint_1 = angles[0]
-        request.joint_2 = angles[1]
-        request.joint_3 = angles[2]
-        request.joint_4 = angles[3]
-        request.joint_5 = angles[4]
-        request.joint_6 = angles[5]
+        (request.joint_1, request.joint_2, request.joint_3,
+         request.joint_4, request.joint_5, request.joint_6) = angles
         request.speed = self.speed
 
         future = self.set_angles_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
-        if future.result() is not None:
-            pass
-            # self.get_logger().info(f"Angles set: {request}")
-        else:
+        if future.result() is None:
             self.get_logger().error('Failed to set angles')
 
     def set_gripper(self, status):
+        """Control gripper open/close.
+
+        Args:
+            status (bool): True for open, False for close.
+        """
         request = GripperStatus.Request()
         request.status = status
-
         future = self.set_gripper_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
-        if future.result() is not None:
-            pass
-            # self.get_logger().info(f"Gripper status set: {status}")
-        else:
+        if future.result() is None:
             self.get_logger().error('Failed to control gripper')
 
+    def set_force_gripper(self, status):
+        """Force control gripper open/close.
+
+        Args:
+            status (bool): True for open, False for close.
+        """
+        request = GripperStatus.Request()
+        request.status = status
+        future = self.set_force_gripper_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is None:
+            self.get_logger().error('Failed to control force gripper')
+
     def set_pump_status(self, status, pin1, pin2):
+        """Control the suction pump.
+
+        Args:
+            status (bool): Pump on/off.
+            pin1 (int): Control pin 1.
+            pin2 (int): Control pin 2.
+        """
         request = PumpStatus.Request()
         request.status = status
         request.pin1 = pin1
@@ -201,7 +247,8 @@ class TeleopKeyboardNode(Node):
             self.get_logger().error('Failed to call pump service.')
 
     def keyboard_listener(self):
-        print(msg)
+        """Listen for keyboard input and execute corresponding robot actions."""
+        print(MSG)
         print(vels(self.speed, self.change_percent))
         while rclpy.ok():
             try:
@@ -253,6 +300,10 @@ class TeleopKeyboardNode(Node):
                     self.set_pump_status(True, 1, 2)
                 elif key in ["m", "M"]:
                     self.set_pump_status(False, 1, 2)
+                elif key in ["t", "T"]:
+                    self.set_force_gripper(True)  # open
+                elif key in ["y", "Y"]:
+                    self.set_force_gripper(False)  # close
                 elif key == "1":
                     self.send_angles(self.init_pose)
                     time.sleep(2)
@@ -262,7 +313,6 @@ class TeleopKeyboardNode(Node):
                     time.sleep(2)
                     self.record_coords = self.get_initial_coords()
                 elif key == "3":
-                    # Save the current posture as the new home posture
                     self.home_pose = self.get_initial_angles()
                     print(f"New home pose saved: {self.home_pose}")
                 elif key == '+':
@@ -289,6 +339,7 @@ class TeleopKeyboardNode(Node):
 
 
 def main(args=None):
+    """Main entry point to start the TeleopKeyboardNode."""
     rclpy.init(args=args)
     teleop_keyboard = TeleopKeyboardNode()
     teleop_keyboard.keyboard_listener()
