@@ -17,7 +17,7 @@ def generate_launch_description():
         name="model",
         default_value=os.path.join(
             get_package_share_path("mycobot_description"),
-            "urdf/mecharm_270_pi/mecharm_270_pi.urdf"
+            "urdf/mecharm_270_m5/mecharm_270_m5_adaptive_gripper.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -26,7 +26,7 @@ def generate_launch_description():
         name="rvizconfig",
         default_value=os.path.join(
             get_package_share_path("mecharm"),
-            "config/mecharm_pi.rviz"
+            "config/mecharm.rviz"
         )
     )
     res.append(rvizconfig_launch_arg)

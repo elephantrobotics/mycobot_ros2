@@ -189,9 +189,9 @@ class MyCobotDriver(Node):
             speed = 80
 
             if request.status:
-                self.mc.set_gripper_state(0, speed)  # open gripper
+                self.mc.set_gripper_state(0, speed, 1)  # open gripper
             else:
-                self.mc.set_gripper_state(1, speed)  # close gripper
+                self.mc.set_gripper_state(1, speed, 1)  # close gripper
             release(lock)
             response.flag = True
         except Exception as e:

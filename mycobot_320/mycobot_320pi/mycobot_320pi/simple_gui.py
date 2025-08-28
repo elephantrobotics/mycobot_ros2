@@ -167,6 +167,7 @@ class WindowNode(Node):
         )
 
     def set_layout(self):
+        """Set the interface layout"""
         self.frmLT = tk.Frame(width=200, height=200)
         self.frmLC = tk.Frame(width=200, height=200)
         self.frmLB = tk.Frame(width=200, height=200)
@@ -503,7 +504,7 @@ class WindowNode(Node):
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.set_gripper_state(0, 80)
+                self.mc.set_gripper_state(0, 80, 1)
                 release(lock)
         except Exception:
             pass
@@ -521,7 +522,7 @@ class WindowNode(Node):
         try:
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
-                self.mc.set_gripper_state(1, 80)
+                self.mc.set_gripper_state(1, 80, 1)
                 release(lock)
         except Exception:
             pass
