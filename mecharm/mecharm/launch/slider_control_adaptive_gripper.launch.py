@@ -18,7 +18,7 @@ def generate_launch_description():
         "model",
         default_value=os.path.join(
             get_package_share_directory("mycobot_description"),
-            "urdf/mecharm_270_m5/mecharm_270_m5.urdf"
+            "urdf/mecharm_270_m5/mecharm_270_m5_adaptive_gripper.urdf"
         )
     )
     res.append(model_launch_arg)
@@ -80,12 +80,12 @@ def generate_launch_description():
     
     slider_control_node = Node(
         package="mecharm",
-        executable="slider_control",
-        name="slider_control",
+        executable="slider_control_adaptive_gripper",
         parameters=[
             {'port': LaunchConfiguration('port')},
             {'baud': LaunchConfiguration('baud')}
         ],
+        name="slider_control_adaptive_gripper",
         output="screen"
     )
     res.append(slider_control_node)

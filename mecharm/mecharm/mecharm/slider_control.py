@@ -29,7 +29,12 @@ class Slider_Subscriber(Node):
         )
         self.subscription
 
-        self.mc = MechArm270("/dev/ttyUSB0", 115200)
+        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('baud', 115200)
+        port = self.get_parameter('port').get_parameter_value().string_value
+        baud = self.get_parameter('baud').get_parameter_value().integer_value
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        self.mc = MechArm270(port, 115200)
         time.sleep(0.05)
         self.mc.set_fresh_mode(1)
         time.sleep(0.05)
@@ -41,7 +46,7 @@ class Slider_Subscriber(Node):
             radians_to_angles = round(math.degrees(value), 2)
             data_list.append(radians_to_angles)
             
-        print('data_list: {}'.format(data_list))
+        self.get_logger().info('data_list: {}'.format(data_list))
         self.mc.send_angles(data_list, 25)
 
 
