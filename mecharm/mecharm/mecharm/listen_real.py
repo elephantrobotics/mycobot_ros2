@@ -115,7 +115,7 @@ class Talker(Node):
         while rclpy.ok():
             rclpy.spin_once(self)
 
-            # Get real angles from MyCobot320
+            # Get real angles from MechArm270
             if self.mc:
                 lock = acquire("/tmp/mycobot_lock")
                 res = self.mc.get_angles()
