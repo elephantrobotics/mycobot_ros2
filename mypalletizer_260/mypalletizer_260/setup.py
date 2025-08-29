@@ -5,10 +5,6 @@ from glob import glob
 
 package_name = 'mypalletizer_260'
 
-# 检查 setuptools 版本
-use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
-
-
 # Checking the setuptools version
 use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
 

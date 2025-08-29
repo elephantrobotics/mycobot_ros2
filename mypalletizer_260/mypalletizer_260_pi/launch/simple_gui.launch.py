@@ -72,15 +72,24 @@ def generate_launch_description():
         name="simple_gui",
         package="mypalletizer_260_pi",
         executable="simple_gui",
+        arameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(simple_gui_node)
     
-    follow_display_node = Node(
-        package="mypalletizer_260_pi",
-        executable="follow_display",
-        name="follow_display",
+    listen_real_node = Node(
+        package="mypalletizer_260",
+        executable="listen_real",
+        name="listen_real",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(listen_real_node)
     
     return LaunchDescription(res)

@@ -83,6 +83,10 @@ def generate_launch_description():
         package="mypalletizer_260",
         executable="slider_control",
         name="slider_control",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
     res.append(slider_control_node)

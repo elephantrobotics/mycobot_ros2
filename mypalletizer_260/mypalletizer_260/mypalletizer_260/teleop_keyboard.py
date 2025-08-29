@@ -171,7 +171,7 @@ class TeleopKeyboardNode(Node):
         """Send joint angles to the robot.
 
         Args:
-            angles (list): List of 6 joint angle values.
+            angles (list): List of 4 joint angle values.
         """
         request = SetAngles.Request()
         (request.joint_1, request.joint_2, request.joint_3,request.joint_4) = angles
