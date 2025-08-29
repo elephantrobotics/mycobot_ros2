@@ -30,6 +30,18 @@ def generate_launch_description():
     )
     res.append(rvizconfig_launch_arg)
 
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyACM0"
+    )
+    res.append(port_launch_arg)
+
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="115200"
+    )
+    res.append(baud_launch_arg)
+
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
 
@@ -51,12 +63,16 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_service_node = Node(
         package="mypalletizer_260",
-        executable="follow_display",
-        name="follow_display",
-        output="screen"
+        executable="listen_real_service",
+        name="listen_real_service",
+        output="screen",
+        parameters=[{
+        "port": LaunchConfiguration("port"),
+        "baud": LaunchConfiguration("baud")
+        }]
     )
-    res.append(follow_display_node)
+    res.append(listen_real_service_node)
 
     return LaunchDescription(res)

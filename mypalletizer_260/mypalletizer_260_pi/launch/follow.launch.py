@@ -59,6 +59,10 @@ def generate_launch_description():
         package="mypalletizer_260_pi",
         executable="follow_display",
         name="follow_display",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
     res.append(follow_display_node)

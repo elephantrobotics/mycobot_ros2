@@ -138,9 +138,17 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![260 m5](./demo_img/260m5/260m5.png)
 
+[myPalletizer 260 m5 adaptive gripper](./mycobot_description/urdf/mypalletizer_260_m5/mypalletizer_260_m5_adaptive_gripper.urdf)
+
+![260 m5 gripper](./demo_img/260m5/260m5_gripper.png)
+
 [myPalletizer 260 pi](./mycobot_description/urdf/mypalletizer_260_pi/mypalletizer_260_pi.urdf)
 
 ![260 pi](./demo_img/260pi/260pi.png)
+
+[myPalletizer 260 pi adaptive gripper](./mycobot_description/urdf/mypalletizer_260_pi/mypalletizer_260_pi_adaptive_gripper.urdf)
+
+![260 pi gripper](./demo_img/260pi/260pi_gripper.png)
 
 [mycobot 320 m5 2022](./mycobot_description/urdf/mycobot_320_m5_2022/mycobot_320_m5_2022.urdf)
 

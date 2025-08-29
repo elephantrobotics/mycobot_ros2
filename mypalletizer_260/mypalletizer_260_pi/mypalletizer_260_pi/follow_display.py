@@ -1,20 +1,24 @@
 import rclpy
-from pymycobot.mypalletizer import MyPalletizer
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
-import math,sys
 import pymycobot
 from packaging import version
 
-# min low version require
+# Minimum required pymycobot version
 MIN_REQUIRE_VERSION = '3.6.1'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
+
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+    raise RuntimeError(
+        'The version of pymycobot library must be greater than {} or higher. '
+        'Current version is {}. Please upgrade the library version.'.format(
+            MIN_REQUIRE_VERSION, current_verison
+        )
+    )
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MyPalletizer260
@@ -31,7 +35,6 @@ class Talker(Node):
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.mc = MyPalletizer260(port, str(baud))
-          
         self.mc.release_all_servos()
 
     def start(self):
@@ -55,7 +58,6 @@ class Talker(Node):
             "joint1_to_base",
             "joint2_to_joint1",
             "joint3_to_joint2",
-            # "joint4_to_joint3",
             "joint5_to_joint4",
         ] 
         joint_state_send.velocity = [0.0,]
@@ -69,21 +71,20 @@ class Talker(Node):
             rclpy.spin_once(self)
             joint_state_send.header.stamp = self.get_clock().now().to_msg()
 
-            try:
-                angles = self.mc.get_radians()
-                data_list = []
-                for _, value in enumerate(angles):
-                    data_list.append(value)
-            except Exception:
-                pass
-            # self.get_logger().info('radians: {}'.format(data_list))
-            
-            joint_state_send.position = data_list
+            angles = self.mc.get_radians()
+            data_list = []
+            for _, value in enumerate(angles):
+                data_list.append(value)
 
-            # print(joint_state_send.position)
-            pub.publish(joint_state_send)
             
-            # print(self.mc.get_coords())
+
+            # self.get_logger().info('radians: {}'.format(data_list))
+            joint_state_send.position = data_list
+            
+            data_list.insert(3,0.0)
+            # print('data_list:',data_list)
+            pub.publish(joint_state_send)
+
             coords = self.mc.get_coords()
 
             # marker

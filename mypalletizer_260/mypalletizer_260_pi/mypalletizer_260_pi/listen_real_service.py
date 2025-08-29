@@ -1,3 +1,4 @@
+from pymycobot import MyPalletizer260
 import math
 import time
 import os
@@ -8,10 +9,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 
-from mecharm_interfaces.srv import SetAngles, SetCoords, GetCoords, GripperStatus, GetAngles, PumpStatus
+from mypalletizer_interfaces.srv import SetAngles, SetCoords, GetCoords, GripperStatus, GetAngles, PumpStatus
 import pymycobot
 from packaging import version
-
 
 # Minimum required pymycobot version
 MIN_REQUIRE_VERSION = '3.6.1'
@@ -25,9 +25,7 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
             MIN_REQUIRE_VERSION, current_verison
         )
     )
-else:
-    print('pymycobot library version meets the requirements!')
-    from pymycobot import MechArm270
+print('pymycobot library version meets the requirements!')
 
 
 def acquire(lock_file):
@@ -40,7 +38,8 @@ def acquire(lock_file):
         int | None: File descriptor if lock acquired, None if failed.
     """
     try:
-        file_descriptor = os.open(lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+        file_descriptor = os.open(
+            lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
     except OSError as erro_info:
         print(f"Failed to open lock file {lock_file}: {erro_info}")
         return None
@@ -71,7 +70,7 @@ def release(fd):
 
 
 class MyCobotDriver(Node):
-    """ROS2 node for controlling the MechArm270 robot arm.
+    """ROS2 node for controlling the MyPalletizer260 robot arm.
 
     Provides publishers for joint states and services for controlling
     joints, coordinates, grippers, and pumps.
@@ -80,25 +79,29 @@ class MyCobotDriver(Node):
     def __init__(self):
         """Initialize MyCobotDriver node, publishers, and services."""
         super().__init__('mycobot_driver_node')
-        self.declare_parameter('port', '/dev/ttyACM0')
-        self.declare_parameter('baud', 115200)
+        self.declare_parameter('port', '/dev/ttyAMA0')
+        self.declare_parameter('baud', 1000000)
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
 
-        self.mc = MechArm270(port, str(baud))
-        if self.mc.get_fresh_mode() != 1:
-            self.mc.set_fresh_mode(1)
+        self.mc = MyPalletizer260(port, str(baud))
 
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.02, self.publish_joint_states)
 
         # Service servers
-        self.srv_angles = self.create_service(SetAngles, 'set_angles', self.set_angles_callback)
-        self.srv_coords = self.create_service(SetCoords, 'set_coords', self.set_coords_callback)
-        self.srv_get_coords = self.create_service(GetCoords, 'get_coords', self.get_coords_callback)
-        self.srv_get_angles = self.create_service(GetAngles, 'get_angles', self.get_angles_callback)
-        self.srv_gripper = self.create_service(GripperStatus, 'set_gripper', self.set_gripper_callback)
-        self.srv_pump = self.create_service(PumpStatus, 'set_pump_status', self.set_pump_callback)
+        self.srv_angles = self.create_service(
+            SetAngles, 'set_angles', self.set_angles_callback)
+        self.srv_coords = self.create_service(
+            SetCoords, 'set_coords', self.set_coords_callback)
+        self.srv_get_coords = self.create_service(
+            GetCoords, 'get_coords', self.get_coords_callback)
+        self.srv_get_angles = self.create_service(
+            GetAngles, 'get_angles', self.get_angles_callback)
+        self.srv_gripper = self.create_service(
+            GripperStatus, 'set_gripper', self.set_gripper_callback)
+        self.srv_pump = self.create_service(
+            PumpStatus, 'set_pump_status', self.set_pump_callback)
 
     def publish_joint_states(self):
         """Publish current joint states to the `joint_states` topic."""
@@ -106,7 +109,7 @@ class MyCobotDriver(Node):
             lock = acquire('/tmp/mycobot_lock')
             angles = self.mc.get_angles()
             release(lock)
-            if not angles or not isinstance(angles, list) or angles[0:3] == [0.0, 0.0, 0.0] or len(angles) != 6:
+            if not angles or not isinstance(angles, list) or angles[0:3] == [0.0, 0.0, 0.0] or len(angles) != 4:
                 return
             js = JointState()
             js.header = Header()
@@ -115,9 +118,7 @@ class MyCobotDriver(Node):
                 "joint1_to_base",
                 "joint2_to_joint1",
                 "joint3_to_joint2",
-                "joint4_to_joint3",
                 "joint5_to_joint4",
-                "joint6_to_joint5",
             ]
             js.position = [math.radians(a) for a in angles]
             self.pub.publish(js)
@@ -130,7 +131,7 @@ class MyCobotDriver(Node):
 
         Args:
             request (SetAngles.Request): The request object containing target joint
-                angles (joint_1 to joint_6) and movement speed.
+                angles (joint_1 to joint_4) and movement speed.
             response (SetAngles.Response): The response object that will be updated
                 with the operation result.
 
@@ -145,8 +146,6 @@ class MyCobotDriver(Node):
                 request.joint_2,
                 request.joint_3,
                 request.joint_4,
-                request.joint_5,
-                request.joint_6,
             ]
             speed = request.speed
             self.mc.send_angles(angles, speed)
@@ -164,7 +163,7 @@ class MyCobotDriver(Node):
 
         Args:
             request (SetCoords.Request): The request object containing target coordinates
-                (x, y, z, rx, ry, rz), motion speed, and movement model.
+                (x, y, z, rx), motion speed, and movement model.
             response (SetCoords.Response): The response object that will be updated
                 with the operation result.
 
@@ -174,8 +173,8 @@ class MyCobotDriver(Node):
         """
         try:
             lock = acquire('/tmp/mycobot_lock')
-            coords = [request.x, request.y, request.z, request.rx, request.ry, request.rz]
-            self.mc.send_coords(coords, request.speed, request.model)
+            coords = [request.x, request.y, request.z, request.rx]
+            self.mc.send_coords(coords, request.speed)
             release(lock)
             response.flag = True
         except Exception as e:
@@ -194,16 +193,16 @@ class MyCobotDriver(Node):
 
         Returns:
             GetCoords.Response: The response containing the current coordinates
-            (x, y, z, rx, ry, rz).
+            (x, y, z, rx).
         """
         try:
             lock = acquire('/tmp/mycobot_lock')
             coords = self.mc.get_coords()
             release(lock)
-            if not coords or len(coords) != 6:
+            if not coords or len(coords) != 4:
                 return
-            if coords and all(c != -1 for c in coords) and len(coords) == 6:
-                response.x, response.y, response.z, response.rx, response.ry, response.rz = coords
+            if not isinstance(coords, list) and all(c != -1 for c in coords) and len(coords) == 4:
+                response.x, response.y, response.z, response.rx = coords
             else:
                 self.get_logger().error("Failed to get coordinates.")
         except Exception as e:
@@ -220,15 +219,15 @@ class MyCobotDriver(Node):
                 with the current joint angles.
 
         Returns:
-            GetAngles.Response: The response containing six joint angles.
+            GetAngles.Response: The response containing four joint angles.
         """
         try:
             lock = acquire('/tmp/mycobot_lock')
             angles = self.mc.get_angles()
             release(lock)
-            if angles and all(a != -1 for a in angles) and len(angles) == 6:
-                (response.joint_1, response.joint_2, response.joint_3,
-                 response.joint_4, response.joint_5, response.joint_6) = angles
+            if not isinstance(angles, list) and all(a != -1 for a in angles) and len(angles) == 4:
+                (response.joint_1, response.joint_2,
+                 response.joint_3, response.joint_4) = angles
             else:
                 self.get_logger().error("Failed to get angles.")
         except Exception as e:
