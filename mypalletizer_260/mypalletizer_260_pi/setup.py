@@ -60,6 +60,7 @@ setup(
             'slider_control = mypalletizer_260_pi.slider_control:main',
             'teleop_keyboard = mypalletizer_260_pi.teleop_keyboard:main',
             'listen_real_service = mypalletizer_260.listen_real_service:main',
+            'slider_control_adaptive_gripper = mypalletizer_260_pi.slider_control_adaptive_gripper:main',
         ],
     },
 )
