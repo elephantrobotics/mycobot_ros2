@@ -14,7 +14,7 @@ def generate_launch_description():
 
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyUSB0"
+        default_value="/dev/ttyACM0"
     )
     res.append(port_launch_arg)
 
@@ -68,18 +68,27 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    follow_display_node = Node(
+    listen_real_node = Node(
         package="mypalletizer_260",
-        executable="follow_display",
-        name="follow_display",
+        executable="listen_real",
+        name="listen_real",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
-    res.append(follow_display_node)
+    res.append(listen_real_node)
 
     mypalletizer_260_node = Node(
         name="simple_gui",
         package="mypalletizer_260",
         executable="simple_gui",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
+        output="screen"
     )
     res.append(mypalletizer_260_node)
 

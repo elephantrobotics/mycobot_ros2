@@ -14,7 +14,7 @@ def generate_launch_description():
     
     port_launch_arg = DeclareLaunchArgument(
         name="port",
-        default_value="/dev/ttyUSB0"
+        default_value="/dev/ttyACM0"
     )
     res.append(port_launch_arg)
 
@@ -59,6 +59,10 @@ def generate_launch_description():
         package="mypalletizer_260",
         executable="follow_display",
         name="follow_display",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
     res.append(follow_display_node)

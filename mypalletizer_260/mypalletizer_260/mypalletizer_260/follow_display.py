@@ -6,13 +6,19 @@ from visualization_msgs.msg import Marker
 import pymycobot
 from packaging import version
 
-# min low version require
+# Minimum required pymycobot version
 MIN_REQUIRE_VERSION = '3.6.1'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
+
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError('The version of pymycobot library must be greater than {} or higher. The current version is {}. Please upgrade the library version.'.format(MIN_REQUIRE_VERSION, current_verison))
+    raise RuntimeError(
+        'The version of pymycobot library must be greater than {} or higher. '
+        'Current version is {}. Please upgrade the library version.'.format(
+            MIN_REQUIRE_VERSION, current_verison
+        )
+    )
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import MyPalletizer260
@@ -21,7 +27,7 @@ else:
 class Talker(Node):
     def __init__(self):
         super().__init__("follow_display")
-        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('port', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
    
         port = self.get_parameter("port").get_parameter_value().string_value
@@ -52,7 +58,6 @@ class Talker(Node):
             "joint1_to_base",
             "joint2_to_joint1",
             "joint3_to_joint2",
-            # "joint4_to_joint3",
             "joint5_to_joint4",
         ] 
         joint_state_send.velocity = [0.0,]
@@ -78,7 +83,6 @@ class Talker(Node):
             
             data_list.insert(3,0.0)
             # print('data_list:',data_list)
-            print(joint_state_send.position)
             pub.publish(joint_state_send)
 
             coords = self.mc.get_coords()

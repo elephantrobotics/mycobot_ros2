@@ -6,4 +6,4 @@ float32 rx
 # float32 rz
 
 int8 speed
-int8 model
+# int8 model
