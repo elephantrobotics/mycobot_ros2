@@ -281,9 +281,13 @@ class MyCobotDriver(Node):
             lock = acquire('/tmp/mycobot_lock')
             pin1, pin2 = request.pin1, request.pin2
             if request.status:
-                self.mc.set_basic_output(pin1, 0)
+                self.mc.set_basic_output(pin2, 0)
                 time.sleep(0.05)
             else:
+                self.mc.set_basic_output(pin2, 1)
+                time.sleep(0.05)
+                self.mc.set_basic_output(pin1, 0)
+                time.sleep(0.05)
                 self.mc.set_basic_output(pin1, 1)
                 time.sleep(0.05)
             release(lock)
