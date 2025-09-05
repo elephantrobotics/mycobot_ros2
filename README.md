@@ -118,6 +118,14 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 
 ![280 x5pi](./demo_img/280pi/280_pi.png)
 
+[mycobot 280 RDKX5](./mycobot_description/urdf/mycobot_280_rdkx5/mycobot_280_rdkx5.urdf)
+
+![280 rdkx5](./demo_img/280rdkx5/280rdkx5.png)
+
+[mycobot 280 RDKX5 adaptive gripper](./mycobot_description/urdf/mycobot_280_rdkx5/mycobot_280_rdkx5_adaptive_gripper.urdf)
+
+![280 rdkx5 gripper](./demo_img/280rdkx5/280rdkx5_adaptive_gripper.png)
+
 [mechArm 270 m5](./mycobot_description/urdf/mecharm_270_m5/mecharm_270_m5.urdf)
 
 ![270 m5](./demo_img/270m5/270m5.png)
