@@ -57,6 +57,7 @@ setup(
             'simple_gui = mycobot_280_rdkx5.simple_gui:main',
             'slider_control = mycobot_280_rdkx5.slider_control:main',
             'teleop_keyboard = mycobot_280_rdkx5.teleop_keyboard:main',
+            'slider_control_adaptive_gripper = mycobot_280_rdkx5.slider_control_adaptive_gripper:main',
         ],
     },
 )
