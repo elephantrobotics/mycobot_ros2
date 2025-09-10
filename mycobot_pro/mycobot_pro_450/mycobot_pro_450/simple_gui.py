@@ -1,106 +1,46 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import queue
+import sys
+import threading
 import tkinter as tk
 import time
-import os
-import fcntl
-import pymycobot
-from packaging import version
+from tkinter import messagebox
 import rclpy
 from rclpy.node import Node
-
-# Minimum required pymycobot version
-MIN_REQUIRE_VERSION = '3.9.9'
-
-current_verison = pymycobot.__version__
-print('current pymycobot library version: {}'.format(current_verison))
-
-if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
-    raise RuntimeError(
-        'The version of pymycobot library must be greater than {} or higher. '
-        'Current version is {}. Please upgrade the library version.'.format(
-            MIN_REQUIRE_VERSION, current_verison
-        )
-    )
-else:
-    print('pymycobot library version meets the requirements!')
-    from pymycobot import Pro450Client
-
-
-def acquire(lock_file):
-    """Acquire a file lock to prevent concurrent access.
-
-    Args:
-        lock_file (str): Path to the lock file.
-
-    Returns:
-        int | None: File descriptor if lock acquired, None if failed.
-    """
-    try:
-        file_descriptor = os.open(lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
-    except OSError as erro_info:
-        print(f"Failed to open lock file {lock_file}: {erro_info}")
-        return None
-    timeout = 50.0
-    start_time = current_time = time.time()
-    while current_time < start_time + timeout:
-        try:
-            fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return file_descriptor
-        except:
-            time.sleep(1)
-            current_time = time.time()
-    os.close(file_descriptor)
-    return None
-
-
-def release(fd):
-    """Release a previously acquired file lock.
-
-    Args:
-        fd (int): File descriptor of the lock file.
-    """
-    try:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
-    except:
-        pass
-
+from pymycobot.robot_info import RobotLimit
+from mycobot_pro450_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles
 
 
 class WindowNode(Node):
-    """ROS2 node for controlling MyCobot via a simple GUI window.
+    """ROS2 node with Tkinter GUI interface for controlling a MyCobot robotic arm.
 
-    This class initializes the robot connection, sets up Tkinter GUI layout,
-    and provides buttons to control joints, coordinates, gripper, and suction pump.
+    This node provides services to send joint angles, coordinates, and gripper
+    commands to the robot, as well as to query the current robot state. It also
+    integrates a Tkinter GUI for user input and displays robot data in real time.
     """
 
     def __init__(self, handle):
-        """Initialize the WindowNode.
+        """Initialize the WindowNode, ROS2 service clients, and GUI.
 
         Args:
-            handle (tk.Tk): The root Tkinter window handle.
+            handle (tk.Tk): Tkinter window instance to attach the GUI.
         """
         super().__init__('simple_gui')
 
-        # Declare ROS2 parameters
-        self.declare_parameter('ip', '192.168.0.232')
-        self.declare_parameter('port', 4500)
+        # ROS2 client request
+        self.set_angles_client = self.create_client(SetAngles, '/set_angles')
+        self.set_coords_client = self.create_client(SetCoords, '/set_coords')
+        self.set_gripper_client = self.create_client(
+            GripperStatus, '/set_gripper')
+        self.get_coords_client = self.create_client(GetCoords, '/get_coords')
+        self.get_angles_client = self.create_client(GetAngles, '/get_angles')
+        self.set_force_gripper_client = self.create_client(
+            GripperStatus, '/set_force_gripper')
 
-        ip = self.get_parameter("ip").get_parameter_value().string_value
-        port = self.get_parameter("port").get_parameter_value().integer_value
-
-        self.get_logger().info("ip:%s, port:%d" % (ip, int(port)))
-        self.mycobot_450 = Pro450Client(ip, port)
-        time.sleep(0.05)
-
-        # Ensure robot is in fresh mode
-        if self.mycobot_450:
-            lock = acquire("/tmp/mycobot_lock")
-            if self.mycobot_450.get_fresh_mode() != 1:
-                self.mycobot_450.set_fresh_mode(1)
-            release(lock)
-        time.sleep(0.05)
+        # Waiting for the service to go online
+        while not self.set_angles_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().info('Service not available, waiting again...')
 
         # Tkinter window setup
         self.win = handle
@@ -121,6 +61,10 @@ class WindowNode(Node):
             [0, 0, 0, 0, 0, 0],
             self.speed
         ]
+        # Command queue and background worker
+        self.cmd_queue = queue.Queue()
+        threading.Thread(target=self.worker, daemon=True).start()
+
         self.get_date()  # Initialize data from the robot
 
         # Screen dimensions
@@ -130,7 +74,7 @@ class WindowNode(Node):
         # Calculate window position
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("440x440+{}+{}".format(int(x), int(y)))
+        self.win.geometry("470x440+{}+{}".format(int(x), int(y)))
 
         # GUI layout and widgets
         self.set_layout()
@@ -163,6 +107,126 @@ class WindowNode(Node):
         #     row=2, column=1, sticky="w", padx=3, pady=2
         # )
 
+        # Periodic GUI update
+        self.update_gui()
+
+        # Robot model and limits
+        self.robot_name = "Pro450Client"
+        self.angles_min = RobotLimit.robot_limit[self.robot_name]["angles_min"]
+        self.angles_max = RobotLimit.robot_limit[self.robot_name]["angles_max"]
+        self.coords_min = RobotLimit.robot_limit[self.robot_name]["coords_min"]
+        self.coords_max = RobotLimit.robot_limit[self.robot_name]["coords_max"]
+
+    def worker(self):
+        """Background thread that executes queued robot commands."""
+        while rclpy.ok():
+            try:
+                cmd = self.cmd_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            try:
+                if cmd[0] == "angles":
+                    _, values, speed = cmd
+                    self.speed = speed
+                    self.send_angles(values)
+
+                elif cmd[0] == "coords":
+                    _, values, speed = cmd
+                    self.record_coords[0] = values
+                    self.record_coords[1] = speed
+                    self.send_coords()
+
+                elif cmd[0] == "gripper":
+                    _, state = cmd
+                    self.set_force_gripper(state)
+
+            except Exception as e:
+                self.get_logger().warn(f"worker error: {e}")
+
+    def wait_for_future(self, future, timeout=3.0):
+        """Wait for a future to complete with timeout (non-blocking ROS executor)."""
+        start = time.time()
+        while not future.done() and (time.time() - start) < timeout:
+            # Only process the callback once, so the GUI will not be blocked
+            rclpy.spin_once(self, timeout_sec=0.1)
+        return future.result()
+
+    def get_initial_coords(self):
+        """Fetch current coordinates from the robot.
+
+        Returns:
+            list: [[x, y, z, rx, ry, rz], speed]
+        """
+        request = GetCoords.Request()
+        future = self.get_coords_client.call_async(request)
+        # rclpy.spin_until_future_complete(self, future)
+        result = self.wait_for_future(future)
+        if result is not None:
+            return [[result.x, result.y, result.z,
+                     result.rx, result.ry, result.rz], self.speed]
+        else:
+            self.get_logger().error('Failed to get coordinates')
+            return [[-1, -1, -1, -1, -1, -1], self.speed]
+
+    def get_initial_angles(self):
+        """Fetch current joint angles from the robot.
+
+        Returns:
+            list: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+        """
+        request = GetAngles.Request()
+        future = self.get_angles_client.call_async(request)
+        # rclpy.spin_until_future_complete(self, future)
+        result = self.wait_for_future(future)
+        if result is not None:
+            return [result.joint_1, result.joint_2, result.joint_3,
+                    result.joint_4, result.joint_5, result.joint_6]
+        else:
+            self.get_logger().error("Failed to get angles")
+            return [-1, -1, -1, -1, -1, -1]
+
+    def send_coords(self):
+        """Send coordinates to the robot, ensuring they are within limits."""
+        coords = self.record_coords[0]
+        request = SetCoords.Request()
+        request.x, request.y, request.z, request.rx, request.ry, request.rz = coords
+        request.speed = self.record_coords[1]
+
+        future = self.set_coords_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is None:
+            self.get_logger().error('Failed to set coordinates')
+
+    def send_angles(self, angles):
+        """Send joint angles to the robot.
+
+        Args:
+            angles (list): List of 6 joint angle values.
+        """
+        request = SetAngles.Request()
+        (request.joint_1, request.joint_2, request.joint_3,
+         request.joint_4, request.joint_5, request.joint_6) = angles
+        request.speed = self.speed
+
+        future = self.set_angles_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is None:
+            self.get_logger().error('Failed to set angles')
+
+    def set_force_gripper(self, status):
+        """Force control gripper open/close.
+
+        Args:
+            status (bool): True for open, False for close.
+        """
+        request = GripperStatus.Request()
+        request.status = status
+        future = self.set_force_gripper_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is None:
+            self.get_logger().error('Failed to control force gripper')
+
     def set_layout(self):
         """Set the interface layout"""
         self.frmLT = tk.Frame(width=200, height=200)
@@ -175,87 +239,39 @@ class WindowNode(Node):
         self.frmRT.grid(row=0, column=1, padx=2, pady=3)
 
     def need_input(self):
-        """Display the input angle coordinate data of the robot arm"""
-        # Input prompt
-        tk.Label(self.frmLT, text="Joint 1 ").grid(row=0)
-        tk.Label(self.frmLT, text="Joint 2 ").grid(row=1)
-        tk.Label(self.frmLT, text="Joint 3 ").grid(row=2)
-        tk.Label(self.frmLT, text="Joint 4 ").grid(row=3)
-        tk.Label(self.frmLT, text="Joint 5 ").grid(row=4)
-        tk.Label(self.frmLT, text="Joint 6 ").grid(row=5)
+        """Display input fields for joint angles and robot coordinates."""
 
-        tk.Label(self.frmRT, text=" x ").grid(row=0)
-        tk.Label(self.frmRT, text=" y ").grid(row=1)
-        tk.Label(self.frmRT, text=" z ").grid(row=2)
-        tk.Label(self.frmRT, text=" rx ").grid(row=3)
-        tk.Label(self.frmRT, text=" ry ").grid(row=4)
-        tk.Label(self.frmRT, text=" rz ").grid(row=5)
+        # Joint labels and input variables
+        joint_names = ["Joint 1", "Joint 2",
+                       "Joint 3", "Joint 4", "Joint 5", "Joint 6"]
+        self.all_j = []
+        self.joint_vars = []
 
-        # Set the default value of the input box
-        self.j1_default = tk.StringVar()
-        self.j1_default.set(self.res_angles[0][0])
-        self.j2_default = tk.StringVar()
-        self.j2_default.set(self.res_angles[0][1])
-        self.j3_default = tk.StringVar()
-        self.j3_default.set(self.res_angles[0][2])
-        self.j4_default = tk.StringVar()
-        self.j4_default.set(self.res_angles[0][3])
-        self.j5_default = tk.StringVar()
-        self.j5_default.set(self.res_angles[0][4])
-        self.j6_default = tk.StringVar()
-        self.j6_default.set(self.res_angles[0][5])
+        for i, name in enumerate(joint_names):
+            tk.Label(self.frmLT, text=name).grid(row=i)
+            var = tk.StringVar()
+            var.set(self.res_angles[0][i])
+            self.joint_vars.append(var)
+            entry = tk.Entry(self.frmLT, textvariable=var)
+            entry.grid(row=i, column=1, pady=3)
+            self.all_j.append(entry)
 
-        self.x_default = tk.StringVar()
-        self.x_default.set(self.record_coords[0][0])
-        self.y_default = tk.StringVar()
-        self.y_default.set(self.record_coords[0][1])
-        self.z_default = tk.StringVar()
-        self.z_default.set(self.record_coords[0][2])
-        self.rx_default = tk.StringVar()
-        self.rx_default.set(self.record_coords[0][3])
-        self.ry_default = tk.StringVar()
-        self.ry_default.set(self.record_coords[0][4])
-        self.rz_default = tk.StringVar()
-        self.rz_default.set(self.record_coords[0][5])
+        # Coordinate labels and input variables
+        coord_names = ["x", "y", "z", "rx", "ry", "rz"]
+        self.all_c = []
+        self.coord_vars = []
 
-        # joint Input Box
-        self.J_1 = tk.Entry(self.frmLT, textvariable=self.j1_default)
-        self.J_1.grid(row=0, column=1, pady=3)
-        self.J_2 = tk.Entry(self.frmLT, textvariable=self.j2_default)
-        self.J_2.grid(row=1, column=1, pady=3)
-        self.J_3 = tk.Entry(self.frmLT, textvariable=self.j3_default)
-        self.J_3.grid(row=2, column=1, pady=3)
-        self.J_4 = tk.Entry(self.frmLT, textvariable=self.j4_default)
-        self.J_4.grid(row=3, column=1, pady=3)
-        self.J_5 = tk.Entry(self.frmLT, textvariable=self.j5_default)
-        self.J_5.grid(row=4, column=1, pady=3)
-        self.J_6 = tk.Entry(self.frmLT, textvariable=self.j6_default)
-        self.J_6.grid(row=5, column=1, pady=3)
+        for i, name in enumerate(coord_names):
+            tk.Label(self.frmRT, text=f" {name} ").grid(row=i)
+            var = tk.StringVar()
+            var.set(self.record_coords[0][i])
+            self.coord_vars.append(var)
+            entry = tk.Entry(self.frmRT, textvariable=var)
+            entry.grid(row=i, column=1, pady=3, padx=0)
+            self.all_c.append(entry)
 
-        # coord Input Box
-        self.x = tk.Entry(self.frmRT, textvariable=self.x_default)
-        self.x.grid(row=0, column=1, pady=3, padx=0)
-        self.y = tk.Entry(self.frmRT, textvariable=self.y_default)
-        self.y.grid(row=1, column=1, pady=3)
-        self.z = tk.Entry(self.frmRT, textvariable=self.z_default)
-        self.z.grid(row=2, column=1, pady=3)
-        self.rx = tk.Entry(self.frmRT, textvariable=self.rx_default)
-        self.rx.grid(row=3, column=1, pady=3)
-        self.ry = tk.Entry(self.frmRT, textvariable=self.ry_default)
-        self.ry.grid(row=4, column=1, pady=3)
-        self.rz = tk.Entry(self.frmRT, textvariable=self.rz_default)
-        self.rz.grid(row=5, column=1, pady=3)
-
-        # All input boxes are used to get the input data
-        self.all_j = [self.J_1, self.J_2,
-                      self.J_3, self.J_4, self.J_5, self.J_6]
-        self.all_c = [self.x, self.y, self.z, self.rx, self.ry, self.rz]
-
-        # Speed ​​input box
-        tk.Label(
-            self.frmLB,
-            text="speed",
-        ).grid(row=0, column=0)
+        # Speed input
+        tk.Label(self.frmLB, text="speed").grid(row=0, column=0)
         self.get_speed = tk.Entry(
             self.frmLB, textvariable=self.speed_d, width=10)
         self.get_speed.grid(row=0, column=1)
@@ -277,11 +293,10 @@ class WindowNode(Node):
         """
         try:
             if angle_list and len(angle_list[0]) > index:
-                return "{}°".format(angle_list[0][index])
+                return "{}°".format(round(angle_list[0][index], 2))
         except Exception as e:
             self.get_logger().warn("safe_get_angle error: {}".format(e))
         return default
-
 
     def safe_get_coord(self, coords_list, index, default="0.0"):
         """Safely get a coordinate from a nested list.
@@ -299,345 +314,266 @@ class WindowNode(Node):
             str: The coordinate as a string, or the default value.
         """
         try:
+            # self.get_logger().info("safe_get_coord: {}".format(coords_list))
             if coords_list and len(coords_list) > 0:
                 value = coords_list[0][index]
                 if value != -1:
-                    return str(value)
+                    return str(round(value, 2))
         except Exception as e:
             self.get_logger().warn("safe_get_coord error: {}".format(e))
         return default
 
-
     def show_init(self):
-        """Display the robot arm angle coordinate data"""
-        # display
-        tk.Label(self.frmLC, text="Joint 1 ").grid(row=0)
-        tk.Label(self.frmLC, text="Joint 2 ").grid(row=1)
-        tk.Label(self.frmLC, text="Joint 3 ").grid(row=2)
-        tk.Label(self.frmLC, text="Joint 4 ").grid(row=3)
-        tk.Label(self.frmLC, text="Joint 5 ").grid(row=4)
-        tk.Label(self.frmLC, text="Joint 6 ").grid(row=5)
+        """Display the robot arm joint angles and coordinate data in the GUI."""
 
-        # Get data display
-        self.cont_1 = tk.StringVar(self.frmLC)
-        self.cont_1.set(self.safe_get_angle(self.res_angles, 0))
-        self.cont_2 = tk.StringVar(self.frmLC)
-        self.cont_2.set(self.safe_get_angle(self.res_angles, 1))
-        self.cont_3 = tk.StringVar(self.frmLC)
-        self.cont_3.set(self.safe_get_angle(self.res_angles, 2))
-        self.cont_4 = tk.StringVar(self.frmLC)
-        self.cont_4.set(self.safe_get_angle(self.res_angles, 3))
-        self.cont_5 = tk.StringVar(self.frmLC)
-        self.cont_5.set(self.safe_get_angle(self.res_angles, 4))
-        self.cont_6 = tk.StringVar(self.frmLC)
-        self.cont_6.set(self.safe_get_angle(self.res_angles, 5))
-        self.cont_all = [
-            self.cont_1,
-            self.cont_2,
-            self.cont_3,
-            self.cont_4,
-            self.cont_5,
-            self.cont_6,
-            self.speed
-        ]
+        # Joint labels
+        joint_names = ["Joint 1", "Joint 2",
+                       "Joint 3", "Joint 4", "Joint 5", "Joint 6"]
+        self.cont_all = []
+        self.all_jo = []
 
-        self.show_j1 = tk.Label(
-            self.frmLC,
-            textvariable=self.cont_1,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=0, column=1, padx=0, pady=5)
-
-        self.show_j2 = tk.Label(
-            self.frmLC,
-            textvariable=self.cont_2,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=1, column=1, padx=0, pady=5)
-        self.show_j3 = tk.Label(
-            self.frmLC,
-            textvariable=self.cont_3,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=2, column=1, padx=0, pady=5)
-        self.show_j4 = tk.Label(
-            self.frmLC,
-            textvariable=self.cont_4,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=3, column=1, padx=0, pady=5)
-        self.show_j5 = tk.Label(
-            self.frmLC,
-            textvariable=self.cont_5,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=4, column=1, padx=0, pady=5)
-        self.show_j6 = tk.Label(
-            self.frmLC,
-            textvariable=self.cont_6,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=5, column=1, padx=5, pady=5)
-
-        self.all_jo = [
-            self.show_j1,
-            self.show_j2,
-            self.show_j3,
-            self.show_j4,
-            self.show_j5,
-            self.show_j6,
-        ]
-
-        # display
-        tk.Label(self.frmLC, text="  x ").grid(row=0, column=3)
-        tk.Label(self.frmLC, text="  y ").grid(row=1, column=3)  # second row
-        tk.Label(self.frmLC, text="  z ").grid(row=2, column=3)
-        tk.Label(self.frmLC, text="  rx ").grid(row=3, column=3)
-        tk.Label(self.frmLC, text="  ry ").grid(row=4, column=3)
-        tk.Label(self.frmLC, text="  rz ").grid(row=5, column=3)
-        self.coord_x = tk.StringVar()
-        self.coord_x.set(self.safe_get_coord(self.record_coords, 0))
-        self.coord_y = tk.StringVar()
-        self.coord_y.set(self.safe_get_coord(self.record_coords, 1))
-        self.coord_z = tk.StringVar()
-        self.coord_z.set(self.safe_get_coord(self.record_coords, 2))
-        self.coord_rx = tk.StringVar()
-        self.coord_rx.set(self.safe_get_coord(self.record_coords, 3))
-        self.coord_ry = tk.StringVar()
-        self.coord_ry.set(self.safe_get_coord(self.record_coords, 4))
-        self.coord_rz = tk.StringVar()
-        self.coord_rz.set(self.safe_get_coord(self.record_coords, 5))
-
-        self.coord_all = [
-            self.coord_x,
-            self.coord_y,
-            self.coord_z,
-            self.coord_rx,
-            self.coord_ry,
-            self.coord_rz,
-            self.speed
-        ]
-
-        self.show_x = tk.Label(
-            self.frmLC,
-            textvariable=self.coord_x,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=0, column=4, padx=5, pady=5)
-        self.show_y = tk.Label(
-            self.frmLC,
-            textvariable=self.coord_y,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=1, column=4, padx=5, pady=5)
-        self.show_z = tk.Label(
-            self.frmLC,
-            textvariable=self.coord_z,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=2, column=4, padx=5, pady=5)
-        self.show_rx = tk.Label(
-            self.frmLC,
-            textvariable=self.coord_rx,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=3, column=4, padx=5, pady=5)
-        self.show_ry = tk.Label(
-            self.frmLC,
-            textvariable=self.coord_ry,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=4, column=4, padx=5, pady=5)
-        self.show_rz = tk.Label(
-            self.frmLC,
-            textvariable=self.coord_rz,
-            font=("Arial", 9),
-            width=7,
-            height=1,
-            bg="white",
-        ).grid(row=5, column=4, padx=5, pady=5)
-
-        # mm Unit Display
-        self.unit = tk.StringVar()
-        self.unit.set("mm")
-        for i in range(6):
-            tk.Label(self.frmLC, textvariable=self.unit, font=("Arial", 9)).grid(
-                row=i, column=5
+        for i, name in enumerate(joint_names):
+            tk.Label(self.frmLC, text=name).grid(row=i)
+            var = tk.StringVar(self.frmLC)
+            var.set(self.safe_get_angle(self.res_angles, i))
+            self.cont_all.append(var)
+            lbl = tk.Label(
+                self.frmLC,
+                textvariable=var,
+                font=("Arial", 9),
+                width=7,
+                height=1,
+                bg="white"
             )
+            lbl.grid(row=i, column=1, padx=5, pady=5)
+            self.all_jo.append(lbl)
+
+        # Add speed to joint variables
+        self.cont_all.append(self.speed)
+
+        # Coordinate labels
+        coord_names = ["x", "y", "z", "rx", "ry", "rz"]
+        self.coord_all = []
+        coord_vars = []
+
+        for i, name in enumerate(coord_names):
+            tk.Label(self.frmLC, text=f"  {name} ").grid(row=i, column=3)
+            var = tk.StringVar(self.frmLC)
+            var.set(self.safe_get_coord(self.record_coords, i))
+            self.coord_all.append(var)
+            lbl = tk.Label(
+                self.frmLC,
+                textvariable=var,
+                font=("Arial", 9),
+                width=7,
+                height=1,
+                bg="white"
+            )
+            lbl.grid(row=i, column=4, padx=5, pady=5)
+            coord_vars.append(lbl)
+
+        # Add speed to coordinate variables
+        self.coord_all.append(self.speed)
+
+        # Unit display (mm)
+        unit_var = tk.StringVar(value="mm")
+        for i in range(6):
+            tk.Label(self.frmLC, textvariable=unit_var,
+                     font=("Arial", 9)).grid(row=i, column=5)
 
     def gripper_open(self):
-        """Open the robotic arm gripper.
+        """Open the robotic arm's gripper.
 
-        Acquires a lock to ensure exclusive access to the robotic arm and
-        sends the command to open the gripper.
-
-        Note:
-            If an exception occurs, it is silently ignored.
+        Attempts to open the gripper by setting the force gripper state to True.
+        Any exceptions during the operation are silently ignored.
         """
         try:
-            if self.mycobot_450:
-                lock = acquire("/tmp/mycobot_lock")
-                self.mycobot_450.set_pro_gripper_open()
-                release(lock)
+            self.set_force_gripper(True)
         except Exception:
             pass
-
 
     def gripper_close(self):
-        """Close the robotic arm gripper.
+        """Close the robotic arm's gripper.
 
-        Acquires a lock to ensure exclusive access to the robotic arm and
-        sends the command to close the gripper.
-
-        Note:
-            If an exception occurs, it is silently ignored.
+        Attempts to close the gripper by setting the force gripper state to False.
+        Any exceptions during the operation are silently ignored.
         """
         try:
-            if self.mycobot_450:
-                lock = acquire("/tmp/mycobot_lock")
-                self.mycobot_450.set_pro_gripper_close()
-                release(lock)
+            self.set_force_gripper(False)
         except Exception:
             pass
 
+    def show_error(self, msg):
+        """Safely show an error message box in the main thread.
+
+        Args:
+            msg (str): The error message to display.
+        """
+        self.win.after(0, lambda: messagebox.showerror(
+            "Error", msg, parent=self.win))
 
     def get_coord_input(self):
-        """Read coordinate input from the GUI and send it to the robotic arm.
+        """Read coordinates input from the GUI and send them to the robotic arm.
 
-        The coordinates are retrieved from the GUI input fields, the speed
-        is updated if specified, and the coordinates are sent to the robotic arm.
-        The GUI is updated to reflect the new coordinates.
+        Retrieves the coordinate values from the GUI input fields, validates
+        them against predefined min/max limits, and reads the speed input.
+        Sends the coordinates and speed as a command to the robot through
+        a queue for execution.
+
+        Displays error messages via `show_error` if input is invalid.
+
+        Raises:
+            ValueError: If the coordinate or speed inputs cannot be converted
+            to numbers.
         """
-        c_value = [float(i.get()) for i in self.all_c]
-        self.speed = int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
+        try:
+            c_value = [float(i.get()) for i in self.all_c]
+        except ValueError:
+            self.show_error("Please enter a number for the coordinates")
+            return
+
+        for idx, val in enumerate(c_value):
+            if not (self.coords_min[idx] <= val <= self.coords_max[idx]):
+                self.show_error(
+                    f"Coordinate {['X','Y','Z','RX'][idx]} input value is out of range "
+                    f"{self.coords_min[idx]}~{self.coords_max[idx]}"
+                )
+                return
 
         try:
-            if self.mycobot_450:
-                lock = acquire("/tmp/mycobot_lock")
-                self.mycobot_450.send_coords(c_value, self.speed)
-                release(lock)
-        except Exception:
-            pass
+            speed_str = self.get_speed.get()
+            if not speed_str:
+                self.show_error("Please enter a speed value (1-100)")
+                return
 
-        self.show_j_date(c_value, "coord")
+            speed = int(float(speed_str))
+            if not (1 <= speed <= 100):
+                self.show_error("Speed input value must be between 1 and 100")
+                return
+        except ValueError:
+            self.show_error("Speed must be a number")
+            return
 
+        self.speed = speed
+        self.cmd_queue.put(("coords", c_value, self.speed))
 
     def get_joint_input(self):
-        """Read joint angles input from the GUI and send it to the robotic arm.
+        """Read joint angles input from the GUI and send them to the robotic arm.
 
-        The joint angles are retrieved from the GUI input fields, the speed
-        is updated if specified, and the angles are sent to the robotic arm.
-        The GUI is updated to reflect the new angles.
+        Retrieves the joint angles from the GUI input fields, validates them
+        against predefined min/max limits, and reads the speed input.
+        Sends the joint angles and speed as a command to the robot through
+        a queue for execution.
+
+        Displays error messages via `show_error` if input is invalid.
+
+        Raises:
+            ValueError: If the joint angle or speed inputs cannot be converted
+            to numbers.
         """
-        j_value = [float(i.get()) for i in self.all_j]
-        self.speed = int(float(self.get_speed.get())) if self.get_speed.get() else self.speed
-
-        res = [j_value, self.speed]
         try:
-            if self.mycobot_450:
-                lock = acquire("/tmp/mycobot_lock")
-                self.mycobot_450.send_angles(*res)
-                release(lock)
-        except Exception:
-            pass
+            j_value = [float(i.get()) for i in self.all_j]
+        except ValueError:
+            self.show_error("Please enter a number for the joint angle")
+            return
 
-        self.show_j_date(j_value)
+        for idx, val in enumerate(j_value):
+            if not (self.angles_min[idx] <= val <= self.angles_max[idx]):
+                self.show_error(
+                    f"Joint {idx+1} input value is out of range "
+                    f"{self.angles_min[idx]}~{self.angles_max[idx]}"
+                )
+                return
 
+        try:
+            speed_str = self.get_speed.get()
+            if not speed_str:
+                self.show_error("Please enter a speed value (1-100)")
+                return
+
+            speed = int(float(speed_str))
+            if not (1 <= speed <= 100):
+                self.show_error("Speed input value must be between 1 and 100")
+                return
+        except ValueError:
+            self.show_error("Speed must be a number")
+            return
+
+        self.speed = speed
+        self.cmd_queue.put(("angles", j_value, self.speed))
 
     def get_date(self):
-        """Retrieve current coordinates and joint angles from the robotic arm.
+        """Retrieve the current coordinates and joint angles from the robotic arm.
 
-        Queries the robotic arm up to 2 seconds for coordinates and angles,
-        acquiring a lock for safe access. The results are stored internally
-        for display or further processing.
+        Queries the robot for its current coordinates and joint angles for up
+        to 2 seconds each. Uses service client methods rather than direct robot
+        access. The retrieved values are rounded to 2 decimal places and stored
+        internally for GUI display or further processing.
+
+        Updates:
+            self.res: Current coordinates as a list of floats.
+            self.angles: Current joint angles as a list of floats.
+            self.record_coords[0]: Updated coordinate record.
+            self.res_angles[0]: Updated joint angle record.
         """
-        t = time.time()
-        while time.time() - t < 2:
-            if self.mycobot_450:
-                lock = acquire("/tmp/mycobot_lock")
-                self.res = self.mycobot_450.get_coords()
-                release(lock)
-            if self.res != []:
+        # Get coordinates
+        t_start = time.time()
+        while time.time() - t_start < 2:
+            self.res = self.get_initial_coords()[0]
+            if self.res != [-1, -1, -1, -1, -1, -1]:
+                self.res = [round(val, 2) for val in self.res]
                 break
             time.sleep(0.1)
 
-        t = time.time()
-        while time.time() - t < 2:
-            if self.mycobot_450:
-                lock = acquire("/tmp/mycobot_lock")
-                self.angles = self.mycobot_450.get_angles()
-                release(lock)
-            if self.angles != []:
+        # Get joint angles
+        t_start = time.time()
+        while time.time() - t_start < 2:
+            self.angles = self.get_initial_angles()
+            if self.angles != [-1, -1, -1, -1, -1, -1]:
+                self.angles = [round(val, 2) for val in self.angles]
                 break
             time.sleep(0.1)
 
+        # Update internal records
         self.record_coords[0] = self.res
         self.res_angles[0] = self.angles
 
+    def update_gui(self):
+        """Periodically refresh the GUI and update joint angles and coordinates.
 
-    def show_j_date(self, date, way=""):
-        """Update the GUI with current joint or coordinate data.
-
-        Args:
-            date (list[float]): List of joint angles or coordinates.
-            way (str, optional): "coord" to indicate coordinates, otherwise joint angles.
+        This method queries the current joint angles and coordinates from the
+        robot, updates the Tkinter variables for display, and schedules itself
+        to run again after 300 ms.
         """
-        if way == "coord":
-            for i, j in zip(date, self.coord_all):
-                j.set(str(i))
-        else:
-            for i, j in zip(date, self.cont_all):
-                j.set(str(i) + "°")
+        try:
+            angles = self.get_initial_angles()
+            coords = self.get_initial_coords()
+            if angles:
+                self.res_angles = [angles]
+                for i, var in enumerate(self.cont_all[:6]):
+                    var.set(self.safe_get_angle(self.res_angles, i))
 
+            if coords:
+                self.record_coords = coords
+                for i, var in enumerate(self.coord_all[:6]):
+                    var.set(self.safe_get_coord(self.record_coords, i))
+        except Exception as e:
+            self.get_logger().warn(f"update_gui error: {e}")
 
-    def run(self):
-        """Run the GUI main loop.
-
-        Continuously updates the Tkinter window and handles GUI events.
-        The loop exits if the window is destroyed.
-        """
-        while True:
-            try:
-                self.win.update()
-                time.sleep(0.001)
-            except tk.TclError as e:
-                if "application has been destroyed" in str(e):
-                    break
-                else:
-                    raise
-
+        # Schedule next update in 300 ms
+        self.win.after(300, self.update_gui)
 
 
 def main(args=None):
-    """Run the MyCobot ROS GUI application.
+    """Initialize the ROS2 node and launch the Tkinter GUI for MyCobot.
 
-    Initializes ROS2, creates the Tkinter window and the WindowNode,
-    and starts the GUI main loop.
+    This function initializes the rclpy client library, creates the main
+    Tkinter window, initializes the WindowNode to handle ROS2 communication
+    and GUI interactions, and starts the Tkinter main loop. The GUI can be
+    safely interrupted using Ctrl+C (KeyboardInterrupt).
 
     Args:
-        args (list, optional): Command-line arguments passed to ROS2.
+        args (list[str], optional): Command line arguments to pass to rclpy.
             Defaults to None.
     """
     rclpy.init(args=args)
@@ -646,17 +582,13 @@ def main(args=None):
     node = WindowNode(window)
 
     try:
-        node.run()
+        window.mainloop()
     except KeyboardInterrupt:
         # Allow graceful exit on Ctrl+C
-        pass
-    # Note: The destroy_node() and shutdown() calls are commented out in
-    # the original code. They can be added if proper ROS2 shutdown is needed.
-    # finally:
-    #     node.destroy_node()
-    #     rclpy.shutdown()
+        print("Exiting...")
+        rclpy.shutdown()  # Shutdown ROS2 client library
+        sys.exit(0)       # Exit the program
 
 
 if __name__ == "__main__":
     main()
-

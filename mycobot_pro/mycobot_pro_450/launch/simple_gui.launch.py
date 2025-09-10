@@ -70,17 +70,17 @@ def generate_launch_description():
     )
     res.append(rviz_node)
 
-    listen_real_node = Node(
+    listen_real_service_node = Node(
         package="mycobot_pro_450",
-        executable="listen_real",
-        name="listen_real",
-        parameters=[
-            {'ip': LaunchConfiguration('ip')},
-            {'port': LaunchConfiguration('port')}
-        ],
-        output="screen"
+        executable="listen_real_service",
+        name="listen_real_service",
+        output="screen",
+        parameters=[{
+        "ip": LaunchConfiguration("ip"),
+        "port": LaunchConfiguration("port")
+        }]
     )
-    res.append(listen_real_node)
+    res.append(listen_real_service_node)
 
     mycobot_pro_450_node = Node(
         name="simple_gui",
