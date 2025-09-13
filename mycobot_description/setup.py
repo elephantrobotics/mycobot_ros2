@@ -5,11 +5,11 @@ from glob import glob
 
 package_name = 'mycobot_description'
 
-# 检查 setuptools 版本
+# Checking the setuptools version
 use_dash_separated_options = Version(setuptools_version) < Version("58.0.0")
 
 
-# 动态生成 setup.cfg 内容
+# Dynamically generate setup.cfg content
 setup_cfg_content = """
 [develop]
 {script_option}=$base/lib/{package_name}
@@ -22,7 +22,7 @@ setup_cfg_content = """
     install_scripts_option='install-scripts' if use_dash_separated_options else 'install_scripts'
 )
 
-# 将内容写入 setup.cfg
+# Write the contents to setup.cfg
 with open("setup.cfg", "w") as f:
     f.write(setup_cfg_content)
 
@@ -66,6 +66,7 @@ setup(
         ('share/' + package_name + '/urdf'+'/mycobot_280_arduino', glob("urdf/mycobot_280_arduino/*")),
         ('share/' + package_name + '/urdf'+'/pro_adaptive_gripper', glob("urdf/pro_adaptive_gripper/*")),
         ('share/' + package_name + '/urdf'+'/pro_force_gripper', glob("urdf/pro_force_gripper/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_450', glob("urdf/mycobot_pro_450/*")),
 
 
 
