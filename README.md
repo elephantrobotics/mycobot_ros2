@@ -201,3 +201,11 @@ $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
 [mycobot pro 630](./mycobot_description/urdf/mycobot_pro_630/mycobot_pro_630.urdf)
 
 ![pro630](./demo_img/pro630/pro630.png)
+
+[mycobot pro 450](./mycobot_description/urdf/mycobot_pro_450/mycobot_pro_450.urdf)
+
+![pro450](./demo_img/pro450/pro450.png)
+
+[mycobot pro 450 force gripper](./mycobot_description/urdf/mycobot_pro_450/mycobot_pro_450_force_gripper.urdf)
+
+![pro450 force gripper](./demo_img/pro450/pro450_force_gripper.png)
