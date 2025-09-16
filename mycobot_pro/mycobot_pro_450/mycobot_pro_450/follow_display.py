@@ -40,9 +40,10 @@ class Talker(Node):
 
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
-        self.mycobot_450.set_motor_enabled(254, 0)
+        # self.mycobot_450.set_motor_enabled(254, 0)
         time.sleep(0.1)
-        self.get_logger().info("All servos released.\n")
+        # self.get_logger().info("All servos released.\n")
+        self.get_logger().info("Please press the button at the end of the machine to drag the joint.\n请按下机器末端按钮进行关节拖拽运动")
 
     def start(self):
         """Start publishing joint states and visualization markers.
