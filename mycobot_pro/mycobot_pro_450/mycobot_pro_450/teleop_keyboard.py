@@ -110,6 +110,8 @@ class TeleopKeyboardNode(Node):
         self.home_pose = [0.0, -10.0, -123.0, 45.0, 0.0, 0.0]
 
         self.record_coords = self.get_initial_coords()
+        
+        self.ready_for_coords = False
 
     def get_initial_coords(self):
         """Fetch current coordinates from the robot.
@@ -206,57 +208,62 @@ class TeleopKeyboardNode(Node):
                     key = sys.stdin.read(1)
                 if key == "q":
                     break
-                elif key in ["w", "W"]:
-                    self.record_coords[0][0] += self.change_len
-                    self.send_coords()
-                elif key in ["s", "S"]:
-                    self.record_coords[0][0] -= self.change_len
-                    self.send_coords()
-                elif key in ["a", "A"]:
-                    self.record_coords[0][1] -= self.change_len
-                    self.send_coords()
-                elif key in ["d", "D"]:
-                    self.record_coords[0][1] += self.change_len
-                    self.send_coords()
-                elif key in ["z", "Z"]:
-                    self.record_coords[0][2] -= self.change_len
-                    self.send_coords()
-                elif key in ["x", "X"]:
-                    self.record_coords[0][2] += self.change_len
-                    self.send_coords()
-                elif key in ["u", "U"]:
-                    self.record_coords[0][3] += self.change_angle
-                    self.send_coords()
-                elif key in ["j", "J"]:
-                    self.record_coords[0][3] -= self.change_angle
-                    self.send_coords()
-                elif key in ["i", "I"]:
-                    self.record_coords[0][4] += self.change_angle
-                    self.send_coords()
-                elif key in ["k", "K"]:
-                    self.record_coords[0][4] -= self.change_angle
-                    self.send_coords()
-                elif key in ["o", "O"]:
-                    self.record_coords[0][5] += self.change_angle
-                    self.send_coords()
-                elif key in ["l", "L"]:
-                    self.record_coords[0][5] -= self.change_angle
-                    self.send_coords()
-                elif key in ["g", "G"]:
-                    self.set_force_gripper(True)  # open
-                elif key in ["h", "H"]:
-                    self.set_force_gripper(False)  # close
+                # Preset poses
                 elif key == "1":
                     self.send_angles(self.init_pose)
                     time.sleep(2)
                     self.record_coords = self.get_initial_coords()
+                    self.ready_for_coords = False
+                    self.get_logger().warn("Returned to zero pose. Press '2' to enable coordinate control.\n")
                 elif key == "2":
                     self.send_angles(self.home_pose)
                     time.sleep(2)
                     self.record_coords = self.get_initial_coords()
+                    self.ready_for_coords = True
+                    self.get_logger().info("Home pose reached. Coordinate control enabled.\n")
                 elif key == "3":
                     self.home_pose = self.get_initial_angles()
                     print(f"New home pose saved: {self.home_pose}")
+                elif key in ["w","W","s","S","a","A","d","D","z","Z","x","X",
+                            "u","U","j","J","i","I","k","K","o","O","l","L"]:
+                    if not self.ready_for_coords:
+                        self.get_logger().warn("Coordinate control disabled. Please press '2' to enable.")
+                        continue
+                    
+                    # Cartesian movement
+                    if key in ["w", "W"]:
+                        self.record_coords[0][0] += self.change_len
+                    elif key in ["s", "S"]:
+                        self.record_coords[0][0] -= self.change_len
+                    elif key in ["a", "A"]:
+                        self.record_coords[0][1] -= self.change_len
+                    elif key in ["d", "D"]:
+                        self.record_coords[0][1] += self.change_len
+                    elif key in ["z", "Z"]:
+                        self.record_coords[0][2] -= self.change_len
+                    elif key in ["x", "X"]:
+                        self.record_coords[0][2] += self.change_len
+                        
+                    # Euler rotation
+                    elif key in ["u", "U"]:
+                        self.record_coords[0][3] += self.change_angle
+                    elif key in ["j", "J"]:
+                        self.record_coords[0][3] -= self.change_angle
+                    elif key in ["i", "I"]:
+                        self.record_coords[0][4] += self.change_angle
+                    elif key in ["k", "K"]:
+                        self.record_coords[0][4] -= self.change_angle
+                    elif key in ["o", "O"]:
+                        self.record_coords[0][5] += self.change_angle
+                    elif key in ["l", "L"]:
+                        self.record_coords[0][5] -= self.change_angle
+                    
+                    self.send_coords()
+                    
+                elif key in ["g", "G"]:
+                    self.set_force_gripper(True)  # open
+                elif key in ["h", "H"]:
+                    self.set_force_gripper(False)  # close
                 elif key == '+':
                     self.change_percent = min(self.change_percent + 1, 20)
                     self.change_angle = 180 * self.change_percent / 100
