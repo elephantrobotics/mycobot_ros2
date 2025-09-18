@@ -86,8 +86,8 @@ class MyCobotDriver(Node):
 
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
-        if self.mycobot_450.get_fresh_mode() != 1:
-            self.mycobot_450.set_fresh_mode(1)
+        if self.mycobot_450.get_fresh_mode() != 0:
+            self.mycobot_450.set_fresh_mode(0)
         time.sleep(0.05)
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.02, self.publish_joint_states)

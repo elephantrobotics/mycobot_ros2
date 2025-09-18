@@ -1,3 +1,4 @@
+import threading
 import time
 import math
 import rclpy
@@ -7,7 +8,7 @@ import pymycobot
 from packaging import version
 
 # Minimum required pymycobot version
-MIN_REQUIRE_VERSION = '3.9.9'
+MIN_REQUIRE_VERSION = '4.0.0'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
@@ -53,6 +54,11 @@ class Slider_Subscriber(Node):
         if self.mycobot_450.get_fresh_mode() != 1:
             self.mycobot_450.set_fresh_mode(1)
         time.sleep(0.05)
+        
+        self.angles_queue = None
+        self.gripper_value = None
+
+        threading.Thread(target=self._send_loop, daemon=True).start()
 
     def listener_callback(self, msg: JointState):
         """Process received joint states and control robot joints and force gripper.
@@ -79,10 +85,22 @@ class Slider_Subscriber(Node):
 
         self.get_logger().info(
             f'joint_list: {data_list}, gripper_value: {gripper_value}')
-        self.mycobot_450.send_angles(data_list, 25)
-        self.mycobot_450.set_pro_gripper_angle(gripper_value)
+        # self.mycobot_450.send_angles(data_list, 25)
+        # self.mycobot_450.set_pro_gripper_angle(gripper_value)
+        self.angles_queue = data_list
+        self.gripper_value = gripper_value
 
-
+    def _send_loop(self):
+        """Background loop to send angles and gripper commands to the robotic arm."""
+        while True:
+            time.sleep(0.01)
+            if self.angles_queue:
+                self.mycobot_450.send_angles(self.angles_queue, 25, _async=True)
+                self.angles_queue = None
+            if self.gripper_value is not None:
+                self.mycobot_450.set_pro_gripper_angle(self.gripper_value)
+                self.gripper_value = None
+                
 def main(args=None):
     """Main function to run the Slider_Subscriber node.
 
