@@ -56,8 +56,8 @@ class SliderSubscriber(Node):
         )
 
         # Declare robot connection parameters
-        self.declare_parameter('ip', '192.168.0.32')
-        self.declare_parameter('port', 450)
+        self.declare_parameter('ip', '192.168.0.232')
+        self.declare_parameter('port', 4500)
 
         ip = self.get_parameter("ip").get_parameter_value().string_value
         port = self.get_parameter("port").get_parameter_value().integer_value
