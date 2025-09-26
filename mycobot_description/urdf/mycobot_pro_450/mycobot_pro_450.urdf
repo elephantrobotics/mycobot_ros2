@@ -9,13 +9,13 @@
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J1.dae"/>
       </geometry>
-      <origin xyz = "0.0 -0.11 0 " rpy = " 0 0 0"/>
+      <origin xyz = "0.0 -0.11 0" rpy = "0 0 0"/>
     </visual>
     <collision>
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J1.dae"/>
         </geometry>
-        <origin xyz = "0.0 -0.11 0 " rpy = " 0 0 0"/>
+        <origin xyz = "0.0 -0.11 0" rpy = "0 0 0"/>
     </collision>
   </link>
 
@@ -24,13 +24,13 @@
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J2.dae"/>
       </geometry>
-      <origin xyz = "0.0405 0 0.0475 " rpy = " -1.5708 0 -1.5708 "/>
+      <origin xyz = "0.0405 0 0.0475" rpy = "-1.5708 0 -1.5708"/>
     </visual>
     <collision>
      <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J2.dae"/>
       </geometry>
-      <origin xyz = "0.0405 0 0.0475 " rpy = " -1.5708 0 -1.5708 "/>
+      <origin xyz = "0.0405 0 0.0475" rpy = "-1.5708 0 -1.5708"/>
     </collision>
   </link>
 
@@ -39,13 +39,13 @@
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J3.dae"/>
       </geometry>
-    <origin xyz = "0.0598 0.005 -0.203 " rpy = " 0 0 1.5708 "/>
+    <origin xyz = "0.0598 0.005 -0.203" rpy = "0 0 1.5708"/>
     </visual>
     <collision>
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J3.dae"/>
       </geometry>
-      <origin xyz = "0.0598  0.005 -0.203 " rpy = " 0 0 1.5708"/>
+      <origin xyz = "0.0598  0.005 -0.203" rpy = "0 0 1.5708"/>
     </collision>
   </link>
 
@@ -55,13 +55,13 @@
        
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J4.dae"/>
       </geometry>
-      <origin xyz = "0.07 0.005 -0.383 " rpy = " 0 0 1.5708"/>
+      <origin xyz = "0.07 0.005 -0.383" rpy = "0 0 1.5708"/>
     </visual>
     <collision>
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J4.dae"/>
       </geometry>
-      <origin xyz = "0.07 0.005 -0.383" rpy = " 0 0 1.5708"/>
+      <origin xyz = "0.07 0.005 -0.383" rpy = "0 0 1.5708"/>
     </collision>
   </link>
 
@@ -71,13 +71,13 @@
       <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J5.dae"/>
       </geometry>
-    <origin xyz = "-0.015 0 -0.002 " rpy = " 0 -1.5708 0"/>
+    <origin xyz = "-0.015 0 -0.002" rpy = "0 -1.5708 0"/>
     </visual>
     <collision>
        <geometry>
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J5.dae"/>
       </geometry>
-      <origin xyz = "-0.015 0 -0.002 " rpy = " 0 -1.5708 0"/>
+      <origin xyz = "-0.015 0 -0.002" rpy = "0 -1.5708 0"/>
     </collision>
   </link>
 
@@ -88,14 +88,14 @@
        
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J6.dae"/>
       </geometry>
-    <origin xyz = "0.003 -0.025 -0.608 " rpy = " 0 0 0"/>
+    <origin xyz = "0.003 -0.025 -0.608" rpy = "0 0 0"/>
     </visual>
     <collision>
       <geometry>
        
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J6.dae"/>
       </geometry>
-    <origin xyz = "0.003 -0.025 -0.608 " rpy = " 0 0 -0"/>
+    <origin xyz = "0.003 -0.025 -0.608" rpy = "0 0 -0"/>
     </collision>
   </link>
 
@@ -106,14 +106,14 @@
        
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J6_end.dae"/>
       </geometry>
-    <origin xyz = "0 0 0.001 " rpy = " 3.14159 0 0"/>
+    <origin xyz = "0 0 0.001" rpy = "3.14159 0 0"/>
     </visual>
     <collision>
       <geometry>
        
        <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J6_end.dae"/>
       </geometry>
-    <origin xyz = "0 0 0.001 " rpy = " 3.14159 0 0"/>
+    <origin xyz = "0 0 0.001" rpy = "3.14159 0 0"/>
     </collision>
   </link>
 
@@ -142,12 +142,12 @@
     <limit effort = "1000.0" lower = "-2.7576" upper = "2.7576" velocity = "0"/>
     <parent link="link2"/>
     <child link="link3"/>
-    <origin xyz= "-0.01 0 0.18  " rpy = "0 0 0"/>  
+    <origin xyz= "-0.01 0 0.18" rpy = "0 0 0"/>  
   </joint>
 
 
   <joint name="joint4" type="revolute">
-    <axis xyz=" 1 0 0"/>
+    <axis xyz="1 0 0"/>
     <limit effort = "1000.0" lower = "-2.8797" upper = "2.8797" velocity = "0"/>
     <parent link="link3"/>
     <child link="link4"/>
