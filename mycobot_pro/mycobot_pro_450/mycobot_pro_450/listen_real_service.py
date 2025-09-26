@@ -8,7 +8,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 
-from mycobot_pro450_interfaces.srv import SetAngles, SetCoords, GetCoords, GripperStatus, GetAngles
+from mycobot_pro450_interfaces.srv import SetAngles, SetCoords, GetCoords, GripperStatus, GetAngles, GetGripperValue
 import pymycobot
 from packaging import version
 
@@ -86,9 +86,15 @@ class MyCobotDriver(Node):
 
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
+        
+        if self.mycobot_450.is_power_on !=1:
+            self.mycobot_450.power_on()
+        time.sleep(0.05)    
         if self.mycobot_450.get_fresh_mode() != 0:
             self.mycobot_450.set_fresh_mode(0)
         time.sleep(0.05)
+        self.mycobot_450.set_limit_switch(2, 0)
+        
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.02, self.publish_joint_states)
 
@@ -98,22 +104,34 @@ class MyCobotDriver(Node):
         self.srv_get_coords = self.create_service(GetCoords, 'get_coords', self.get_coords_callback)
         self.srv_get_angles = self.create_service(GetAngles, 'get_angles', self.get_angles_callback)
         self.srv_force_gripper = self.create_service(GripperStatus, 'set_force_gripper', self.set_force_gripper_callback)
+        self.srv_get_force_gripper = self.create_service(GetGripperValue, 'get_force_gripper', self.get_force_gripper_callback)
 
     def publish_joint_states(self):
         """Publish current joint states to the `joint_states` topic."""
         try:
             lock = acquire('/tmp/mycobot_lock')
             angles = self.mycobot_450.get_angles()
+            gripper_value = self.mycobot_450.get_pro_gripper_angle()
             release(lock)
             # self.get_logger().info(f"Raw angles from MyCobot: {angles}")
             if not angles or not isinstance(angles, list) or len(angles) != 6:
                 self.get_logger().warn("Failed to get valid joint angles, fallback to [-1] * 6.")
                 return
+            
+            positions = [math.radians(a) for a in angles]
+            
+            if gripper_value is not None or gripper_value !=-1:
+                positions.append(math.radians(gripper_value))
+                
+            joint_names = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper_controller"]  
+            if len(positions) < len(joint_names):
+                positions += [0.0] * (len(joint_names) - len(positions))  
+                
             js = JointState()
             js.header = Header()
             js.header.stamp = self.get_clock().now().to_msg()
-            js.name = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
-            js.position = [math.radians(a) for a in angles]
+            js.name = joint_names[:len(positions)]
+            js.position = positions[:len(joint_names)]
             self.pub.publish(js)
         except Exception as e:
             e = traceback.format_exc()
@@ -255,6 +273,20 @@ class MyCobotDriver(Node):
             e = traceback.format_exc()
             self.get_logger().error(f"SetForceGripper service error: {e}")
             response.flag = False
+        return response
+    
+    def get_force_gripper_callback(self, request, response):
+        """Get current force gripper angle."""
+        try:
+            lock = acquire('/tmp/mycobot_lock')
+            gripper_angle = self.mycobot_450.get_pro_gripper_angle()
+            release(lock)
+
+            response.gripper_angle = int(gripper_angle)
+        except Exception as e:
+            e = traceback.format_exc()
+            self.get_logger().error(f"GetForceGripper service error: {e}")
+            response.gripper_angle = -1
         return response
 
 
