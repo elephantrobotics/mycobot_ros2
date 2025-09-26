@@ -61,15 +61,6 @@ def generate_launch_description():
     )
     res.append(robot_state_publisher_node)
 
-    rviz_node = Node(
-        name="rviz2",
-        package="rviz2",
-        executable="rviz2",
-        output="screen",
-        arguments=['-d', LaunchConfiguration("rvizconfig")],
-    )
-    res.append(rviz_node)
-
     listen_real_service_node = Node(
         package="mycobot_pro_450",
         executable="listen_real_service",
@@ -93,5 +84,14 @@ def generate_launch_description():
         output="screen"
     )
     res.append(mycobot_pro_450_node)
+    
+    rviz_node = Node(
+    name="rviz2",
+    package="rviz2",
+    executable="rviz2",
+    output="screen",
+    arguments=['-d', LaunchConfiguration("rvizconfig")],
+    )
+    res.append(rviz_node)
 
     return LaunchDescription(res)

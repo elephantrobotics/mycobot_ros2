@@ -47,9 +47,13 @@ class Slider_Subscriber(Node):
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
         time.sleep(0.05)
+        if self.mycobot_450.is_power_on !=1:
+            self.mycobot_450.power_on()
+        time.sleep(0.05)
         if self.mycobot_450.get_fresh_mode() != 1:
             self.mycobot_450.set_fresh_mode(1)
         time.sleep(0.05)
+        self.mycobot_450.set_limit_switch(2, 0)
 
     def listener_callback(self, msg: JointState):
         """Handle received joint state messages and send angles to the robot.

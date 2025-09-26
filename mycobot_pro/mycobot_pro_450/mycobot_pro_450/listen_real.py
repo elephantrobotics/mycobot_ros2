@@ -83,10 +83,15 @@ class Talker(Node):
 
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
+        
+        if self.mycobot_450.is_power_on !=1:
+            self.mycobot_450.power_on()
+            
         if self.mycobot_450.get_fresh_mode() != 0:
             self.mycobot_450.set_fresh_mode(0)
         time.sleep(0.05)
-
+        self.mycobot_450.set_limit_switch(2, 0)
+        
     def start(self):
         """Start publishing joint states at 30 Hz.
 

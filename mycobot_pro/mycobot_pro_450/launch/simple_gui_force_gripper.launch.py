@@ -12,24 +12,6 @@ from launch.substitutions import Command, LaunchConfiguration
 def generate_launch_description():
     res = []
 
-    model_launch_arg = DeclareLaunchArgument(
-        "model",
-        default_value=os.path.join(
-            get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_pro_450/mycobot_pro_450.urdf"
-        )
-    )
-    res.append(model_launch_arg)
-
-    rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
-        default_value=os.path.join(
-            get_package_share_directory("mycobot_pro_450"),
-            "config/mycobot_pro_450.rviz"
-        )
-    )
-    res.append(rvizconfig_launch_arg)
-    
     ip_launch_arg = DeclareLaunchArgument(
         name="ip",
         default_value="192.168.0.232",
@@ -43,7 +25,31 @@ def generate_launch_description():
         description='Port number used by the device'
     )
     res.append(port_launch_arg)
-    
+
+    model_launch_arg = DeclareLaunchArgument(
+        name="model",
+        default_value=os.path.join(
+            get_package_share_directory("mycobot_description"),
+            "urdf/mycobot_pro_450/mycobot_pro_450_force_gripper.urdf"
+        )
+    )
+    res.append(model_launch_arg)
+
+    rvizconfig_launch_arg = DeclareLaunchArgument(
+        name="rvizconfig",
+        default_value=os.path.join(
+            get_package_share_directory("mycobot_pro_450"),
+            "config/mycobot_pro_450.rviz"
+        )
+    )
+    res.append(rvizconfig_launch_arg)
+
+    gui_launch_arg = DeclareLaunchArgument(
+        name="gui",
+        default_value="false"
+    )
+    res.append(gui_launch_arg)
+
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
 
@@ -51,8 +57,7 @@ def generate_launch_description():
         name="robot_state_publisher",
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[{'robot_description': robot_description}],
-        arguments=[LaunchConfiguration("model")]
+        parameters=[{'robot_description': robot_description}]
     )
     res.append(robot_state_publisher_node)
 
@@ -67,6 +72,18 @@ def generate_launch_description():
         }]
     )
     res.append(listen_real_service_node)
+
+    mycobot_pro_450_node = Node(
+        name="simple_gui",
+        package="mycobot_pro_450",
+        executable="simple_gui",
+        parameters=[
+            {'ip': LaunchConfiguration('ip')},
+            {'port': LaunchConfiguration('port')}
+        ],
+        output="screen"
+    )
+    res.append(mycobot_pro_450_node)
     
     rviz_node = Node(
     name="rviz2",

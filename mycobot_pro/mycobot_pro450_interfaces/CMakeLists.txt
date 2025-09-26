@@ -35,6 +35,7 @@ set(srv_files
   "srv/GetCoords.srv"
   "srv/SetCoords.srv"
   "srv/GripperStatus.srv"
+  "srv/GetGripperValue.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
