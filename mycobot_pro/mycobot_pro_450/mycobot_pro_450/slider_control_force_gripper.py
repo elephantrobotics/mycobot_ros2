@@ -8,7 +8,7 @@ import pymycobot
 from packaging import version
 
 # Minimum required pymycobot version
-MIN_REQUIRE_VERSION = '4.0.0'
+MIN_REQUIRE_VERSION = '4.0.1'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
