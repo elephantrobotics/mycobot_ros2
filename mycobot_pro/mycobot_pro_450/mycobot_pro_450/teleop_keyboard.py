@@ -23,10 +23,6 @@ j(rx-)   k(ry-)   l(rz-)
 
 +/- : Increase/decrease movement step size
 
-Force Gripper control:
-    g - open
-    h - close
-
 Other:
     1 - Go to init pose
     2 - Go to home pose
@@ -89,12 +85,10 @@ class TeleopKeyboardNode(Node):
         # client request
         self.set_angles_client = self.create_client(SetAngles, '/set_angles')
         self.set_coords_client = self.create_client(SetCoords, '/set_coords')
-        self.set_gripper_client = self.create_client(
-            GripperStatus, '/set_gripper')
         self.get_coords_client = self.create_client(GetCoords, '/get_coords')
         self.get_angles_client = self.create_client(GetAngles, '/get_angles')
-        self.set_force_gripper_client = self.create_client(
-            GripperStatus, '/set_force_gripper')
+        # self.set_force_gripper_client = self.create_client(
+        #     GripperStatus, '/set_force_gripper')
 
         # Waiting for the service to go online
         while not self.set_angles_client.wait_for_service(timeout_sec=1.0):
@@ -260,10 +254,10 @@ class TeleopKeyboardNode(Node):
                     
                     self.send_coords()
                     
-                elif key in ["g", "G"]:
-                    self.set_force_gripper(True)  # open
-                elif key in ["h", "H"]:
-                    self.set_force_gripper(False)  # close
+                # elif key in ["g", "G"]:
+                #     self.set_force_gripper(True)  # open
+                # elif key in ["h", "H"]:
+                #     self.set_force_gripper(False)  # close
                 elif key == '+':
                     self.change_percent = min(self.change_percent + 1, 20)
                     self.change_angle = 180 * self.change_percent / 100
