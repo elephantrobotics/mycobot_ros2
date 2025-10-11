@@ -74,9 +74,9 @@ def generate_launch_description():
     res.append(listen_real_service_node)
 
     mycobot_pro_450_node = Node(
-        name="simple_gui",
+        name="simple_gui_force_gripper",
         package="mycobot_pro_450",
-        executable="simple_gui",
+        executable="simple_gui_force_gripper",
         parameters=[
             {'ip': LaunchConfiguration('ip')},
             {'port': LaunchConfiguration('port')}

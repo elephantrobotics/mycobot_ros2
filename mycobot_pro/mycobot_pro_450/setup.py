@@ -60,6 +60,8 @@ setup(
             'teleop_keyboard = mycobot_pro_450.teleop_keyboard:main',
             'listen_real_service = mycobot_pro_450.listen_real_service:main',
             'slider_control_force_gripper = mycobot_pro_450.slider_control_force_gripper:main',
+            'teleop_keyboard_force_gripper = mycobot_pro_450.teleop_keyboard_force_gripper:main',
+            'simple_gui_force_gripper = mycobot_pro_450.simple_gui_force_gripper:main',
         ],
     },
 )
