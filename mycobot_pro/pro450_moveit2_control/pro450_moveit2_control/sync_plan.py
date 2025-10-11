@@ -19,7 +19,7 @@ import pymycobot
 from packaging import version
 
 # Minimum required pymycobot library version
-MIN_REQUIRE_VERSION = '4.0.0'
+MIN_REQUIRE_VERSION = '4.0.1'
 
 CURRENT_VERSION = pymycobot.__version__
 print(f'current pymycobot library version: {CURRENT_VERSION}')
@@ -65,9 +65,13 @@ class SliderSubscriber(Node):
         self.get_logger().info(f"ip:{ip}, port:{port}")
         self.mycobot_450 = Pro450Client(ip, port)
         time.sleep(0.05)
+        if self.mycobot_450.is_power_on() !=1:
+            self.mycobot_450.power_on()
+        time.sleep(0.05)
         if self.mycobot_450.get_fresh_mode() != 1:
             self.mycobot_450.set_fresh_mode(1)
         time.sleep(0.05)
+        self.mycobot_450.set_limit_switch(2, 0)
 
         # Joint order in RViz
         self.rviz_order = ['joint1', 'joint2',
