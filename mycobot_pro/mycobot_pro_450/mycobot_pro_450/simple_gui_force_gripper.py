@@ -26,15 +26,17 @@ class WindowNode(Node):
         Args:
             handle (tk.Tk): Tkinter window instance to attach the GUI.
         """
-        super().__init__('simple_gui')
+        super().__init__('simple_gui_gripper')
 
         # ROS2 client request
         self.set_angles_client = self.create_client(SetAngles, '/set_angles')
         self.set_coords_client = self.create_client(SetCoords, '/set_coords')
+        self.set_gripper_client = self.create_client(
+            GripperStatus, '/set_gripper')
         self.get_coords_client = self.create_client(GetCoords, '/get_coords')
         self.get_angles_client = self.create_client(GetAngles, '/get_angles')
-        # self.set_force_gripper_client = self.create_client(
-        #     GripperStatus, '/set_force_gripper')
+        self.set_force_gripper_client = self.create_client(
+            GripperStatus, '/set_force_gripper')
 
         # Waiting for the service to go online
         while not self.set_angles_client.wait_for_service(timeout_sec=2.0):
@@ -90,12 +92,12 @@ class WindowNode(Node):
         )
 
         # Gripper control buttons
-        # tk.Button(self.frmLB, text="Gripper Open", command=self.gripper_open, width=10).grid(
-        #     row=1, column=0, sticky="w", padx=3, pady=20
-        # )
-        # tk.Button(self.frmLB, text="Gripper Close", command=self.gripper_close, width=10).grid(
-        #     row=1, column=1, sticky="w", padx=3, pady=2
-        # )
+        tk.Button(self.frmLB, text="Gripper Open", command=self.gripper_open, width=10).grid(
+            row=1, column=0, sticky="w", padx=3, pady=20
+        )
+        tk.Button(self.frmLB, text="Gripper Close", command=self.gripper_close, width=10).grid(
+            row=1, column=1, sticky="w", padx=3, pady=2
+        )
 
         # Suction pump control buttons
         # tk.Button(self.frmLB, text=" 吸泵(开)", command=self.pump_open, width=5).grid(
@@ -212,7 +214,6 @@ class WindowNode(Node):
         if future.result() is None:
             self.get_logger().error('Failed to set angles')
 
-    '''
     def set_force_gripper(self, status):
         """Force control gripper open/close.
 
@@ -225,8 +226,7 @@ class WindowNode(Node):
         rclpy.spin_until_future_complete(self, future)
         if future.result() is None:
             self.get_logger().error('Failed to control force gripper')
-    '''
-    
+
     def set_layout(self):
         """Set the interface layout"""
         self.frmLT = tk.Frame(width=200, height=200)
@@ -381,27 +381,27 @@ class WindowNode(Node):
             tk.Label(self.frmLC, textvariable=unit_var,
                      font=("Arial", 9)).grid(row=i, column=5)
 
-    # def gripper_open(self):
-    #     """Open the robotic arm's gripper.
+    def gripper_open(self):
+        """Open the robotic arm's gripper.
 
-    #     Attempts to open the gripper by setting the force gripper state to True.
-    #     Any exceptions during the operation are silently ignored.
-    #     """
-    #     try:
-    #         self.set_force_gripper(True)
-    #     except Exception:
-    #         pass
+        Attempts to open the gripper by setting the force gripper state to True.
+        Any exceptions during the operation are silently ignored.
+        """
+        try:
+            self.set_force_gripper(True)
+        except Exception:
+            pass
 
-    # def gripper_close(self):
-    #     """Close the robotic arm's gripper.
+    def gripper_close(self):
+        """Close the robotic arm's gripper.
 
-    #     Attempts to close the gripper by setting the force gripper state to False.
-    #     Any exceptions during the operation are silently ignored.
-    #     """
-    #     try:
-    #         self.set_force_gripper(False)
-    #     except Exception:
-    #         pass
+        Attempts to close the gripper by setting the force gripper state to False.
+        Any exceptions during the operation are silently ignored.
+        """
+        try:
+            self.set_force_gripper(False)
+        except Exception:
+            pass
 
     def show_error(self, msg):
         """Safely show an error message box in the main thread.
