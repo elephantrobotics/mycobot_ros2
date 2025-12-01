@@ -1,0 +1,81 @@
+import rclpy
+from sensor_msgs.msg import JointState
+from rclpy.node import Node
+import math
+import pymycobot
+from packaging import version
+# min low version require
+MIN_REQUIRE_VERSION = '4.0.3'
+
+current_verison = pymycobot.__version__
+print('current pymycobot library version: {}'.format(current_verison))
+if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
+    raise RuntimeError(
+        'The version of pymycobot library must be greater than {} or higher. '
+        'The current version is {}. Please upgrade the library version.'.format(
+            MIN_REQUIRE_VERSION, current_verison
+        )
+    )
+else:
+    print('pymycobot library version meets the requirements!')
+    from pymycobot import UltraArmP1
+
+
+class Slider_Subscriber(Node):
+    """ROS2 node that subscribes to joint states and sends commands to ultraArm P1."""
+
+    def __init__(self):
+        super().__init__("control_slider")
+        self.subscription = self.create_subscription(
+            JointState,
+            "joint_states",
+            self.listener_callback,
+            10
+        )
+        # self.subscription
+        # Declare robot connection parameters
+        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('baud', 115200)
+
+        port = self.get_parameter("port").get_parameter_value().string_value
+        baud = self.get_parameter("baud").get_parameter_value().integer_value
+
+        self.get_logger().info("port:%s, baud:%d" % (port, baud))
+        self.ua = UltraArmP1(port, baud)
+
+    def listener_callback(self, msg):
+        """Handle received joint state messages and send angles to the robot.
+
+        Args:
+            msg (JointState): ROS2 JointState message containing joint positions
+                in radians.
+
+        Returns:
+            None
+        """
+
+        data_list = []
+        for _, value in enumerate(msg.position):
+            radians_to_angles = round(math.degrees(value), 2)
+            data_list.append(radians_to_angles)
+        joint1 = data_list[0]
+        joint2 = data_list[1]
+        joint3 = data_list[5] + 90
+        joint4 = data_list[-1]
+        angles_list = [joint1, joint2, joint3, joint4]
+        self.get_logger().info('joint_angles: {}'.format(angles_list))
+        self.ua.set_angles(angles_list, 2500, _async=False)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    slider_subscriber = Slider_Subscriber()
+
+    rclpy.spin(slider_subscriber)
+
+    slider_subscriber.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
