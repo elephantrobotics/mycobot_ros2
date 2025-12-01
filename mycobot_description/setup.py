@@ -67,7 +67,7 @@ setup(
         ('share/' + package_name + '/urdf'+'/pro_adaptive_gripper', glob("urdf/pro_adaptive_gripper/*")),
         ('share/' + package_name + '/urdf'+'/pro_force_gripper', glob("urdf/pro_force_gripper/*")),
         ('share/' + package_name + '/urdf'+'/mycobot_pro_450', glob("urdf/mycobot_pro_450/*")),
-
+        ('share/' + package_name + '/urdf'+'/ultraArm_p1', glob("urdf/ultraArm_p1/*")),
 
 
     ],
