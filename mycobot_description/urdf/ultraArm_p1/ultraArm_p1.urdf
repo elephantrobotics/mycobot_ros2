@@ -3,7 +3,7 @@
      Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot
-  name="mycobot_description/urdf/ultraArm_p1">
+  name="firefighter">
   <link name="world"/>
   <joint name="world_to_base" type="fixed">
     <parent link="world"/>
@@ -52,7 +52,7 @@
     </collision>
   </link>
   <link
-    name="J1-LINK">
+    name="J1_LINK">
     <inertial>
       <origin
         xyz="0.00210492593461096 -0.000275715822415964 0.0639697094673263"
@@ -73,7 +73,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://mycobot_description/urdf/ultraArm_p1/J1-LINK.STL" />
+          filename="package://mycobot_description/urdf/ultraArm_p1/J1_LINK.STL" />
       </geometry>
       <material
         name="">
@@ -87,7 +87,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://mycobot_description/urdf/ultraArm_p1/J1-LINK.STL" />
+          filename="package://mycobot_description/urdf/ultraArm_p1/J1_LINK.STL" />
       </geometry>
     </collision>
   </link>
@@ -100,7 +100,7 @@
     <parent
       link="base_link" />
     <child
-      link="J1-LINK" />
+      link="J1_LINK" />
     <axis
       xyz="0 0 1" />
     <limit
@@ -156,7 +156,7 @@
       xyz="0.0225 -0.015 0.0799"
       rpy="0 0 0" />
     <parent
-      link="J1-LINK" />
+      link="J1_LINK" />
     <child
       link="J2_Link1" />
     <axis
@@ -208,7 +208,7 @@
     </collision>
   </link>
   <joint
-    name="J2-4"
+    name="J2_4"
     type="revolute">
     <origin
       xyz="-0.002409 0.0059 0.13998"
@@ -225,7 +225,7 @@
       effort="100"
       velocity="1" />
     <mimic
-      joint="J2-3"
+      joint="J2_3"
       multiplier="1"
       offset="0" />
   </joint>
@@ -271,13 +271,13 @@
     </collision>
   </link>
   <joint
-    name="J2-2"
+    name="J2_2"
     type="revolute">
     <origin
       xyz="-0.0025 -0.024 0.1049"
       rpy="0 0 0" />
     <parent
-      link="J1-LINK" />
+      link="J1_LINK" />
     <child
       link="J2_Link2" />
     <axis
@@ -293,7 +293,7 @@
       offset="0" />
   </joint>
   <link
-    name="J2-Link3">
+    name="J2_Link3">
     <inertial>
       <origin
         xyz="-5.85469173142172E-17 -0.00500000000000002 5.55111512312578E-17"
@@ -314,7 +314,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://mycobot_description/urdf/ultraArm_p1/J2-Link3.STL" />
+          filename="package://mycobot_description/urdf/ultraArm_p1/J2_Link3.STL" />
       </geometry>
       <material
         name="">
@@ -328,12 +328,12 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://mycobot_description/urdf/ultraArm_p1/J2-Link3.STL" />
+          filename="package://mycobot_description/urdf/ultraArm_p1/J2_Link3.STL" />
       </geometry>
     </collision>
   </link>
   <joint
-    name="J2-3"
+    name="J2_3"
     type="revolute">
     <origin
       xyz="0 0 0.14"
@@ -341,7 +341,7 @@
     <parent
       link="J2_Link2" />
     <child
-      link="J2-Link3" />
+      link="J2_Link3" />
     <axis
       xyz="0 1 0" />
     <limit
@@ -454,7 +454,7 @@
     </collision>
   </link>
   <joint
-    name="J3-3"
+    name="J3_3"
     type="revolute">
     <origin
       xyz="0.14232 -0.0099 -0.0049908"
@@ -636,7 +636,7 @@
       xyz="0 0 0" />
   </joint>
   <link
-    name="J3-LIink2">
+    name="J3_LIink2">
     <inertial>
       <origin
         xyz="0.073501731692264 0.0240046446313847 -0.0015475696710967"
@@ -657,7 +657,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://mycobot_description/urdf/ultraArm_p1/J3-LIink2.STL" />
+          filename="package://mycobot_description/urdf/ultraArm_p1/J3_LIink2.STL" />
       </geometry>
       <material
         name="">
@@ -671,12 +671,12 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://mycobot_description/urdf/ultraArm_p1/J3-LIink2.STL" />
+          filename="package://mycobot_description/urdf/ultraArm_p1/J3_LIink2.STL" />
       </geometry>
     </collision>
   </link>
   <joint
-    name="J3-2"
+    name="J3_2"
     type="revolute">
     <origin
       xyz="0 0 0"
@@ -684,7 +684,7 @@
     <parent
       link="FIX3" />
     <child
-      link="J3-LIink2" />
+      link="J3_LIink2" />
     <axis
       xyz="0 1 0" />
     <limit
@@ -738,13 +738,13 @@
     </collision>
   </link>
   <joint
-    name="J3-4"
+    name="J3_4"
     type="revolute">
     <origin
       xyz="0.13991 0.005 -0.0050135"
       rpy="0 0 0" />
     <parent
-      link="J3-LIink2" />
+      link="J3_LIink2" />
     <child
       link="J3_Link4" />
     <axis
@@ -755,7 +755,7 @@
       effort="100"
       velocity="1" />
     <mimic
-      joint="J3-3"
+      joint="J3_3"
       multiplier="1"
       offset="0" />
   </joint>
