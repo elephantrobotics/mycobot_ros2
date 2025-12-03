@@ -49,7 +49,7 @@ def acquire(lock_file):
             fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return file_descriptor
         except:
-            time.sleep(1)
+            time.sleep(0.001)
             current_time = time.time()
     os.close(file_descriptor)
     return None
@@ -86,6 +86,7 @@ class MyCobotDriver(Node):
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
+        self.ua.set_joint_enable()
         
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.02, self.publish_joint_states)
@@ -101,8 +102,8 @@ class MyCobotDriver(Node):
         try:
             lock = acquire('/tmp/mycobot_lock')
             angles = self.ua.get_angles_info()
-            time.sleep(0.1)
             release(lock)
+            time.sleep(0.1)
             # self.get_logger().info(f"Raw angles from MyCobot: {angles}")
             if not angles or not isinstance(angles, list) or len(angles) != 4:
                 self.get_logger().warn("Failed to get valid joint angles, fallback to [-1] * 4.")
@@ -195,9 +196,9 @@ class MyCobotDriver(Node):
         """
         try:
             lock = acquire('/tmp/mycobot_lock')
-            coords = self.ua.get_angles_info()
-            time.sleep(0.1)
+            coords = self.ua.get_coords_info()
             release(lock)
+            time.sleep(0.1)
             if coords and all(c != -1 for c in coords) and len(coords) == 4:
                 response.x, response.y, response.z, response.rx = coords
             else:
@@ -221,8 +222,8 @@ class MyCobotDriver(Node):
         try:
             lock = acquire('/tmp/mycobot_lock')
             angles = self.ua.get_angles_info()
-            time.sleep(0.1)
             release(lock)
+            time.sleep(0.1)
             if angles and all(a != -1 for a in angles) and len(angles) == 4:
                 (response.joint_1, response.joint_2, response.joint_3, response.joint_4) = angles
             else:

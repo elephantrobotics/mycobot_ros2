@@ -372,7 +372,7 @@ class WindowNode(Node):
 
         # Unit display (mm)
         unit_var = tk.StringVar(value="mm")
-        for i in range(6):
+        for i in range(4):
             tk.Label(self.frmLC, textvariable=unit_var,
                      font=("Arial", 9)).grid(row=i, column=5)
 

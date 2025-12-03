@@ -62,7 +62,7 @@ def generate_launch_description():
     res.append(robot_state_publisher_node)
 
     listen_real_service_node = Node(
-        package="mycobot_pro_450",
+        package="ultraarm_p1",
         executable="listen_real_service",
         name="listen_real_service",
         output="screen",
@@ -73,9 +73,9 @@ def generate_launch_description():
     )
     res.append(listen_real_service_node)
 
-    mycobot_pro_450_node = Node(
+    ultraarm_p1_node = Node(
         name="simple_gui",
-        package="mycobot_pro_450",
+        package="ultraarm_p1",
         executable="simple_gui",
         parameters=[
             {'port': LaunchConfiguration('port')},
@@ -83,7 +83,7 @@ def generate_launch_description():
         ],
         output="screen"
     )
-    res.append(mycobot_pro_450_node)
+    res.append(ultraarm_p1_node)
     
     rviz_node = Node(
     name="rviz2",

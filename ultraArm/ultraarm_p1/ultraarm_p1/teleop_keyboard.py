@@ -97,8 +97,8 @@ class TeleopKeyboardNode(Node):
         self.change_angle = 180 * self.change_percent / 100
         self.change_len = 250 * self.change_percent / 100
 
-        self.init_pose = [0.0, 0.0, 0.0]
-        self.home_pose = [0.0, 0.0, -90.0, 0.0]
+        self.init_pose = [0.0, 0.0, 90.0, 0.0]
+        self.home_pose = [0.0, 10.0, 135.0, 0.0]
 
         self.record_coords = self.get_initial_coords()
         

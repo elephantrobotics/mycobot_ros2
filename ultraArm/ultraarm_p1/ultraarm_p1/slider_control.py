@@ -42,6 +42,7 @@ class Slider_Subscriber(Node):
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
+        self.ua.set_joint_enable()
 
     def listener_callback(self, msg):
         """Handle received joint state messages and send angles to the robot.

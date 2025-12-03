@@ -41,7 +41,7 @@ class Talker(Node):
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
         time.sleep(0.02)
-        self.ua.set_joint_disable()
+        self.ua.set_joint_release()
         self.get_logger().info("All joint released.\n")
 
     def start(self):
@@ -93,7 +93,7 @@ class Talker(Node):
                     self.get_logger().warn("Failed to get valid angles: {}".format(angles))
 
                 # Get robot coordinates
-                coords = self.ua.get_coords()
+                coords = self.ua.get_coords_info()
                 if not isinstance(coords, list) or len(coords) == 0 or coords == -1:
                     self.get_logger().warn("Failed to get valid coordinates: {}".format(coords))
                     coords = [0, 0, 0, 0]  # fallback
