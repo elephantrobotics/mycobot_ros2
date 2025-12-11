@@ -43,7 +43,9 @@ class Talker(Node):
         if self.mycobot_450.is_power_on !=1:
             self.mycobot_450.power_on()
         # self.mycobot_450.set_motor_enabled(254, 0)
-        time.sleep(0.1)
+        time.sleep(0.05)
+        self.mycobot_450.set_free_move_mode(1)
+        time.sleep(0.05)
         # self.get_logger().info("All servos released.\n")
         self.get_logger().info("Please press the button at the end of the machine to drag the joint.\n请按下机器末端按钮进行关节拖拽运动")
 
