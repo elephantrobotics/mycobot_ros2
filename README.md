@@ -41,6 +41,8 @@ $ git clone -b foxy --depth 1 https://github.com/elephantrobotics/mycobot_ros2.g
 # For the galactic branch
 $ git clone -b galactic --depth 1 https://github.com/elephantrobotics/mycobot_ros2.git
 $ cd ~/colcon_ws
+$ vcs import src < src/warehouse_ros_mongo.repos
+$ sudo apt-get update && rosdep install --from-paths src --ignore-src -y
 $ colcon build
 $ source ~/colcon_ws/install/setup.bash
 $ sudo echo 'source ~/colcon_ws/install/setup.bash' >> ~/.bashrc
