@@ -7,8 +7,6 @@
   <maintainer email="u20@todo.todo">u20</maintainer>
   <license>TODO: License declaration</license>
 
-    <buildtool_depend>ament_python</buildtool_depend>
-
   <build_depend>rclpy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>mypalletizer_interfaces</build_depend>

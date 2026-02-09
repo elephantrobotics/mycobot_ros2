@@ -7,8 +7,6 @@
   <maintainer email="u2@todo.todo">u2</maintainer>
   <license>BSD</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
-
   <build_depend>rclpy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>mycobot_interfaces</build_depend>
