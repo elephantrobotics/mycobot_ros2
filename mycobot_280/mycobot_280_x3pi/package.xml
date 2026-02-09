@@ -20,8 +20,7 @@
   <exec_depend>rclcpp</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>actionlib</exec_depend>
-  <exec_depend>join_state_publisher</exec_depend>
-  <exec_depend>join_state_publisher_gui</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>joy</exec_depend>
