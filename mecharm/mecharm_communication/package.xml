@@ -7,16 +7,13 @@
   <maintainer email="u20@todo.todo">u20</maintainer>
   <license>TODO: License declaration</license>
 
-    <buildtool_depend>ament_python</buildtool_depend>
-
   <build_depend>rclpy</build_depend>
   <build_depend>std_msgs</build_depend>
-  <build_depend>message_generation</build_depend>
   <build_depend>mycobot_interfaces</build_depend>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>mycobot_interfaces</exec_depend>
 
   <build_export_depend>mycobot_interfaces</build_export_depend>
