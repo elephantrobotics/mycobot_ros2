@@ -1,0 +1,11 @@
+# warehouse_ros_mongo - MongoDB backend for MoveIt scene/state storage
+# Required by: mycobot_*_moveit2, pro450_moveit2, mycobot_630_moveit2
+# Not available as ros-humble-warehouse-ros-mongo apt package; build from source.
+#
+# Usage (from workspace root): vcs import src < src/warehouse_ros_mongo.repos
+#
+repositories:
+  warehouse_ros_mongo:
+    type: git
+    url: https://github.com/ros-planning/warehouse_ros_mongo.git
+    version: ros2
