@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: mycobotpro630_gazeboros2
+    relative_path: config/mycobot_pro_630_force_gripper.urdf
+  srdf:
+    relative_path: config/firefighter.srdf
+  package_settings:
+    author_name: jiawei.long
+    author_email: 627892495@qq.com
+    generated_timestamp: 1776134539
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
