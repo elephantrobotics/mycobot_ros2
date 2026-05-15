@@ -86,18 +86,19 @@ class SliderControl(Node):
         self.coords_lock = threading.Lock()
         
         if self.mode == 1:
-            self.pub_arm = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
-            self.pub_gripper = self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
-            self.get_logger().info("Mode 1: Gazebo Sim")
-
+            self.get_logger().info("Mode 1: Gazebo Sim Only")
         elif self.mode == 2:
-            self.get_logger().info("Mode 2: Real Robot")
+            self.get_logger().info("Mode 2: Real Robot & Gazebo Sim")
             if not self.initialize_pro450():
                 self.get_logger().error("Init failed")
                 return
             
             threading.Thread(target=self.command_executor, daemon=True).start()
             threading.Thread(target=self.monitor_height, daemon=True).start()
+
+        # 无论在哪个模式下，都创建 Gazebo 的 Publisher 以保证仿真模型联动
+        self.pub_arm = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
+        self.pub_gripper = self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
 
         self.create_subscription(JointState, '/joint_states', self.joint_states_cb, 1)
         self.create_subscription(Point, '/pro450/end_effector_coords', self.coords_cb, 1)
@@ -113,7 +114,7 @@ class SliderControl(Node):
             self.get_logger().info(f"Connected, angles: {self.mc.get_angles()}")
             try: self.mc.get_pro_gripper(1, GRIPPER_ID)
             except: pass
-            self.mc.release_all_servos()
+            # 移除 self.mc.release_all_servos()，否则滑块控制时实机会掉电软掉，无法执行后续 send_angles 命令
             time.sleep(0.5)
             return True
         except Exception as e:
@@ -151,32 +152,32 @@ class SliderControl(Node):
         if angle_diff < ANGLE_THRESHOLD and gripper_diff < GRIPPER_THRESHOLD:
             return
 
-        if self.mode == 1:
-            try:
-                traj = JointTrajectory()
-                traj.header.stamp = self.get_clock().now().to_msg()
-                traj.joint_names = ARM_JOINTS
-                pt = JointTrajectoryPoint()
-                pt.positions = [math.radians(d) for d in arm_deg]
-                pt.time_from_start = Duration(sec=0, nanosec=200000000)
-                traj.points = [pt]
-                self.pub_arm.publish(traj)
-                
-                traj_g = JointTrajectory()
-                traj_g.header.stamp = self.get_clock().now().to_msg()
-                traj_g.joint_names = [GRIPPER_JOINT]
-                ptg = JointTrajectoryPoint()
-                ptg.positions = [math.radians(grip_deg)]
-                ptg.time_from_start = Duration(sec=0, nanosec=200000000)
-                traj_g.points = [ptg]
-                self.pub_gripper.publish(traj_g)
-                
-                self.last_angles = arm_deg.copy()
-                self.last_gripper_angle = grip_deg
-                self.last_command_time = time.time()
-            except: pass
+        try:
+            # 同步发布到 Gazebo
+            traj = JointTrajectory()
+            traj.header.stamp = self.get_clock().now().to_msg()
+            traj.joint_names = ARM_JOINTS
+            pt = JointTrajectoryPoint()
+            pt.positions = [math.radians(d) for d in arm_deg]
+            pt.time_from_start = Duration(sec=0, nanosec=200000000)
+            traj.points = [pt]
+            self.pub_arm.publish(traj)
             
-        elif self.mode == 2:
+            traj_g = JointTrajectory()
+            traj_g.header.stamp = self.get_clock().now().to_msg()
+            traj_g.joint_names = [GRIPPER_JOINT]
+            ptg = JointTrajectoryPoint()
+            ptg.positions = [math.radians(grip_deg)]
+            ptg.time_from_start = Duration(sec=0, nanosec=200000000)
+            traj_g.points = [ptg]
+            self.pub_gripper.publish(traj_g)
+            
+            self.last_angles = arm_deg.copy()
+            self.last_gripper_angle = grip_deg
+            self.last_command_time = time.time()
+        except: pass
+
+        if self.mode == 2:
             try:
                 self.command_queue.put_nowait(RobotCommand('angles', arm_deg))
                 if gripper_diff >= GRIPPER_THRESHOLD:
