@@ -20,7 +20,7 @@ pip install pymycobot --user
 
 
 
-下载包到你的ros工作空间中
+下载包到你的ros2工作空间中
 
 
 
@@ -28,8 +28,8 @@ pip install pymycobot --user
 
 $ cd ~/catkin_ws/src
 $ cd ~/catkin_ws
-$ catkin_make
-$ source devel/setup.bash
+$ colcon build
+$ source install/setup.bash
 
 ```
 
@@ -46,21 +46,21 @@ MyCobot_450_m5-Gazebo使用说明
 
 ```bash
 在src/mycobot_ros/mycobot_pro路径下执行
-sudo chmod -R 777 mycobotpro450_gazebo/scripts/follow_display_gazebo.py
-sudo chmod -R 777 mycobotpro450_gazebo/scripts/slider_control_gazebo.py
-sudo chmod -R 777 mycobotpro450_gazebo/scripts/teleop_keyboard_gazebo.py
-sudo chmod -R 777 mycobotpro450_gazebo/scripts/coords_broadcaster.py
-roscore
+sudo chmod -R 777 mycobotpro450_gazeboros2/scripts/follow_display_gazebo.py
+sudo chmod -R 777 mycobotpro450_gazeboros2/scripts/slider_control_gazebo.py
+sudo chmod -R 777 mycobotpro450_gazeboros2/scripts/teleop_keyboard_gazebo.py
+sudo chmod -R 777 mycobotpro450_gazeboros2/scripts/coords_broadcaster.py
 
 ```
-
+每次开新终端就必须执行环境配置
+```bash
+source install/setup.bash
 
 
 以下步骤请在ros目录下执行
 ```bash
 
-source devel/setup.bash
-roslaunch mycobotpro450_gazebo slider.launch
+ros2 launch mycobotpro450_gazeboros2 slider.launch.py
 
 ```
 
@@ -70,8 +70,7 @@ roslaunch mycobotpro450_gazebo slider.launch
 
 ```bash
 
-source devel/setup.bash
-rosrun mycobotpro450_gazebo coords_broadcaster.py
+ros2 run mycobotpro450_gazeboros2 coords_broadcaster.py
 
 ```
 
@@ -79,8 +78,7 @@ rosrun mycobotpro450_gazebo coords_broadcaster.py
 
 ```bash
 
-source devel/setup.bash
-rosrun  mycobotpro450_gazebo slider_control_gazebo.py
+ros2 run mycobotpro450_gazeboros2 slider_control_gazebo.py
 
 ```
 
@@ -96,8 +94,7 @@ rosrun  mycobotpro450_gazebo slider_control_gazebo.py
 
 ```bash
 
-source devel/setup.bash
-roslaunch  mycobotpro450_gazebo follow.launch 
+ros2 launch mycobotpro450_gazeboros2 follow.launch.py
 
 ```
 
@@ -109,8 +106,7 @@ roslaunch  mycobotpro450_gazebo follow.launch
 
 ```bash
 
-source devel/setup.bash
-rosrun  mycobotpro450_gazebo follow_display_gazebo.py 
+ros2 run mycobotpro450_gazeboros2 follow_display_gazebo.py
 
 ```
 
@@ -128,8 +124,7 @@ rosrun  mycobotpro450_gazebo follow_display_gazebo.py
 
 ```bash
 
-source devel/setup.bash
-roslaunch  mycobotpro450_gazebo teleop_keyboard.launch 
+ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py
 
 ```
 
@@ -141,8 +136,7 @@ roslaunch  mycobotpro450_gazebo teleop_keyboard.launch
 
 ```bash
 
-source devel/setup.bash
-rosrun  mycobotpro450_gazebo teleop_keyboard_gazebo.py 
+ros2 run mycobotpro450_gazeboros2 teleop_keyboard_gazebo.py
 
 ```
 
