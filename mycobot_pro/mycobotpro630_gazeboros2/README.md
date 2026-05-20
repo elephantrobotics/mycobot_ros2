@@ -12,7 +12,7 @@
 colcon build --packages-select mycobotpro630_gazeboros2
 
 # 2. 刷新你的环境变量 (Windows下通常为 setup.bat，基于具体的终端可能为 .ps1。Linux为 .bashrc 或 install/setup.bash)
-call install/setup.bat
+source install/setup.bash
 ```
 
 ---
