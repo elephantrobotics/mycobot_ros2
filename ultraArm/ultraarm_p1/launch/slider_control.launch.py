@@ -13,6 +13,19 @@ from launch.substitutions import Command, LaunchConfiguration
 def generate_launch_description():
     res = []
 
+    port_launch_arg = DeclareLaunchArgument(
+        name="port",
+        default_value="/dev/ttyUSB0",
+        description='Port used by the device'
+    )
+    res.append(port_launch_arg)
+
+    baud_launch_arg = DeclareLaunchArgument(
+        name="baud",
+        default_value="1000000",
+        description='baud number used by the device'
+    )
+    res.append(baud_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
         "model",
@@ -52,10 +65,20 @@ def generate_launch_description():
     joint_state_publisher_gui_node = Node(
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
-        condition=IfCondition(LaunchConfiguration('gui'))
+        condition=IfCondition(LaunchConfiguration('gui')),
+        # remappings=[
+        #     ('/joint_states', '/joint_states_raw')
+        # ]
     )
     res.append(joint_state_publisher_gui_node)
 
+    joint_coupling_node = Node(
+        package='ultraarm_p1', 
+        executable='joint_coupling_node',
+        output='screen'
+    )
+    # res.append(joint_coupling_node)
+    
     rviz_node = Node(
         name="rviz2",
         package="rviz2",
@@ -69,6 +92,10 @@ def generate_launch_description():
         package="ultraarm_p1",
         executable="slider_control",
         name="slider_control",
+        parameters=[
+            {'port': LaunchConfiguration('port')},
+            {'baud': LaunchConfiguration('baud')}
+        ],
         output="screen"
     )
     res.append(slider_control_node)

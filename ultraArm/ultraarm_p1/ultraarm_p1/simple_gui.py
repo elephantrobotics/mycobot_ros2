@@ -44,7 +44,7 @@ class WindowNode(Node):
         self.win = handle
         self.win.resizable(0, 0)  # Fixed window size
 
-        self.speed = 2850
+        self.speed = 50
 
         # Default speed variable
         self.speed_d = tk.StringVar()
@@ -438,12 +438,12 @@ class WindowNode(Node):
         try:
             speed_str = self.get_speed.get()
             if not speed_str:
-                self.show_error("Please enter a speed value (1-5700)")
+                self.show_error("Please enter a speed value (1-100)")
                 return
 
             speed = int(float(speed_str))
-            if not (1 <= speed <= 5700):
-                self.show_error("Speed input value must be between 1 and 5700")
+            if not (1 <= speed <= 100):
+                self.show_error("Speed input value must be between 1 and 100")
                 return
         except ValueError:
             self.show_error("Speed must be a number")
@@ -483,12 +483,12 @@ class WindowNode(Node):
         try:
             speed_str = self.get_speed.get()
             if not speed_str:
-                self.show_error("Please enter a speed value (1-5700)")
+                self.show_error("Please enter a speed value (1-100)")
                 return
 
             speed = int(float(speed_str))
-            if not (1 <= speed <= 5700):
-                self.show_error("Speed input value must be between 1 and 5700")
+            if not (1 <= speed <= 100):
+                self.show_error("Speed input value must be between 1 and 100")
                 return
         except ValueError:
             self.show_error("Speed must be a number")

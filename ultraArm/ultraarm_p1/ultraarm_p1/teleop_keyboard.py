@@ -30,9 +30,9 @@ Other:
 """
 
 COORD_LIMITS = {
-    'x': (-301.7, 362.7),
-    'y': (-362.7, 362.7),
-    'z': (-157, 91),
+    'x': (-350, 362.43),
+    'y': (-362.43, 362.43),
+    'z': (-186.265, 93.44),
     'rx': (-180, 180)
 }
 
@@ -91,7 +91,7 @@ class TeleopKeyboardNode(Node):
         while not self.set_angles_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Service not available, waiting again...')
 
-        self.speed = 2850
+        self.speed = 50
         self.change_percent = 5  # Percentage of change
 
         self.change_angle = 180 * self.change_percent / 100
@@ -137,7 +137,7 @@ class TeleopKeyboardNode(Node):
     def print_status(self):
         """Print the current coordinates to console."""
         coords = self.record_coords[0]
-        print(
+        self.get_logger().info(
             "\r current coords: [%.2f, %.2f, %.2f, %.2f]" % tuple(coords))
 
     def send_coords(self):
@@ -198,7 +198,7 @@ class TeleopKeyboardNode(Node):
                     self.get_logger().info("Home pose reached. Coordinate control enabled.\n")
                 elif key == "3":
                     self.home_pose = self.get_initial_angles()
-                    print(f"New home pose saved: {self.home_pose}")
+                    self.get_logger().info(f"New home pose saved: {self.home_pose}")
                 elif key in ["w","W","s","S","a","A","d","D","z","Z","x","X",
                             "u","U","j","J"]:
                     if not self.ready_for_coords:
@@ -235,13 +235,13 @@ class TeleopKeyboardNode(Node):
                     self.change_percent = min(self.change_percent + 1, 20)
                     self.change_angle = 180 * self.change_percent / 100
                     self.change_len = 250 * self.change_percent / 100
-                    print("Increase change_percent to %d%%, move step: %.1f mm" % (
+                    self.get_logger().info("Increase change_percent to %d%%, move step: %.1f mm" % (
                         self.change_percent, self.change_len))
                 elif key == '-':
                     self.change_percent = max(self.change_percent - 1, 1)
                     self.change_angle = 180 * self.change_percent / 100
                     self.change_len = 250 * self.change_percent / 100
-                    print("Decrease change_percent to %d%%, move step: %.1f mm" % (
+                    self.get_logger().info("Decrease change_percent to %d%%, move step: %.1f mm" % (
                         self.change_percent, self.change_len))
                 else:
                     continue

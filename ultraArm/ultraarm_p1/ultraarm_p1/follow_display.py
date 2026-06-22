@@ -9,7 +9,7 @@ import pymycobot
 from packaging import version
 
 # Minimum required pymycobot version
-MIN_REQUIRE_VERSION = '4.0.3'
+MIN_REQUIRE_VERSION = '4.0.5'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
@@ -33,7 +33,7 @@ class Talker(Node):
         """Initialize the Talker node and connect to ultraArm P1."""
         super().__init__("follow_display")
         self.declare_parameter('port', '/dev/ttyUSB0')
-        self.declare_parameter('baud', 115200)
+        self.declare_parameter('baud', 1000000)
 
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
@@ -41,8 +41,9 @@ class Talker(Node):
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
         time.sleep(0.02)
-        self.ua.set_joint_release()
-        self.get_logger().info("All joint released.\n")
+        self.ua.set_end_button_enable()
+        # self.get_logger().info("All joint released.\n")
+        self.get_logger().info("Please press the LED button at the end of the machine to drag the joint.\n请按下机器末端LED按钮进行关节拖拽运动\n")
 
     def start(self):
         """Start publishing joint states and visualization markers.

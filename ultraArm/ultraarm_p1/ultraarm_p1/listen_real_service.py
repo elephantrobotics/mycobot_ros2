@@ -13,7 +13,7 @@ import pymycobot
 from packaging import version
 
 # Minimum required pymycobot version
-MIN_REQUIRE_VERSION = '4.0.3'
+MIN_REQUIRE_VERSION = '4.0.5'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
@@ -79,14 +79,14 @@ class MyCobotDriver(Node):
         """Initialize MyCobotDriver node, publishers, and services."""
         super().__init__('mycobot_driver_node')
         self.declare_parameter('port', '/dev/ttyUSB0')
-        self.declare_parameter('baud', 115200)
+        self.declare_parameter('baud', 1000000)
 
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
-        self.ua.set_joint_enable()
+        self.ua.set_joint_enable(0)
         
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.02, self.publish_joint_states)

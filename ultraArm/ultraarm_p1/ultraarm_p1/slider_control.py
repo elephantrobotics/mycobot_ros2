@@ -5,7 +5,7 @@ import math
 import pymycobot
 from packaging import version
 # min low version require
-MIN_REQUIRE_VERSION = '4.0.3'
+MIN_REQUIRE_VERSION = '4.0.5'
 
 current_verison = pymycobot.__version__
 print('current pymycobot library version: {}'.format(current_verison))
@@ -35,14 +35,14 @@ class Slider_Subscriber(Node):
         # self.subscription
         # Declare robot connection parameters
         self.declare_parameter('port', '/dev/ttyUSB0')
-        self.declare_parameter('baud', 115200)
+        self.declare_parameter('baud', 1000000)
 
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
-        self.ua.set_joint_enable()
+        self.ua.set_joint_enable(0)
 
     def listener_callback(self, msg):
         """Handle received joint state messages and send angles to the robot.
@@ -65,7 +65,7 @@ class Slider_Subscriber(Node):
         joint4 = data_list[-1]
         angles_list = [joint1, joint2, joint3, joint4]
         self.get_logger().info('joint_angles: {}'.format(angles_list))
-        self.ua.set_angles(angles_list, 2500, _async=False)
+        self.ua.set_angles(angles_list, 25, _async=False)
 
 
 def main(args=None):
