@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import queue
-import sys
 import threading
 import tkinter as tk
 import time
 from tkinter import messagebox
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from pymycobot.robot_info import RobotLimit
 from ultraarm_p1_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles
 
@@ -63,7 +63,7 @@ class WindowNode(Node):
         self.cmd_queue = queue.Queue()
         threading.Thread(target=self.worker, daemon=True).start()
 
-        self.get_date()  # Initialize data from the robot
+        # self.get_date()  # Initialize data from the robot
 
         # Screen dimensions
         self.ws = self.win.winfo_screenwidth()
@@ -106,7 +106,8 @@ class WindowNode(Node):
         # )
 
         # Periodic GUI update
-        self.update_gui()
+        # self.update_gui()
+        self.win.after(1200, self.fill_current_to_input)
 
         # Robot model and limits
         self.robot_name = "UltraArmP1"
@@ -142,12 +143,43 @@ class WindowNode(Node):
             except Exception as e:
                 self.get_logger().warn(f"worker error: {e}")
 
-    def wait_for_future(self, future, timeout=3.0):
+    def fill_current_to_input(self):
+        """Fill current robot angles and coords into input fields."""
+        try:
+            angles = self.get_initial_angles()
+            coords = self.get_initial_coords()
+
+            if (
+                isinstance(angles, list)
+                and len(angles) == 4
+                and all(a != -1 for a in angles)
+            ):
+                for i, var in enumerate(self.joint_vars[:4]):
+                    var.set(str(round(angles[i], 2)))
+
+            if (
+                isinstance(coords, list)
+                and len(coords) == 2
+                and isinstance(coords[0], list)
+                and len(coords[0]) == 4
+                and all(c != -1 for c in coords[0])
+            ):
+                for i, var in enumerate(self.coord_vars[:4]):
+                    var.set(str(round(coords[0][i], 2)))
+
+        except Exception as e:
+            self.get_logger().warn(f"fill_current_to_input error: {e}")
+        
+    def wait_for_future(self, future, timeout=5.0):
         """Wait for a future to complete with timeout (non-blocking ROS executor)."""
         start = time.time()
         while not future.done() and (time.time() - start) < timeout:
-            # Only process the callback once, so the GUI will not be blocked
-            rclpy.spin_once(self, timeout_sec=0.1)
+            time.sleep(0.02)
+            
+        if not future.done():
+            self.get_logger().error("service call timeout")
+            return None
+        
         return future.result()
 
     def get_initial_coords(self):
@@ -190,9 +222,12 @@ class WindowNode(Node):
         request.speed = self.record_coords[1]
 
         future = self.set_coords_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-        if future.result() is None:
+        result = self.wait_for_future(future, timeout=10.0)
+
+        if result is None or not result.flag:
             self.get_logger().error('Failed to set coordinates')
+        else:
+            self.get_logger().info('send_coords call finish')
 
     def send_angles(self, angles):
         """Send joint angles to the robot.
@@ -203,11 +238,13 @@ class WindowNode(Node):
         request = SetAngles.Request()
         (request.joint_1, request.joint_2, request.joint_3, request.joint_4) = angles
         request.speed = self.speed
-
         future = self.set_angles_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-        if future.result() is None:
+        result = self.wait_for_future(future, timeout=10.0)
+
+        if result is None or not result.flag:
             self.get_logger().error('Failed to set angles')
+        else:
+            self.get_logger().info('send_angles call finish')
 
     '''
     def set_force_gripper(self, status):
@@ -555,8 +592,8 @@ class WindowNode(Node):
         except Exception as e:
             self.get_logger().warn(f"update_gui error: {e}")
 
-        # Schedule next update in 300 ms
-        self.win.after(300, self.update_gui)
+        # Schedule next update in 1000 ms
+        self.win.after(1000, self.update_gui)
 
 
 def main(args=None):
@@ -576,14 +613,23 @@ def main(args=None):
     window.title("ultraArm ROS GUI")
     node = WindowNode(window)
 
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+    spin_thread = threading.Thread(target=executor.spin, daemon=True)
+    spin_thread.start()
+    
+    # After the executor starts, the data reading from the robotic arm is delayed.
+    window.after(500, node.get_date)
+    window.after(800, node.update_gui)
+
     try:
         window.mainloop()
     except KeyboardInterrupt:
-        # Allow graceful exit on Ctrl+C
         print("Exiting...")
-        rclpy.shutdown()  # Shutdown ROS2 client library
-        sys.exit(0)       # Exit the program
-
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

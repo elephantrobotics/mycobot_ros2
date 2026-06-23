@@ -89,7 +89,7 @@ class MyCobotDriver(Node):
         self.ua.set_joint_enable(0)
         
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
-        self.timer = self.create_timer(0.02, self.publish_joint_states)
+        self.timer = self.create_timer(1, self.publish_joint_states)
 
         # Service servers
         self.srv_angles = self.create_service(SetAngles, 'set_angles', self.set_angles_callback)
@@ -99,11 +99,11 @@ class MyCobotDriver(Node):
 
     def publish_joint_states(self):
         """Publish current joint states to the `joint_states` topic."""
+        lock = None
         try:
             lock = acquire('/tmp/mycobot_lock')
             angles = self.ua.get_angles_info()
             release(lock)
-            time.sleep(0.1)
             # self.get_logger().info(f"Raw angles from MyCobot: {angles}")
             if not angles or not isinstance(angles, list) or len(angles) != 4:
                 self.get_logger().warn("Failed to get valid joint angles, fallback to [-1] * 4.")
@@ -124,6 +124,9 @@ class MyCobotDriver(Node):
         except Exception as e:
             e = traceback.format_exc()
             self.get_logger().error(f"Joint state publish error: {e}")
+        finally:
+            if lock is not None:
+                release(lock)
 
     def set_angles_callback(self, request, response):
         """Set joint angles via ROS2 service.
@@ -138,23 +141,27 @@ class MyCobotDriver(Node):
             SetAngles.Response: The response with a boolean `flag` indicating
             whether the operation succeeded.
         """
+        lock = None
         try:
             lock = acquire('/tmp/mycobot_lock')
-            angles = [
-                request.joint_1,
-                request.joint_2,
-                request.joint_3,
-                request.joint_4,
-            ]
+            if lock is None:
+                self.get_logger().error("Failed to acquire serial lock")
+                response.flag = False
+                return response
+            angles = [round(j, 2) for j in [request.joint_1, request.joint_2, request.joint_3, request.joint_4]]
             speed = request.speed
+            self.get_logger().info(f"command start angles: {angles}")
             self.ua.set_angles(angles, speed, _async=False)
             release(lock)
+            self.get_logger().info(f"command finish angles: {angles}")
             response.flag = True
         except Exception as e:
             e = traceback.format_exc()
-            release(lock)
             self.get_logger().error(f"SetJointAngles service error: {e}")
             response.flag = False
+        finally:
+            if lock is not None:
+                release(lock)
         return response
 
     def set_coords_callback(self, request, response):
@@ -170,16 +177,26 @@ class MyCobotDriver(Node):
             SetCoords.Response: The response with a boolean `flag` indicating
             whether the operation succeeded.
         """
+        lock = None
         try:
             lock = acquire('/tmp/mycobot_lock')
-            coords = [request.x, request.y, request.z, request.rx]
+            if lock is None:
+                self.get_logger().error("Failed to acquire serial lock")
+                response.flag = False
+                return response
+            coords = [round(j, 2) for j in [request.x, request.y, request.z, request.rx]]
+            self.get_logger().info(f"command start coords: {coords}")
             self.ua.set_coords(coords, request.speed, _async=False)
             release(lock)
+            self.get_logger().info(f"command finish coords: {coords}")
             response.flag = True
         except Exception as e:
             e = traceback.format_exc()
             self.get_logger().error(f"Set coords failed: {e}")
             response.flag = False
+        finally:
+            if lock is not None:
+                release(lock)
         return response
 
     def get_coords_callback(self, request, response):
@@ -194,18 +211,40 @@ class MyCobotDriver(Node):
             GetCoords.Response: The response containing the current coordinates
             (x, y, z, rx).
         """
+        lock = None
+        coords = None
         try:
             lock = acquire('/tmp/mycobot_lock')
-            coords = self.ua.get_coords_info()
-            release(lock)
-            time.sleep(0.1)
-            if coords and all(c != -1 for c in coords) and len(coords) == 4:
+            if lock is None:
+                self.get_logger().error("GetCoords failed: failed to acquire serial lock")
+                return response
+
+            for _ in range(3):
+                data = self.ua.get_coords_info()
+
+                if (
+                    isinstance(data, list)
+                    and len(data) == 4
+                    and all(c != -1 for c in data)
+                ):
+                    coords = data
+                    break
+
+                # self.get_logger().warn(f"Invalid coords read: {data}")
+                time.sleep(0.05)
+
+            if coords is not None:
                 response.x, response.y, response.z, response.rx = coords
             else:
-                self.get_logger().error("Failed to get coordinates.")
-        except Exception as e:
-            e = traceback.format_exc()
-            self.get_logger().error(f"GetCoords service error: {e}")
+                self.get_logger().error("Failed to get coordinates after 3 retries.")
+
+        except Exception:
+            self.get_logger().error(f"GetCoords service error: {traceback.format_exc()}")
+
+        finally:
+            if lock is not None:
+                release(lock)
+
         return response
 
     def get_angles_callback(self, request, response):
@@ -219,18 +258,40 @@ class MyCobotDriver(Node):
         Returns:
             GetAngles.Response: The response containing four joint angles.
         """
+        lock = None
+        angles = None
         try:
             lock = acquire('/tmp/mycobot_lock')
-            angles = self.ua.get_angles_info()
-            release(lock)
-            time.sleep(0.1)
-            if angles and all(a != -1 for a in angles) and len(angles) == 4:
-                (response.joint_1, response.joint_2, response.joint_3, response.joint_4) = angles
+            if lock is None:
+                self.get_logger().error("GetAngles failed: failed to acquire serial lock")
+                return response
+
+            for _ in range(3):
+                data = self.ua.get_angles_info()
+
+                if (
+                    isinstance(data, list)
+                    and len(data) == 4
+                    and all(a != -1 for a in data)
+                ):
+                    angles = data
+                    break
+
+                # self.get_logger().warn(f"Invalid angles read: {data}")
+                time.sleep(0.05)
+
+            if angles is not None:
+                response.joint_1, response.joint_2, response.joint_3, response.joint_4 = angles
             else:
-                self.get_logger().error("Failed to get angles.")
-        except Exception as e:
-            e = traceback.format_exc()
-            self.get_logger().error(f"GetAngles service error: {e}")
+                self.get_logger().error("Failed to get angles after 3 retries.")
+
+        except Exception:
+            self.get_logger().error(f"GetAngles service error: {traceback.format_exc()}")
+
+        finally:
+            if lock is not None:
+                release(lock)
+
         return response
 
 
