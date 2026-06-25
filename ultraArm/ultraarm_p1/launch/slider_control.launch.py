@@ -26,6 +26,55 @@ def generate_launch_description():
         description='baud number used by the device'
     )
     res.append(baud_launch_arg)
+    
+    speed_launch_arg = DeclareLaunchArgument(
+        name="speed",
+        default_value="25",
+        description='Robot motion speed'
+    )
+    res.append(speed_launch_arg)
+
+    command_rate_launch_arg = DeclareLaunchArgument(
+        name="command_rate",
+        default_value="5.0",
+        description='Max rate for sending real robot commands'
+    )
+    res.append(command_rate_launch_arg)
+
+    queue_limit_launch_arg = DeclareLaunchArgument(
+        name="queue_limit",
+        default_value="0",
+        description='Queue limit used when stop-before-send is disabled'
+    )
+    res.append(queue_limit_launch_arg)
+
+    min_angle_delta_launch_arg = DeclareLaunchArgument(
+        name="min_angle_delta",
+        default_value="0.2",
+        description='Minimum angle delta before sending a new target'
+    )
+    res.append(min_angle_delta_launch_arg)
+
+    use_stop_before_send_launch_arg = DeclareLaunchArgument(
+        name="use_stop_before_send",
+        default_value="true",
+        description='Clear firmware queue with stop() when the queue is too deep'
+    )
+    res.append(use_stop_before_send_launch_arg)
+
+    stop_queue_threshold_launch_arg = DeclareLaunchArgument(
+        name="stop_queue_threshold",
+        default_value="10",
+        description='Call stop() before sending when queue size is above this value'
+    )
+    res.append(stop_queue_threshold_launch_arg)
+
+    stop_settle_time_launch_arg = DeclareLaunchArgument(
+        name="stop_settle_time",
+        default_value="0.02",
+        description='Delay after stop() before sending the latest target'
+    )
+    res.append(stop_settle_time_launch_arg)
 
     model_launch_arg = DeclareLaunchArgument(
         "model",
@@ -94,7 +143,14 @@ def generate_launch_description():
         name="slider_control",
         parameters=[
             {'port': LaunchConfiguration('port')},
-            {'baud': LaunchConfiguration('baud')}
+            {'baud': ParameterValue(LaunchConfiguration('baud'), value_type=int)},
+            {'speed': ParameterValue(LaunchConfiguration('speed'), value_type=int)},
+            {'command_rate': ParameterValue(LaunchConfiguration('command_rate'), value_type=float)},
+            {'queue_limit': ParameterValue(LaunchConfiguration('queue_limit'), value_type=int)},
+            {'min_angle_delta': ParameterValue(LaunchConfiguration('min_angle_delta'), value_type=float)},
+            {'use_stop_before_send': ParameterValue(LaunchConfiguration('use_stop_before_send'), value_type=bool)},
+            {'stop_queue_threshold': ParameterValue(LaunchConfiguration('stop_queue_threshold'), value_type=int)},
+            {'stop_settle_time': ParameterValue(LaunchConfiguration('stop_settle_time'), value_type=float)}
         ],
         output="screen"
     )

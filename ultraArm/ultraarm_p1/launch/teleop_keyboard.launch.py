@@ -63,7 +63,7 @@ def generate_launch_description():
         output="screen",
         parameters=[{
         "port": LaunchConfiguration("port"),
-        "baud": LaunchConfiguration("baud")
+        "baud": ParameterValue(LaunchConfiguration("baud"), value_type=int)
         }]
     )
     res.append(listen_real_service_node)

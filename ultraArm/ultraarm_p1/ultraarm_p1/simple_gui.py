@@ -28,6 +28,11 @@ class WindowNode(Node):
         """
         super().__init__('simple_gui')
 
+        self.declare_parameter('refresh_period_ms', 1000)
+        self.refresh_period_ms = max(
+            self.get_parameter('refresh_period_ms').get_parameter_value().integer_value,
+            100
+        )
         # ROS2 client request
         self.set_angles_client = self.create_client(SetAngles, '/set_angles')
         self.set_coords_client = self.create_client(SetCoords, '/set_coords')
@@ -40,9 +45,12 @@ class WindowNode(Node):
         while not self.set_angles_client.wait_for_service(timeout_sec=2.0):
             self.get_logger().info('Service not available, waiting again...')
 
+
         # Tkinter window setup
         self.win = handle
         self.win.resizable(0, 0)  # Fixed window size
+        self.running = True
+        self.win.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.speed = 50
 
@@ -589,11 +597,36 @@ class WindowNode(Node):
                 self.record_coords = coords
                 for i, var in enumerate(self.coord_all[:4]):
                     var.set(self.safe_get_coord(self.record_coords, i))
+            self.sync_input_fields()
         except Exception as e:
             self.get_logger().warn(f"update_gui error: {e}")
 
-        # Schedule next update in 1000 ms
-        self.win.after(1000, self.update_gui)
+        # Schedule next update.
+        if self.running and rclpy.ok():
+            self.win.after(self.refresh_period_ms, self.update_gui)
+
+    def sync_input_fields(self):
+        """Sync input boxes with current robot state unless the user is editing."""
+        try:
+            focused = self.win.focus_get()
+        except (KeyError, tk.TclError):
+            return
+
+        if focused not in self.all_j:
+            for value, var in zip(self.res_angles[0][:4], self.joint_vars[:4]):
+                var.set(str(round(value, 2)))
+        if focused not in self.all_c:
+            for value, var in zip(self.record_coords[0][:4], self.coord_vars[:4]):
+                var.set(str(round(value, 2)))
+
+    def on_close(self):
+        """Stop GUI refreshes and close the Tk window."""
+        self.running = False
+        try:
+            self.win.destroy()
+        except tk.TclError:
+            pass
+
 
 
 def main(args=None):

@@ -26,7 +26,18 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
     )
 print('pymycobot library version meets the requirements!')
 from pymycobot import UltraArmP1
+from pymycobot.robot_info import RobotLimit
 
+ROBOT_LIMIT = RobotLimit.robot_limit.get("UltraArmP1", {})
+JOINT_LIMITS = list(zip(
+    ROBOT_LIMIT.get("angles_min", [-165, -18, 89, -179]),
+    ROBOT_LIMIT.get("angles_max", [165, 85, 200, 179]),
+))
+
+
+def valid_angles(angles):
+    """Return True if all joint angles are inside the expected P1 range."""
+    return all(low <= angle <= high for angle, (low, high) in zip(angles, JOINT_LIMITS))
 
 def acquire(lock_file):
     """Acquire a file lock to prevent concurrent access.
@@ -87,6 +98,8 @@ class MyCobotDriver(Node):
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
         self.ua.set_joint_enable(0)
+        self.latest_angles = [0.0, 0.0, 90.0, 0.0]
+        self.latest_coords = [0.0, 0.0, 0.0, 0.0]
         
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(1, self.publish_joint_states)
@@ -105,11 +118,13 @@ class MyCobotDriver(Node):
             angles = self.ua.get_angles_info()
             release(lock)
             # self.get_logger().info(f"Raw angles from MyCobot: {angles}")
-            if not angles or not isinstance(angles, list) or len(angles) != 4:
-                self.get_logger().warn("Failed to get valid joint angles, fallback to [-1] * 4.")
+            if not angles or not isinstance(angles, list) or len(angles) != 4 or not valid_angles(angles):
+                self.get_logger().warn("Skip invalid joint angles for RViz: %s" % angles)
                 return
-            angles[2] -= 90
-            positions = [math.radians(a) for a in angles]
+            self.latest_angles = list(angles)
+            display_angles = list(angles)
+            display_angles[2] -= 90
+            positions = [math.radians(a) for a in display_angles]
                 
             joint_names = ["J1", "J2", "J3", "J4"]  
             if len(positions) < len(joint_names):
@@ -234,9 +249,11 @@ class MyCobotDriver(Node):
                 time.sleep(0.05)
 
             if coords is not None:
+                self.latest_coords = list(coords)
                 response.x, response.y, response.z, response.rx = coords
             else:
-                self.get_logger().error("Failed to get coordinates after 3 retries.")
+                self.get_logger().warn("Failed to get coordinates after 3 retries; return latest valid coords: %s" % self.latest_coords)
+                response.x, response.y, response.z, response.rx = self.latest_coords
 
         except Exception:
             self.get_logger().error(f"GetCoords service error: {traceback.format_exc()}")
@@ -281,9 +298,11 @@ class MyCobotDriver(Node):
                 time.sleep(0.05)
 
             if angles is not None:
+                self.latest_angles = list(angles)
                 response.joint_1, response.joint_2, response.joint_3, response.joint_4 = angles
             else:
-                self.get_logger().error("Failed to get angles after 3 retries.")
+                self.get_logger().warn("Failed to get angles after 3 retries; return latest valid angles: %s" % self.latest_angles)
+                response.joint_1, response.joint_2, response.joint_3, response.joint_4 = self.latest_angles
 
         except Exception:
             self.get_logger().error(f"GetAngles service error: {traceback.format_exc()}")

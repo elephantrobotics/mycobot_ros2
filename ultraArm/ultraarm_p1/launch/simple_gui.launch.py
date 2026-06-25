@@ -44,6 +44,13 @@ def generate_launch_description():
     )
     res.append(baud_launch_arg)
 
+    gui_refresh_period_launch_arg = DeclareLaunchArgument(
+        name="gui_refresh_period_ms",
+        default_value="1000",
+        description='GUI state refresh period in milliseconds'
+    )
+    res.append(gui_refresh_period_launch_arg)
+    
     gui_launch_arg = DeclareLaunchArgument(
         name="gui",
         default_value="false"
@@ -68,7 +75,7 @@ def generate_launch_description():
         output="screen",
         parameters=[{
         "port": LaunchConfiguration("port"),
-        "baud": LaunchConfiguration("baud")
+        "baud": ParameterValue(LaunchConfiguration("baud"), value_type=int)
         }]
     )
     res.append(listen_real_service_node)
@@ -79,7 +86,8 @@ def generate_launch_description():
         executable="simple_gui",
         parameters=[
             {'port': LaunchConfiguration('port')},
-            {'baud': LaunchConfiguration('baud')}
+            {'baud': ParameterValue(LaunchConfiguration('baud'), value_type=int)},
+            {'refresh_period_ms': ParameterValue(LaunchConfiguration('gui_refresh_period_ms'), value_type=int)}
         ],
         output="screen"
     )

@@ -6,6 +6,7 @@ import traceback
 import time
 import rclpy
 from rclpy.node import Node
+from pymycobot.robot_info import RobotLimit
 from ultraarm_p1_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles
 
 MSG = """\
@@ -14,7 +15,7 @@ ultraArm P1 Teleop Keyboard Controller
 Movimg options(control coordinations [x,y,z,rx]):
               w(x+)
 
-    a(y-)     s(x-)     d(y+)
+    a(y+)     s(x-)     d(y-)
 
     z(z-) x(z+)
 
@@ -29,12 +30,14 @@ Other:
     q - Quit
 """
 
-COORD_LIMITS = {
-    'x': (-350, 362.43),
-    'y': (-362.43, 362.43),
-    'z': (-186.265, 93.44),
-    'rx': (-180, 180)
-}
+ROBOT_LIMIT = RobotLimit.robot_limit.get("UltraArmP1", {})
+COORD_LIMITS = dict(zip(
+    ['x', 'y', 'z', 'rx'],
+    zip(
+        ROBOT_LIMIT.get("coords_min", [-350, -362.43, -186.265, -180]),
+        ROBOT_LIMIT.get("coords_max", [362.43, 362.43, 93.44, 180]),
+    ),
+))
 
 
 def vels(speed, turn):
@@ -140,15 +143,22 @@ class TeleopKeyboardNode(Node):
         self.get_logger().info(
             "\r current coords: [%.2f, %.2f, %.2f, %.2f]" % tuple(coords))
 
-    def send_coords(self):
-        """Send coordinates to the robot, ensuring they are within limits."""
-        coords = self.record_coords[0]
+    def validate_coords(self, coords):
+        """Return True if target coordinates are inside configured limits."""
         for i, axis in enumerate(['x', 'y', 'z', 'rx']):
             min_limit, max_limit = COORD_LIMITS[axis]
             if coords[i] < min_limit or coords[i] > max_limit:
                 self.get_logger().warn(
-                    f"{axis} value {coords[i]} exceeds the limit range [{min_limit}, {max_limit}], unable to send coordinates")
-                return
+                    f"{axis} value {coords[i]} exceeds the limit range [{min_limit}, {max_limit}], unable to send coordinates"
+                )
+                return False
+        return True
+
+    def send_coords(self):
+        """Send coordinates to the robot, ensuring they are within limits."""
+        coords = self.record_coords[0]
+        if not self.validate_coords(coords):
+            return
         request = SetCoords.Request()
         request.x, request.y, request.z, request.rx = coords
         request.speed = self.record_coords[1]
@@ -204,27 +214,32 @@ class TeleopKeyboardNode(Node):
                     if not self.ready_for_coords:
                         self.get_logger().warn("Coordinate control disabled. Please press '2' to enable.")
                         continue
+                    target_coords = list(self.record_coords[0])
                     
                     # Cartesian movement
                     if key in ["w", "W"]:
-                        self.record_coords[0][0] += self.change_len
+                        target_coords[0] += self.change_len
                     elif key in ["s", "S"]:
-                        self.record_coords[0][0] -= self.change_len
+                        target_coords[0] -= self.change_len
                     elif key in ["a", "A"]:
-                        self.record_coords[0][1] -= self.change_len
+                        target_coords[1] += self.change_len
                     elif key in ["d", "D"]:
-                        self.record_coords[0][1] += self.change_len
+                        target_coords[1] -= self.change_len
                     elif key in ["z", "Z"]:
-                        self.record_coords[0][2] -= self.change_len
+                        target_coords[2] -= self.change_len
                     elif key in ["x", "X"]:
-                        self.record_coords[0][2] += self.change_len
+                        target_coords[2] += self.change_len
                         
                     # Euler rotation
                     elif key in ["u", "U"]:
-                        self.record_coords[0][3] += self.change_angle
+                        target_coords[3] += self.change_angle
                     elif key in ["j", "J"]:
-                        self.record_coords[0][3] -= self.change_angle
+                        target_coords[3] -= self.change_angle
+
+                    if not self.validate_coords(target_coords):
+                        continue
                     
+                    self.record_coords[0] = target_coords
                     self.send_coords()
                     
                 # elif key in ["g", "G"]:
