@@ -115,9 +115,9 @@ def generate_launch_description():
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
         condition=IfCondition(LaunchConfiguration('gui')),
-        # remappings=[
-        #     ('/joint_states', '/joint_states_raw')
-        # ]
+        remappings=[
+            ('/joint_states', '/joint_states_raw')
+        ]
     )
     res.append(joint_state_publisher_gui_node)
 
@@ -126,7 +126,7 @@ def generate_launch_description():
         executable='joint_coupling_node',
         output='screen'
     )
-    # res.append(joint_coupling_node)
+    res.append(joint_coupling_node)
     
     rviz_node = Node(
         name="rviz2",

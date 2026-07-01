@@ -66,15 +66,19 @@ class Slider_Subscriber(Node):
 
     def joint_state_to_angles(self, msg):
         """Convert JointState radians into ultraArm P1 joint angles in degrees."""
-        data_list = []
-        for value in msg.position:
-            radians_to_angles = round(math.degrees(value), 2)
-            data_list.append(radians_to_angles)
-        joint1 = data_list[0]
-        joint2 = data_list[1]
-        joint3 = data_list[5] + 90
-        joint4 = data_list[-1]
-        return [joint1, joint2, joint3, joint4]
+        positions_by_name = dict(zip(msg.name, msg.position))
+        required_joints = ["J1", "J2", "J3", "J4"]
+        missing_joints = [joint for joint in required_joints if joint not in positions_by_name]
+        if missing_joints:
+            raise KeyError(", ".join(missing_joints))
+        
+        joint1 = round(math.degrees(positions_by_name["J1"]), 2)
+        joint2 = round(math.degrees(positions_by_name["J2"]), 2)
+        joint3 = round(math.degrees(positions_by_name["J3"]), 2) + 90
+        joint4 = round(math.degrees(positions_by_name["J4"]), 2)
+        angles_list = [round(angle, 2) for angle in [joint1, joint2, joint3, joint4]]
+        
+        return angles_list
 
     def angles_changed(self, new_angles):
         """Return True when the target changed enough to justify a new command."""
@@ -155,8 +159,8 @@ class Slider_Subscriber(Node):
         try:
             self.latest_angles = self.joint_state_to_angles(msg)
             self.target_dirty = True
-        except IndexError:
-            self.get_logger().warn("Invalid JointState position length: %s" % len(msg.position))
+        except KeyError as exc:
+            self.get_logger().warn("JointState missing required joints: %s" % exc)
 
 
 def main(args=None):

@@ -26,6 +26,13 @@ def generate_launch_description():
     )
     res.append(baud_launch_arg)
 
+    publish_rate_launch_arg = DeclareLaunchArgument(
+        name="publish_rate",
+        default_value="30.0",
+        description='joint state publish rate'
+    )
+    res.append(publish_rate_launch_arg)
+
     model_launch_arg = DeclareLaunchArgument(
         "model",
         default_value=os.path.join(
@@ -63,7 +70,8 @@ def generate_launch_description():
         name="follow_display",
         parameters=[
             {'port': LaunchConfiguration('port')},
-            {'baud': LaunchConfiguration('baud')}
+            {'baud': ParameterValue(LaunchConfiguration('baud'), value_type=int)},
+            {'publish_rate': ParameterValue(LaunchConfiguration('publish_rate'), value_type=float)}
         ],
         output="screen"
     )

@@ -4,7 +4,6 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
-from visualization_msgs.msg import Marker
 import pymycobot
 from packaging import version
 
@@ -24,7 +23,27 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import UltraArmP1
+    from pymycobot.robot_info import RobotLimit
 
+ROBOT_LIMIT = RobotLimit.robot_limit.get("UltraArmP1", {})
+JOINT_LIMITS = list(zip(
+    ROBOT_LIMIT.get("angles_min", [-165, -18, 89, -179]),
+    ROBOT_LIMIT.get("angles_max", [165, 85, 200, 179]),
+))
+
+
+def valid_angles(angles):
+    return (
+        isinstance(angles, list)
+        and len(angles) == 4
+        and all(low <= angle <= high for angle, (low, high) in zip(angles, JOINT_LIMITS))
+    )
+
+
+def angles_to_joint_positions(angles):
+    display_angles = list(angles)
+    display_angles[2] -= 90
+    return [math.radians(value) for value in display_angles]
 
 class Talker(Node):
     """ROS2 node to publish joint states and visualize end-effector position."""
@@ -34,15 +53,18 @@ class Talker(Node):
         super().__init__("follow_display")
         self.declare_parameter('port', '/dev/ttyUSB0')
         self.declare_parameter('baud', 1000000)
+        self.declare_parameter('publish_rate', 30.0)
 
         port = self.get_parameter("port").get_parameter_value().string_value
         baud = self.get_parameter("baud").get_parameter_value().integer_value
+        self.publish_rate = max(self.get_parameter("publish_rate").get_parameter_value().double_value,0.1)
 
         self.get_logger().info("port:%s, baud:%d" % (port, baud))
         self.ua = UltraArmP1(port, baud)
         time.sleep(0.02)
         self.ua.set_end_button_enable()
-        # self.get_logger().info("All joint released.\n")
+        self.last_invalid_log_time = 0.0
+        
         self.get_logger().info("Please press the LED button at the end of the machine to drag the joint.\n请按下机器末端LED按钮进行关节拖拽运动\n")
 
     def start(self):
@@ -50,19 +72,14 @@ class Talker(Node):
 
         Publishes:
             JointState messages to 'joint_states' topic.
-            Marker messages to 'visualization_marker' topic.
         """
         pub = self.create_publisher(
             msg_type=JointState,
             topic="joint_states",
             qos_profile=10
         )
-        pub_marker = self.create_publisher(
-            msg_type=Marker,
-            topic="visualization_marker",
-            qos_profile=10
-        )
-        rate = self.create_rate(30)
+        
+        rate = self.create_rate(self.publish_rate)
 
         # Initialize joint state message
         joint_state_send = JointState()
@@ -71,11 +88,6 @@ class Talker(Node):
         joint_state_send.velocity = [0.0]
         joint_state_send.effort = []
 
-        # Initialize marker
-        marker_ = Marker()
-        marker_.header.frame_id = "/base"
-        marker_.ns = "my_namespace"
-
         self.get_logger().info("Publishing ...")
         while rclpy.ok():
             rclpy.spin_once(self)
@@ -83,38 +95,19 @@ class Talker(Node):
             try:
                 # Get robot joint angles
                 angles = self.ua.get_angles_info()
-                time.sleep(0.1)
-                if isinstance(angles, list) and len(angles) > 0:
-                    angles[2] -= 90
-                    # Convert angles to radians for ROS2
-                    data_list = [math.radians(value) for value in angles]
-                    joint_state_send.position = data_list
-                    pub.publish(joint_state_send)
+                if valid_angles(angles):
+                    last_valid_positions = angles_to_joint_positions(angles)
                 else:
-                    self.get_logger().warn("Failed to get valid angles: {}".format(angles))
+                    now = self.get_clock().now().nanoseconds / 1e9
+                    if now - self.last_invalid_log_time >= 5.0:
+                        # self.get_logger().warn("Failed to get valid angles: {}".format(angles))
+                        self.last_invalid_log_time = now
+                    if last_valid_positions is None:
+                        rate.sleep()
+                        continue
 
-                # Get robot coordinates
-                coords = self.ua.get_coords_info()
-                if not isinstance(coords, list) or len(coords) == 0 or coords == -1:
-                    self.get_logger().warn("Failed to get valid coordinates: {}".format(coords))
-                    coords = [0, 0, 0, 0]  # fallback
-
-                # Configure marker
-                marker_.header.stamp = self.get_clock().now().to_msg()
-                marker_.type = marker_.SPHERE
-                marker_.action = marker_.ADD
-                marker_.scale.x = 0.04
-                marker_.scale.y = 0.04
-                marker_.scale.z = 0.04
-
-                # Set marker position
-                marker_.pose.position.x = coords[1] / 1000 * -1
-                marker_.pose.position.y = coords[0] / 1000
-                marker_.pose.position.z = coords[2] / 1000
-
-                marker_.color.a = 1.0
-                marker_.color.g = 1.0
-                pub_marker.publish(marker_)
+                joint_state_send.position = list(last_valid_positions)
+                pub.publish(joint_state_send)
 
                 rate.sleep()
             except Exception as e:
@@ -128,13 +121,21 @@ def main(args=None):
         args (list, optional): Command-line arguments for ROS2. Defaults to None.
     """
     rclpy.init(args=args)
-
     talker = Talker()
-    talker.start()
-    rclpy.spin(talker)
+    try:
+        talker.start()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        talker.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+    # talker = Talker()
+    # talker.start()
+    # rclpy.spin(talker)
 
-    talker.destroy_node()
-    rclpy.shutdown()
+    # talker.destroy_node()
+    # rclpy.shutdown()
 
 
 if __name__ == "__main__":

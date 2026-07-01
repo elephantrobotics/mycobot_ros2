@@ -4,6 +4,7 @@ import queue
 import threading
 import tkinter as tk
 import time
+import math
 from tkinter import messagebox
 import rclpy
 from rclpy.node import Node
@@ -11,6 +12,38 @@ from rclpy.executors import MultiThreadedExecutor
 from pymycobot.robot_info import RobotLimit
 from ultraarm_p1_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles
 
+MODEL_J2_RANGE = (-18.0, 85.0)
+MODEL_J3_RANGE = (-1.0, 110.0)
+ZERO_EPS_DEG = 0.1
+
+
+def snap_zero(angle_deg):
+    return 0.0 if abs(angle_deg) < ZERO_EPS_DEG else angle_deg
+
+
+def valid_j2_j3_region(j2_model, j3_model):
+    """Validate coupled J2/J3 model angles in degrees."""
+    a = snap_zero(j2_model)
+    b = snap_zero(j3_model)
+
+    if not (MODEL_J2_RANGE[0] <= a <= MODEL_J2_RANGE[1] and MODEL_J3_RANGE[0] <= b <= MODEL_J3_RANGE[1]):
+        return False
+
+    if -18 <= a < 0:
+        cond1 = math.cos(math.radians(-a + b)) - math.sin(math.radians(45 + a)) <= 7 / 30
+        cond2 = abs(math.cos(math.radians(-a + b))) >= 15.4 / 30
+        return cond1 and cond2
+
+    if 0 <= a <= 50.87:
+        return math.cos(math.radians(a - b)) >= 15.4 / 30
+
+    if 50.87 < a < 76.72:
+        return True
+
+    if 76.72 <= a <= 85:
+        return abs(math.cos(math.radians(a - b))) >= 6.89 / 30
+
+    return False
 
 class WindowNode(Node):
     """ROS2 node with Tkinter GUI interface for controlling a ultraArm robotic arm.
@@ -452,6 +485,22 @@ class WindowNode(Node):
         self.win.after(0, lambda: messagebox.showerror(
             "Error", msg, parent=self.win))
 
+    def validate_joint_coupling(self, joint_values):
+        """Check J2/J3 coupled motion before sending real robot angles."""
+        j2_model = joint_values[1]
+        j3_model = joint_values[2] - 90
+
+        if valid_j2_j3_region(j2_model, j3_model):
+            return True
+
+        self.show_error(
+            "J2-J3 combination is out of the allowed coupled range!\n"
+            f"J2 model angle: {j2_model:.2f}\n"
+            f"J3 real angle: {joint_values[2]:.2f}\n"
+            f"J3 model angle: {j3_model:.2f}"
+        )
+        return False
+
     def get_coord_input(self):
         """Read coordinates input from the GUI and send them to the robotic arm.
 
@@ -524,6 +573,9 @@ class WindowNode(Node):
                     f"{self.angles_min[idx]}~{self.angles_max[idx]}"
                 )
                 return
+        
+        if not self.validate_joint_coupling(j_value):
+            return
 
         try:
             speed_str = self.get_speed.get()
