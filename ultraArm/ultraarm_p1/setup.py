@@ -55,6 +55,7 @@ setup(
             'simple_gui = ultraarm_p1.simple_gui:main',
             'teleop_keyboard = ultraarm_p1.teleop_keyboard:main',
             'listen_real_service = ultraarm_p1.listen_real_service:main',
+            'joint_coupling_node = ultraarm_p1.joint_coupling_node:main',
         ],
     },
 )
