@@ -48,6 +48,7 @@ setup(
     entry_points={
         'console_scripts': [
             'sync_plan = ultraarm_p1_moveit2_control.sync_plan:main',
+            'mimic_preview_node = ultraarm_p1_moveit2_control.mimic_preview_node:main',
         ],
     },
 )

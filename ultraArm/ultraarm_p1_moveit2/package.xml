@@ -18,6 +18,15 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <build_depend>moveit_core</build_depend>
+  <build_depend>moveit_msgs</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>rclcpp</build_depend>
+
+  <exec_depend>moveit_core</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
   <exec_depend>moveit_ros_move_group</exec_depend>
   <exec_depend>moveit_kinematics</exec_depend>
   <exec_depend>moveit_planners</exec_depend>
@@ -48,5 +57,6 @@
 
   <export>
       <build_type>ament_cmake</build_type>
+      <moveit_core plugin="${prefix}/coupling_adapter_plugin.xml"/>
   </export>
 </package>
