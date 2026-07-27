@@ -5,12 +5,15 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import Command, LaunchConfiguration
 
 
 def generate_launch_description():
     res = []
+
+    # Enable ANSI colors under ros2 launch (WARN=yellow, ERROR=red).
+    res.append(SetEnvironmentVariable("RCUTILS_COLORIZED_OUTPUT", "1"))
     
     port_launch_arg = DeclareLaunchArgument(
         name="port",

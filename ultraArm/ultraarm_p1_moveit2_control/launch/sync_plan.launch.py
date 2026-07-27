@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -7,6 +7,8 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
     return LaunchDescription([
+        # Enable ANSI colors under ros2 launch (WARN=yellow, ERROR=red).
+        SetEnvironmentVariable("RCUTILS_COLORIZED_OUTPUT", "1"),
         DeclareLaunchArgument("port", default_value="/dev/ttyUSB0", description="Serial port used by ultraArm P1"),
         DeclareLaunchArgument("baud", default_value="1000000", description="Serial baudrate"),
         DeclareLaunchArgument("speed", default_value="25", description="Robot motion speed"),

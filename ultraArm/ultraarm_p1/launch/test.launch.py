@@ -5,13 +5,16 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration
 
 
 def generate_launch_description():
     res = []
+
+    # Enable ANSI colors under ros2 launch (WARN=yellow, ERROR=red).
+    res.append(SetEnvironmentVariable("RCUTILS_COLORIZED_OUTPUT", "1"))
 
     model_launch_arg = DeclareLaunchArgument(
         name="model",
@@ -47,19 +50,33 @@ def generate_launch_description():
     )
     res.append(robot_state_publisher_node)
 
+    # Publish raw slider states; joint_coupling_node filters J2-J3 then republishes /joint_states
     joint_state_publisher_node = Node(
         package='joint_state_publisher',
         executable='joint_state_publisher',
-        condition=UnlessCondition(LaunchConfiguration('gui'))
+        condition=UnlessCondition(LaunchConfiguration('gui')),
+        remappings=[
+            ('/joint_states', '/joint_states_raw')
+        ]
     )
     res.append(joint_state_publisher_node)
 
     joint_state_publisher_gui_node = Node(
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
-        condition=IfCondition(LaunchConfiguration('gui'))
+        condition=IfCondition(LaunchConfiguration('gui')),
+        remappings=[
+            ('/joint_states', '/joint_states_raw')
+        ]
     )
     res.append(joint_state_publisher_gui_node)
+
+    joint_coupling_node = Node(
+        package='ultraarm_p1',
+        executable='joint_coupling_node',
+        output='screen'
+    )
+    res.append(joint_coupling_node)
 
     rviz_node = Node(
         name="rviz2",

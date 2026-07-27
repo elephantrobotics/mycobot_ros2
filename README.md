@@ -28,6 +28,19 @@ For using this package, the [Python api](https://github.com/elephantrobotics/pym
 pip install pymycobot --user
 ```
 
+Many ROS2 scripts also need `packaging` (for `pymycobot` version checks). After cloning, install common Python deps with:
+
+```bash
+cd ~/colcon_ws/src/mycobot_ros2
+bash install_deps.sh
+```
+
+Or:
+
+```bash
+pip3 install --user -r ~/colcon_ws/src/mycobot_ros2/requirements.txt
+```
+
 ### 1.2 Package Download and Install
 
 Install ros package in your src folder of your Colcon workspace.
