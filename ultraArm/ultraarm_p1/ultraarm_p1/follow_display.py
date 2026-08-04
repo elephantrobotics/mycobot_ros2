@@ -23,21 +23,16 @@ if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
 else:
     print('pymycobot library version meets the requirements!')
     from pymycobot import UltraArmP1
-    from pymycobot.robot_info import RobotLimit
-
-ROBOT_LIMIT = RobotLimit.robot_limit.get("UltraArmP1", {})
-JOINT_LIMITS = list(zip(
-    ROBOT_LIMIT.get("angles_min", [-165, -18, 89, -179]),
-    ROBOT_LIMIT.get("angles_max", [165, 85, 200, 179]),
-))
 
 
 def valid_angles(angles):
-    return (
-        isinstance(angles, list)
-        and len(angles) == 4
-        and all(low <= angle <= high for angle, (low, high) in zip(angles, JOINT_LIMITS))
-    )
+    """Accept any finite 4-joint reading for model follow (no software joint limits)."""
+    if not isinstance(angles, list) or len(angles) != 4:
+        return False
+    try:
+        return all(math.isfinite(float(angle)) for angle in angles)
+    except (TypeError, ValueError):
+        return False
 
 
 def angles_to_joint_positions(angles):
@@ -87,6 +82,7 @@ class Talker(Node):
         joint_state_send.name = ["J1", "J2", "J3", "J4"]
         joint_state_send.velocity = [0.0]
         joint_state_send.effort = []
+        last_valid_positions = None
 
         self.get_logger().info("Publishing ...")
         while rclpy.ok():
