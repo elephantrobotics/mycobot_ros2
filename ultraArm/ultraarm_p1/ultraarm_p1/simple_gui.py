@@ -116,7 +116,7 @@ class WindowNode(Node):
         # Calculate window position
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("470x440+{}+{}".format(int(x), int(y)))
+        self.win.geometry("600x600+{}+{}".format(int(x), int(y)))
 
         # GUI layout and widgets
         self.set_layout()

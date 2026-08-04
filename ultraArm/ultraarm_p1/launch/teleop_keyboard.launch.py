@@ -46,6 +46,13 @@ def generate_launch_description():
         description='baud number used by the device'
     )
     res.append(baud_launch_arg)
+
+    publish_rate_launch_arg = DeclareLaunchArgument(
+        name="publish_rate",
+        default_value="10.0",
+        description='JointState publish rate (Hz) for RViz model follow'
+    )
+    res.append(publish_rate_launch_arg)
     
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
@@ -66,7 +73,8 @@ def generate_launch_description():
         output="screen",
         parameters=[{
         "port": LaunchConfiguration("port"),
-        "baud": ParameterValue(LaunchConfiguration("baud"), value_type=int)
+        "baud": ParameterValue(LaunchConfiguration("baud"), value_type=int),
+        "publish_rate": ParameterValue(LaunchConfiguration("publish_rate"), value_type=float),
         }]
     )
     res.append(listen_real_service_node)

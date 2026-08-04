@@ -47,6 +47,13 @@ def generate_launch_description():
     )
     res.append(baud_launch_arg)
 
+    publish_rate_launch_arg = DeclareLaunchArgument(
+        name="publish_rate",
+        default_value="10.0",
+        description='JointState publish rate (Hz) for RViz model follow'
+    )
+    res.append(publish_rate_launch_arg)
+
     gui_refresh_period_launch_arg = DeclareLaunchArgument(
         name="gui_refresh_period_ms",
         default_value="1000",
@@ -78,7 +85,8 @@ def generate_launch_description():
         output="screen",
         parameters=[{
         "port": LaunchConfiguration("port"),
-        "baud": ParameterValue(LaunchConfiguration("baud"), value_type=int)
+        "baud": ParameterValue(LaunchConfiguration("baud"), value_type=int),
+        "publish_rate": ParameterValue(LaunchConfiguration("publish_rate"), value_type=float),
         }]
     )
     res.append(listen_real_service_node)
