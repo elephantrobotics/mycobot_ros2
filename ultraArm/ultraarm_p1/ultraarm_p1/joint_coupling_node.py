@@ -1,8 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import math
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
+
 """_summary_
 The J2–J3 joint coupling node has the following overall structure:
 
@@ -24,6 +27,9 @@ joint_coupling_node
 │
 └── slider_control.py
 (Controls the real robot)
+
+Also publishes /ultraarm_p1/j2_j3_coupling_warning for optional GUI popup
+(coupling_warn_gui).
 """
 J2_RANGE = (-18.0, 85.0)
 J3_RANGE = (-1.0, 110.0)
@@ -41,11 +47,14 @@ class JointCouplingNode(Node):
     def __init__(self):
         super().__init__("joint_coupling_node")
         self.pub = self.create_publisher(JointState, "/joint_states", 10)
+        self.warn_pub = self.create_publisher(
+            String, "/ultraarm_p1/j2_j3_coupling_warning", 1
+        )
         self.sub = self.create_subscription(
             JointState,
             "/joint_states_raw",
             self.callback,
-            10
+            10,
         )
         self.last_valid_msg = None
         self.last_invalid_pair = None
@@ -106,7 +115,6 @@ class JointCouplingNode(Node):
             return
 
         if not self.valid_region(j2, j3):
-            # self.get_logger().warn(f"Invalid J2-J3 combination: {j2:.2f} {j3:.2f}")
             should_warn = not self.was_invalid
             if self.last_invalid_pair is not None:
                 should_warn = should_warn or abs(j2 - self.last_invalid_pair[0]) >= INVALID_WARN_DELTA_DEG
@@ -115,8 +123,14 @@ class JointCouplingNode(Node):
                 should_warn = True
 
             if should_warn:
-                self.get_logger().warn(f"Invalid J2-J3 combination: {j2:.2f} {j3:.2f}")
+                warn_text = (
+                    "Invalid J2-J3 combination: "
+                    "J2=%.2f deg (%.3f rad), J3=%.2f deg (%.3f rad)"
+                    % (j2, math.radians(j2), j3, math.radians(j3))
+                )
+                self.get_logger().warn(warn_text)
                 self.last_invalid_pair = (j2, j3)
+                self.warn_pub.publish(String(data=warn_text))
             self.was_invalid = True
 
             if self.last_valid_msg is not None:
@@ -125,6 +139,8 @@ class JointCouplingNode(Node):
                 self.pub.publish(safe_msg)
             return
 
+        if self.was_invalid:
+            self.warn_pub.publish(String(data="ok"))
         self.was_invalid = False
         self.last_invalid_pair = None
         self.last_valid_msg = self.clone_joint_state(msg)

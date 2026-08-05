@@ -78,6 +78,13 @@ def generate_launch_description():
     )
     res.append(joint_coupling_node)
 
+    coupling_warn_gui_node = Node(
+        package='ultraarm_p1',
+        executable='coupling_warn_gui',
+        output='screen'
+    )
+    res.append(coupling_warn_gui_node)
+
     rviz_node = Node(
         name="rviz2",
         package="rviz2",
