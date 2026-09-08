@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: mycobot_description
+    relative_path: urdf/ultraArm_p1/ultraArm_p1.urdf
+  srdf:
+    relative_path: config/firefighter.srdf
+  package_settings:
+    author_name: wangweijian
+    author_email: weijian.wang@elephantrobotics
+    generated_timestamp: 1782890017
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
