@@ -1,6 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <!-- MoveIt uses collision_exact by default. Gazebo overrides this with
+         collision_gazebo because ODE is unstable with dynamic non-convex,
+         high-triangle collision meshes. -->
+    <xacro:arg name="collision_mesh_dir" default="collision_exact" />
 
     <!-- Import firefighter urdf file -->
     <xacro:include filename="$(find mycobotpro450_gazeboros2)/config/mycobot_pro_450_force_gripper.urdf" />

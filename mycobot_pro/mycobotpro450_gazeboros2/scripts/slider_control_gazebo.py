@@ -48,6 +48,7 @@ MAX_TRAJECTORY_DURATION = 600.0
 SPLINE_PEAK_VELOCITY_FACTOR = 1.5
 COLLISION_SAMPLE_STEP = math.radians(1.0)
 MAX_COLLISION_SAMPLES = 400
+DEFAULT_COLLISION_DEPTH_TOLERANCE_M = 0.0001
 FORCE_EXECUTE_MAX_SPEED_SCALE = 0.10
 FLOOR_OBJECT_ID = "pro450_ground_safety"
 
@@ -76,10 +77,13 @@ class SliderControl(Node):
         self.declare_parameter("pro450_ip", DEFAULT_PRO450_IP)
         self.declare_parameter("pro450_port", DEFAULT_PRO450_PORT)
         self.declare_parameter("minimum_real_height_mm", 170.0)
-        # The Pro450 gripper uses irregular visual meshes but simplified
-        # collision boxes.  Keep those boxes above the real Gazebo floor by a
-        # small margin so that the rendered fingertips do not clip through it.
-        self.declare_parameter("floor_clearance_m", 0.02)
+        # Keep the MoveIt ground surface coincident with Gazebo's z=0 plane.
+        # A positive value is an optional safety margin, not model geometry.
+        self.declare_parameter("floor_clearance_m", 0.0)
+        self.declare_parameter(
+            "collision_depth_tolerance_m",
+            DEFAULT_COLLISION_DEPTH_TOLERANCE_M,
+        )
         self.declare_parameter("floor_size_m", 20.0)
         self.declare_parameter("floor_thickness_m", 0.10)
         self.declare_parameter("floor_frame", "world")
@@ -90,6 +94,10 @@ class SliderControl(Node):
         )
         self.floor_clearance_m = max(
             0.0, float(self.get_parameter("floor_clearance_m").value)
+        )
+        self.collision_depth_tolerance_m = max(
+            0.0,
+            float(self.get_parameter("collision_depth_tolerance_m").value),
         )
         self.floor_size_m = max(1.0, float(self.get_parameter("floor_size_m").value))
         self.floor_thickness_m = max(
@@ -321,37 +329,103 @@ class SliderControl(Node):
             2, min(MAX_COLLISION_SAMPLES, math.ceil(max_delta / COLLISION_SAMPLE_STEP))
         )
 
+        current_valid, previous_contacts, reason = self._state_is_valid(current)
+        if reason:
+            return False, reason
+        escaping_collision = not current_valid
+        initial_contacts = dict(previous_contacts)
+
         for index in range(1, sample_count + 1):
             if self._stop_requested:
                 return False, "STOP requested."
             ratio = index / sample_count
             sample = [a + (b - a) * ratio for a, b in zip(current, target)]
 
-            request = GetStateValidity.Request()
-            request.robot_state.is_diff = True
-            request.robot_state.joint_state.name = list(COMMAND_JOINTS)
-            request.robot_state.joint_state.position = sample
-            request.group_name = "arm"
+            valid, contacts, reason = self._state_is_valid(sample)
+            if reason:
+                return False, reason
+            if valid:
+                escaping_collision = False
+                previous_contacts = {}
+                continue
 
-            future = self.validity_client.call_async(request)
-            deadline = time.monotonic() + 2.0
-            while not future.done() and time.monotonic() < deadline:
-                if self._stop_requested:
-                    return False, "STOP requested."
-                time.sleep(0.01)
-            if not future.done():
-                return False, "MoveIt state-validity check timed out."
-            response = future.result()
-            if response is None:
-                return False, "MoveIt state-validity check failed."
-            if not response.valid:
-                detail = ""
-                if response.contacts:
-                    contact = response.contacts[0]
-                    detail = f" ({contact.contact_body_1} vs {contact.contact_body_2})"
-                return False, f"collision detected at {ratio * 100:.0f}% of path{detail}."
+            if escaping_collision and self._collision_is_decreasing(
+                initial_contacts,
+                previous_contacts,
+                contacts,
+            ):
+                previous_contacts = contacts
+                continue
+
+            return False, self._format_collision_reason(ratio, contacts)
+
+        if escaping_collision:
+            return False, (
+                "target remains in collision; move farther along a path that "
+                "fully exits the existing contact."
+            )
 
         return True, "valid"
+
+    def _state_is_valid(self, positions):
+        """Return validity and maximum penetration depth for every body pair."""
+
+        request = GetStateValidity.Request()
+        request.robot_state.is_diff = True
+        request.robot_state.joint_state.name = list(COMMAND_JOINTS)
+        request.robot_state.joint_state.position = positions
+        request.group_name = "arm"
+
+        future = self.validity_client.call_async(request)
+        deadline = time.monotonic() + 2.0
+        while not future.done() and time.monotonic() < deadline:
+            if self._stop_requested:
+                return False, {}, "STOP requested."
+            time.sleep(0.01)
+        if not future.done():
+            return False, {}, "MoveIt state-validity check timed out."
+        response = future.result()
+        if response is None:
+            return False, {}, "MoveIt state-validity check failed."
+        if response.valid:
+            return True, {}, ""
+
+        contacts = {}
+        for contact in response.contacts:
+            if contact.depth <= self.collision_depth_tolerance_m:
+                continue
+            pair = tuple(sorted((contact.contact_body_1, contact.contact_body_2)))
+            contacts[pair] = max(contacts.get(pair, 0.0), contact.depth)
+
+        # FCL can report tiny contacts at coincident triangle surfaces. Ignore
+        # only the configured numerical tolerance. An invalid response without
+        # contacts can be a constraint failure and must remain a hard failure.
+        if response.contacts and not contacts:
+            return True, {}, ""
+        if not contacts:
+            return False, {}, "MoveIt reported an invalid state without contacts."
+        return False, contacts, ""
+
+    def _collision_is_decreasing(self, initial, previous, current):
+        if not set(current).issubset(initial):
+            return False
+        tolerance = self.collision_depth_tolerance_m
+        for pair, depth in current.items():
+            if depth > initial[pair] + tolerance:
+                return False
+            if depth > previous.get(pair, 0.0) + tolerance:
+                return False
+        return True
+
+    @staticmethod
+    def _format_collision_reason(ratio, contacts):
+        if not contacts:
+            return f"invalid state at {ratio * 100:.0f}% of path."
+        pair, depth = max(contacts.items(), key=lambda item: item[1])
+        return (
+            f"collision detected at {ratio * 100:.0f}% of path "
+            f"({pair[0]} vs {pair[1]}, depth {depth * 1000.0:.3f} mm)."
+        )
 
     def _wait_for_future(self, future, timeout_sec, operation):
         deadline = time.monotonic() + timeout_sec
@@ -430,8 +504,8 @@ class SliderControl(Node):
         ]
         pose = Pose()
         pose.orientation.w = 1.0
-        # The collision surface is raised above Gazebo z=0 by the configured
-        # clearance.  Only the fixed base link is allowed to overlap it.
+        # The default collision surface matches Gazebo z=0.  A configured
+        # positive clearance deliberately turns it into a safety margin.
         pose.position.z = self.floor_clearance_m - self.floor_thickness_m / 2.0
         floor.primitives = [primitive]
         floor.primitive_poses = [pose]

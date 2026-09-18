@@ -1,5 +1,8 @@
 <?xml version="1.0" ?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter">
+    <!-- collision_mesh_dir is selected by the parent xacro. MoveIt uses
+         collision_exact for accurate self-collision checks, while Gazebo
+         uses collision_gazebo for stable ODE dynamics. -->
     <link name="world" />
     <!-- Base Joint -->
     <joint name="base_joint" type="fixed">
@@ -16,9 +19,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/base_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J1_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.0 -0.11 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="8.0" />
@@ -35,9 +38,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link1_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J2_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.0405 0 0.0475" rpy="-1.5708 0 -1.5708" />
         </collision>
         <inertial>
             <mass value="3.5" />
@@ -54,9 +57,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link2_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J3_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.0598 0.005 -0.203" rpy="0 0 1.5708" />
         </collision>
         <inertial>
             <mass value="2.8" />
@@ -73,9 +76,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link3_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J4_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.07 0.005 -0.383" rpy="0 0 1.5708" />
         </collision>
         <inertial>
             <mass value="2.2" />
@@ -92,9 +95,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link4_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J5_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.015 0 -0.002" rpy="0 -1.5708 0" />
         </collision>
         <inertial>
             <mass value="1.2" />
@@ -111,9 +114,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link5_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J6_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.003 -0.025 -0.608" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.8" />
@@ -130,9 +133,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link6_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J6_end_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0 0 0.001" rpy="3.14159 0 0" />
         </collision>
         <inertial>
             <mass value="0.4" />
@@ -149,9 +152,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_connection_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/mygripper_f100_connection_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.03 0.014 0" rpy="0 0 -1.5708" />
         </collision>
         <inertial>
             <mass value="0.15" />
@@ -168,9 +171,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_base_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_base_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.107 0.012 0.0" rpy="1.5708 0 1.5708" />
         </collision>
         <inertial>
             <mass value="0.12" />
@@ -189,9 +192,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_left1_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_left1_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.047 -0.013 0.044" rpy="1.5708 0 1.5708" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -209,9 +212,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_left2_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_left2_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0 0.03 0.004" rpy="3.14159 0 1.5708" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -230,9 +233,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_left3_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_left3_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0 -0.03 0.012" rpy="1.5708 3.14159 1.5708" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -251,9 +254,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_right1_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_right1_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.047 -0.013 -0.046" rpy="1.5708 3.14 -1.5708" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -272,9 +275,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_right2_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_right2_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0 0.03 -0.005" rpy="0 0 1.5708" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -293,9 +296,9 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_right3_collision.stl" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/pro_gripper_right3_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.014 -0.029 0.004" rpy="3.14 0 -1.5708" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -447,6 +450,7 @@
             <joint>gripper_controller</joint>
             <mimicJoint>gripper_base_to_gripper_left2</mimicJoint>
             <multiplier>1.0</multiplier>
+            <sensitiveness>0.001</sensitiveness>
         </plugin>
     </gazebo>
     <gazebo>
@@ -454,6 +458,7 @@
             <joint>gripper_controller</joint>
             <mimicJoint>gripper_left3_to_gripper_left1</mimicJoint>
             <multiplier>-1.0</multiplier>
+            <sensitiveness>0.001</sensitiveness>
         </plugin>
     </gazebo>
     <gazebo>
@@ -461,6 +466,7 @@
             <joint>gripper_controller</joint>
             <mimicJoint>gripper_base_to_gripper_right3</mimicJoint>
             <multiplier>-1.0</multiplier>
+            <sensitiveness>0.001</sensitiveness>
         </plugin>
     </gazebo>
     <gazebo>
@@ -468,6 +474,7 @@
             <joint>gripper_controller</joint>
             <mimicJoint>gripper_base_to_gripper_right2</mimicJoint>
             <multiplier>-1.0</multiplier>
+            <sensitiveness>0.001</sensitiveness>
         </plugin>
     </gazebo>
     <gazebo>
@@ -475,6 +482,7 @@
             <joint>gripper_controller</joint>
             <mimicJoint>gripper_right3_to_gripper_right1</mimicJoint>
             <multiplier>1.0</multiplier>
+            <sensitiveness>0.001</sensitiveness>
         </plugin>
     </gazebo>
 </robot>

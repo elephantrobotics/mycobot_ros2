@@ -11,7 +11,10 @@ from launch.actions import (
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -56,11 +59,53 @@ def continue_after_success(completed_name, next_action):
 def generate_launch_description():
     moveit_config = MoveItConfigsBuilder("firefighter", package_name="mycobotpro450_gazeboros2").to_moveit_configs()
 
+    # MoveIt/FCL gets accurate triangle meshes, while Gazebo/ODE gets a
+    # low-poly convex representation. Feeding the exact dynamic meshes to ODE
+    # causes false contact impulses, folded startup poses, and gzserver crashes.
+    gazebo_robot_description = {
+        "robot_description": ParameterValue(
+            Command(
+                [
+                    FindExecutable(name="xacro"),
+                    " ",
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare("mycobotpro450_gazeboros2"),
+                            "config",
+                            "firefighter.urdf.xacro",
+                        ]
+                    ),
+                    " collision_mesh_dir:=collision_gazebo",
+                ]
+            ),
+            value_type=str,
+        )
+    }
+
     rsp = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="screen",
         parameters=[moveit_config.robot_description, {'use_sim_time': True}],
+    )
+
+    # This publisher exists only to feed spawn_entity. Its TF streams are
+    # isolated so it cannot duplicate or corrupt the normal MoveIt TF tree.
+    gazebo_description_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        namespace="gazebo_spawn",
+        name="robot_description_publisher",
+        output="screen",
+        parameters=[
+            gazebo_robot_description,
+            {"use_sim_time": True, "frame_prefix": "gazebo_spawn_unused/"},
+        ],
+        remappings=[
+            ("/joint_states", "/gazebo_spawn/joint_states_unused"),
+            ("/tf", "/gazebo_spawn/tf_unused"),
+            ("/tf_static", "/gazebo_spawn/tf_static_unused"),
+        ],
     )
 
     gazebo_ros_share = get_package_share_directory('gazebo_ros')
@@ -71,7 +116,10 @@ def generate_launch_description():
     spawn_entity = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
-        arguments=['-topic', 'robot_description', '-entity', 'mycobotpro450'],
+        arguments=[
+            '-topic', '/gazebo_spawn/robot_description',
+            '-entity', 'mycobotpro450',
+        ],
         output='screen'
     )
 
@@ -141,6 +189,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         rsp,
+        gazebo_description_publisher,
         gazebo,
         spawn_entity,
         move_group,
