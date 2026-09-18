@@ -51,6 +51,11 @@ MAX_COLLISION_SAMPLES = 400
 DEFAULT_COLLISION_DEPTH_TOLERANCE_M = 0.0001
 FORCE_EXECUTE_MAX_SPEED_SCALE = 0.10
 FLOOR_OBJECT_ID = "pro450_ground_safety"
+# Collision validation still computes the first collision point and penetration
+# depth. These flags only control how much diagnostic detail is exposed in the
+# operator-facing status text, so the previous wording can be restored easily.
+SHOW_COLLISION_PATH_PERCENT = False
+SHOW_COLLISION_DEPTH = False
 
 
 def estimate_end_effector_height(j2_deg, j3_deg, j4_deg):
@@ -217,7 +222,7 @@ class SliderControl(Node):
         for name, value, limits in zip(COMMAND_JOINTS, target, JOINT_LIMITS_RAD):
             if not limits[0] <= value <= limits[1]:
                 self._publish_status(
-                    f"Rejected: {name}={math.degrees(value):.1f} deg is outside its limits."
+                    f"Rejected: {name}={value:.4f} rad is outside its limits."
                 )
                 return
 
@@ -420,12 +425,19 @@ class SliderControl(Node):
     @staticmethod
     def _format_collision_reason(ratio, contacts):
         if not contacts:
-            return f"invalid state at {ratio * 100:.0f}% of path."
+            if SHOW_COLLISION_PATH_PERCENT:
+                return f"invalid state at {ratio * 100:.0f}% of path."
+            return "invalid state."
+
         pair, depth = max(contacts.items(), key=lambda item: item[1])
-        return (
-            f"collision detected at {ratio * 100:.0f}% of path "
-            f"({pair[0]} vs {pair[1]}, depth {depth * 1000.0:.3f} mm)."
-        )
+        summary = "collision detected"
+        if SHOW_COLLISION_PATH_PERCENT:
+            summary += f" at {ratio * 100:.0f}% of path"
+
+        details = [f"{pair[0]} vs {pair[1]}"]
+        if SHOW_COLLISION_DEPTH:
+            details.append(f"depth {depth * 1000.0:.3f} mm")
+        return f"{summary} ({', '.join(details)})."
 
     def _wait_for_future(self, future, timeout_sec, operation):
         deadline = time.monotonic() + timeout_sec

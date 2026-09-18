@@ -36,15 +36,17 @@ from python_qt_binding.QtWidgets import (
 ARM_JOINTS = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
 GRIPPER_JOINT = "gripper_controller"
 COMMAND_JOINTS = ARM_JOINTS + [GRIPPER_JOINT]
-JOINT_LIMITS_DEG = [
-    (-162.0, 162.0),
-    (-125.0, 125.0),
-    (-154.0, 154.0),
-    (-162.0, 162.0),
-    (-162.0, 162.0),
-    (-165.0, 165.0),
-    (0.0, 57.3),
+JOINT_LIMITS_RAD = [
+    (math.radians(-162.0), math.radians(162.0)),
+    (math.radians(-125.0), math.radians(125.0)),
+    (math.radians(-154.0), math.radians(154.0)),
+    (math.radians(-162.0), math.radians(162.0)),
+    (math.radians(-162.0), math.radians(162.0)),
+    (math.radians(-165.0), math.radians(165.0)),
+    (0.0, 1.0),
 ]
+RAD_DISPLAY_DECIMALS = 4
+RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
 FORCE_EXECUTE_MAX_SPEED_PERCENT = 10
 
 
@@ -131,30 +133,37 @@ class Pro450SliderWindow(QMainWindow):
         joint_group = QGroupBox("Joint Targets")
         grid = QGridLayout(joint_group)
         grid.addWidget(QLabel("Joint"), 0, 0)
-        grid.addWidget(QLabel("Target (deg)"), 0, 1)
+        grid.addWidget(QLabel("Target (rad)"), 0, 1)
         grid.addWidget(QLabel("Slider"), 0, 2)
-        grid.addWidget(QLabel("Actual (deg)"), 0, 3)
+        grid.addWidget(QLabel("Actual (rad)"), 0, 3)
 
         labels = ["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5", "Joint 6", "Gripper"]
-        for row, (label, limits) in enumerate(zip(labels, JOINT_LIMITS_DEG), start=1):
+        for row, (label, limits) in enumerate(zip(labels, JOINT_LIMITS_RAD), start=1):
             minimum, maximum = limits
             target_box = QDoubleSpinBox()
             target_box.setRange(minimum, maximum)
-            target_box.setDecimals(1)
-            target_box.setSingleStep(1.0)
+            target_box.setDecimals(RAD_DISPLAY_DECIMALS)
+            target_box.setSingleStep(0.01)
 
             slider = QSlider(Qt.Horizontal)
-            slider.setRange(round(minimum * 10), round(maximum * 10))
-            slider.setSingleStep(10)
+            slider.setRange(
+                round(minimum * RAD_SLIDER_SCALE),
+                round(maximum * RAD_SLIDER_SCALE),
+            )
+            slider.setSingleStep(round(0.01 * RAD_SLIDER_SCALE))
 
             actual_label = QLabel("--")
             actual_label.setMinimumWidth(90)
 
             slider.valueChanged.connect(
-                lambda value, box=target_box: box.setValue(value / 10.0)
+                lambda value, box=target_box: box.setValue(
+                    value / RAD_SLIDER_SCALE
+                )
             )
             target_box.valueChanged.connect(
-                lambda value, control=slider: control.setValue(round(value * 10))
+                lambda value, control=slider: control.setValue(
+                    round(value * RAD_SLIDER_SCALE)
+                )
             )
             target_box.valueChanged.connect(self._target_edited)
 
@@ -227,15 +236,19 @@ class Pro450SliderWindow(QMainWindow):
 
         if actual is not None:
             for label, value in zip(self.actual_labels, actual):
-                label.setText("NaN" if not math.isfinite(value) else f"{math.degrees(value):.1f}")
+                label.setText(
+                    "NaN"
+                    if not math.isfinite(value)
+                    else f"{value:.{RAD_DISPLAY_DECIMALS}f}"
+                )
 
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True
             for box, slider, value in zip(self.target_boxes, self.sliders, actual):
                 box.blockSignals(True)
                 slider.blockSignals(True)
-                box.setValue(math.degrees(value))
-                slider.setValue(round(math.degrees(value) * 10))
+                box.setValue(value)
+                slider.setValue(round(value * RAD_SLIDER_SCALE))
                 box.blockSignals(False)
                 slider.blockSignals(False)
             self.user_edited_target = False
@@ -251,7 +264,7 @@ class Pro450SliderWindow(QMainWindow):
             self.status_label.setText(status)
 
     def _execute(self):
-        positions = [math.radians(box.value()) for box in self.target_boxes]
+        positions = self._target_positions_rad()
         self.node.execute(positions, self.speed_box.value())
         self.status_label.setText("Command submitted; waiting for validation...")
         self.user_edited_target = False
@@ -271,7 +284,7 @@ class Pro450SliderWindow(QMainWindow):
         if answer != QMessageBox.Yes:
             return
 
-        positions = [math.radians(box.value()) for box in self.target_boxes]
+        positions = self._target_positions_rad()
         forced_speed = min(
             self.speed_box.value(), FORCE_EXECUTE_MAX_SPEED_PERCENT
         )
@@ -284,7 +297,7 @@ class Pro450SliderWindow(QMainWindow):
 
     def _randomize_target(self):
         """Generate a target locally; motion still requires Execute."""
-        for box, limits in zip(self.target_boxes, JOINT_LIMITS_DEG):
+        for box, limits in zip(self.target_boxes, JOINT_LIMITS_RAD):
             box.setValue(random.uniform(*limits))
         self.user_edited_target = True
         self.status_label.setText(
@@ -299,6 +312,13 @@ class Pro450SliderWindow(QMainWindow):
         self.status_label.setText(
             "Zero target loaded. Press Execute to validate and return to zero."
         )
+
+    def _target_positions_rad(self):
+        """Read radian targets and clamp display rounding to exact URDF limits."""
+        return [
+            min(max(box.value(), lower), upper)
+            for box, (lower, upper) in zip(self.target_boxes, JOINT_LIMITS_RAD)
+        ]
 
     def _stop(self):
         self.node.stop()
