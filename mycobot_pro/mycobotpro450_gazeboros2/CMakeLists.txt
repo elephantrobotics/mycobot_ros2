@@ -15,6 +15,7 @@ install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/coords_broadcaster.py
+  scripts/pro450_slider_gui.py
   scripts/slider_control_gazebo.py
   scripts/follow_display_gazebo.py
   scripts/teleop_keyboard_gazebo.py

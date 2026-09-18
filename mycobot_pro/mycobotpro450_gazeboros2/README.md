@@ -37,7 +37,14 @@ MyCobot_450_m5-Gazebo使用说明
 
 1. 滑块控制
 
-现已实现通过joint_state_publisher_gui的滑块控制机械臂模型在Gazebo中的位姿
+使用项目自带的 Pro450 Confirmed Slider Control 页面控制机械臂。滑块只编辑目标，
+点击英文 `Execute` 按钮后才执行；`Speed (%)` 同时控制 Gazebo 轨迹速度和真机速度。
+执行前会检查关节限位、反馈 NaN，并通过 MoveIt 检查插值路径碰撞。
+控制程序还会向 MoveIt 规划场景加入与 Gazebo `z=0` 地面对应的碰撞体；只有固定
+底座 `base` 允许接触地面。Pro450 本体和力控夹爪的 15 个可视部件使用由 DAE
+外形生成的封闭凸碰撞网格（外扩 0.5 mm），不再使用尺寸、位置偏差较大的圆柱和
+方盒近似。默认另外保留 20 mm 地面净空。执行路径按不大于 1 度的关节步长检查，
+因此 link5/link2、夹爪/link2 以及夹爪/地面的中途碰撞会在下发轨迹前被拒绝。
 
 
 打开通信，给脚本添加执行权限
@@ -82,7 +89,58 @@ ros2 run mycobotpro450_gazeboros2 slider_control_gazebo.py
 
 ```
 
-此时便可通过操控joint\_state\_publisher\_gui的滑块来同时操控Gazebo中机械臂模型的位姿了。
+输入 `1` 仅控制 Gazebo（默认、安全）；输入 `2` 同时控制 Gazebo 与真机。
+此时在 `Pro450 Confirmed Slider Control` 页面设置目标角度和 `Speed (%)`，然后点击
+`Execute`。`Randomize Target` 只生成随机目标，不会立即运动，仍需点击 `Execute`
+并通过碰撞校验；`Zero Target` 同样只装载全零目标，确认执行后才回零。
+移动滑块本身不会让机械臂运动；紧急停止使用 `STOP`。
+
+`Force Execute (Sim Only)` 用于核对碰撞模型：它通过独立话题绕过 MoveIt
+碰撞拒绝，但仅允许 Gazebo 模式，速度强制不超过 10%，且仍检查关节限位、
+反馈超时和 NaN。真机模式会在后台强制拒绝该命令。Gazebo 内部物理自碰撞已关闭，
+Force Execute 可能让机器人连杆视觉穿透；它只能用于验证 MoveIt 拒绝结果，不能
+用来验证 ODE 接触力。
+
+机器人自碰撞由 MoveIt 和 `firefighter.srdf` 负责，在轨迹下发前完成。Gazebo 只
+负责机器人与地面、工作台及其他外部物体的物理接触。不要把 link1～link6 的
+`selfCollide` 改回 `true`：力控夹爪的 mimic 机构与安装端凸碰撞包络存在预期重叠，
+ODE 接触约束会与位置控制器互相对抗，表现为夹爪抖动、越过关节限位并拖慢仿真。
+
+`/joint_states` 仅作为 Gazebo 实际反馈，不再作为滑块命令。GUI 的确认目标使用
+`/pro450/slider_targets`，因此不会再由两个 `/joint_states` 发布者形成反馈回路。
+
+真机 IP、端口和坐标读取频率可使用 ROS 参数设置，例如：
+
+```bash
+ros2 run mycobotpro450_gazeboros2 coords_broadcaster.py --ros-args \
+  -p pro450_ip:=192.168.0.232 -p pro450_port:=4500 -p broadcast_rate:=10.0
+
+ros2 run mycobotpro450_gazeboros2 slider_control_gazebo.py --ros-args \
+  -p pro450_ip:=192.168.0.232 -p pro450_port:=4500
+```
+
+仿真地面保护参数可按模型标定结果调整（通常不建议小于 10 mm）：
+
+```bash
+ros2 run mycobotpro450_gazeboros2 slider_control_gazebo.py --ros-args \
+  -p floor_clearance_m:=0.02 -p floor_frame:=world
+```
+
+碰撞网格维护与复核（开发时使用，运行仿真不需要安装这些 Python 依赖）：
+
+```bash
+python3 scripts/generate_collision_hulls.py \
+  config/mycobot_pro_450_force_gripper.urdf \
+  ../../mycobot_description \
+  ../../mycobot_description/urdf/mycobot_pro_450/collision
+
+python3 scripts/validate_collision_hulls.py \
+  config/mycobot_pro_450_force_gripper.urdf \
+  ../../mycobot_description
+```
+
+生成脚本需要 `numpy`、`scipy`、`trimesh` 和 `pycollada`。验证必须显示全部可视顶点
+均位于 watertight 碰撞网格内；视觉模型或原点发生变化后必须重新生成并验证。
 
 
 

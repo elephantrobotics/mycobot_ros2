@@ -1,11 +1,57 @@
 import os
+
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    EmitEvent,
+    IncludeLaunchDescription,
+    LogInfo,
+    RegisterEventHandler,
+    TimerAction,
+)
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
-from moveit_configs_utils.launches import generate_spawn_controllers_launch
+
+
+CONTROLLER_MANAGER_TIMEOUT = "30"
+
+
+def controller_spawner(controller_name):
+    return Node(
+        package="controller_manager",
+        executable="spawner",
+        name=f"spawner_{controller_name}",
+        output="screen",
+        arguments=[
+            controller_name,
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            CONTROLLER_MANAGER_TIMEOUT,
+        ],
+    )
+
+
+def continue_after_success(completed_name, next_action):
+    """Start next_action only when the completed spawner exited successfully."""
+
+    def on_exit(event, _context):
+        if event.returncode == 0:
+            return [next_action]
+
+        reason = (
+            f"Failed to activate {completed_name}: controller spawner exited "
+            f"with code {event.returncode}."
+        )
+        return [
+            LogInfo(msg=f"ERROR: {reason}"),
+            EmitEvent(event=Shutdown(reason=reason)),
+        ]
+
+    return on_exit
 
 def generate_launch_description():
     moveit_config = MoveItConfigsBuilder("firefighter", package_name="mycobotpro450_gazeboros2").to_moveit_configs()
@@ -29,7 +75,12 @@ def generate_launch_description():
         output='screen'
     )
 
-    spawn_controllers = generate_spawn_controllers_launch(moveit_config)
+    # controller_manager can time out when several spawners call its services at
+    # the same time during Gazebo startup.  Bring the controllers up in a strict
+    # order and do not expose the command GUI until every controller is active.
+    joint_state_spawner = controller_spawner("joint_state_broadcaster")
+    arm_spawner = controller_spawner("arm_controller")
+    gripper_spawner = controller_spawner("pro_gripper_controller")
 
     move_group = Node(
         package="moveit_ros_move_group",
@@ -57,11 +108,35 @@ def generate_launch_description():
         ],
     )
 
-    jsp_gui = Node(
-        package='joint_state_publisher_gui',
-        executable='joint_state_publisher_gui',
-        name='joint_state_publisher_gui',
-        parameters=[{'use_sim_time': True}]
+    slider_gui = Node(
+        package='mycobotpro450_gazeboros2',
+        executable='pro450_slider_gui.py',
+        name='pro450_slider_gui',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+    )
+
+    start_arm_after_joint_state = RegisterEventHandler(
+        OnProcessExit(
+            target_action=joint_state_spawner,
+            on_exit=continue_after_success(
+                "joint_state_broadcaster", arm_spawner
+            ),
+        )
+    )
+    start_gripper_after_arm = RegisterEventHandler(
+        OnProcessExit(
+            target_action=arm_spawner,
+            on_exit=continue_after_success("arm_controller", gripper_spawner),
+        )
+    )
+    start_gui_after_gripper = RegisterEventHandler(
+        OnProcessExit(
+            target_action=gripper_spawner,
+            on_exit=continue_after_success(
+                "pro_gripper_controller", slider_gui
+            ),
+        )
     )
 
     return LaunchDescription([
@@ -70,7 +145,9 @@ def generate_launch_description():
         spawn_entity,
         move_group,
         rviz,
-        jsp_gui,
-        TimerAction(period=3.0, actions=[spawn_controllers])
+        start_arm_after_joint_state,
+        start_gripper_after_arm,
+        start_gui_after_gripper,
+        TimerAction(period=3.0, actions=[joint_state_spawner]),
     ])
 

@@ -1,286 +1,590 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Validated Pro450 slider-command bridge for Gazebo and optional real hardware."""
+
 import math
-import time
-import threading
 import queue
+import threading
+import time
+
 import rclpy
+from builtin_interfaces.msg import Duration
+from geometry_msgs.msg import Point, Pose
+from moveit_msgs.msg import (
+    AllowedCollisionEntry,
+    CollisionObject,
+    PlanningScene,
+    PlanningSceneComponents,
+)
+from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Empty, String
+from shape_msgs.msg import SolidPrimitive
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from builtin_interfaces.msg import Duration
-from geometry_msgs.msg import Point
+
 from pymycobot import Pro450Client
 
-PRO450_IP = "192.168.0.232"
-PRO450_PORT = 4500
 
-JOINT_LIMITS = [
-    (-162, 162), (-125, 125), (-154, 154),
-    (-162, 162), (-162, 162), (-165, 165)
-]
-GRIPPER_LIMITS = (0, 57.3)
-GRIPPER_ID = 14                 
-
-GAZEBO_MIN_POSITION = 0 
-GAZEBO_MAX_POSITION = 57.3
-PRO450_GRIPPER_MIN = 0      
-PRO450_GRIPPER_MAX = 100    
-
-ANGLE_THRESHOLD = 3.0           
-GRIPPER_THRESHOLD = 5.0         
-MAX_COMMAND_RATE = 10.0         
+DEFAULT_PRO450_IP = "192.168.0.232"
+DEFAULT_PRO450_PORT = 4500
 
 ARM_JOINTS = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
 GRIPPER_JOINT = "gripper_controller"
+COMMAND_JOINTS = ARM_JOINTS + [GRIPPER_JOINT]
+JOINT_LIMITS_RAD = [
+    (math.radians(-162), math.radians(162)),
+    (math.radians(-125), math.radians(125)),
+    (math.radians(-154), math.radians(154)),
+    (math.radians(-162), math.radians(162)),
+    (math.radians(-162), math.radians(162)),
+    (math.radians(-165), math.radians(165)),
+    (0.0, 1.0),
+]
+MAX_VELOCITY_RAD_S = [1.0] * 7
+MIN_TRAJECTORY_DURATION = 0.5
+MAX_TRAJECTORY_DURATION = 600.0
+SPLINE_PEAK_VELOCITY_FACTOR = 1.5
+COLLISION_SAMPLE_STEP = math.radians(1.0)
+MAX_COLLISION_SAMPLES = 400
+FORCE_EXECUTE_MAX_SPEED_SCALE = 0.10
+FLOOR_OBJECT_ID = "pro450_ground_safety"
 
-class RobotCommand:
-    def __init__(self, cmd_type, data):
-        self.type = cmd_type
-        self.data = data
 
-def map_gripper_angle_to_pro450(gazebo_angle):
-    gazebo_angle = max(GAZEBO_MIN_POSITION, min(GAZEBO_MAX_POSITION, gazebo_angle))
-    mapped_angle = ((gazebo_angle - GAZEBO_MIN_POSITION) / (GAZEBO_MAX_POSITION - GAZEBO_MIN_POSITION)) * (PRO450_GRIPPER_MAX - PRO450_GRIPPER_MIN) + PRO450_GRIPPER_MIN
-    return int(round(max(PRO450_GRIPPER_MIN, min(PRO450_GRIPPER_MAX, mapped_angle))))
+def estimate_end_effector_height(j2_deg, j3_deg, j4_deg):
+    j2 = math.radians(j2_deg)
+    j3 = math.radians(j3_deg)
+    j4 = math.radians(j4_deg)
+    angle3 = j2 + j3
+    angle4 = angle3 + j4
+    return (
+        0.155
+        + 0.048
+        + 0.18 * math.cos(j2)
+        + 0.1735 * math.cos(angle3)
+        + 0.08 * math.cos(angle4)
+        + 0.17 * math.cos(angle4)
+    )
 
-def estimate_end_effector_height(j2, j3, j4):
-    j2_rad = math.radians(j2)
-    j3_rad = math.radians(j3)
-    j4_rad = math.radians(j4)
-    
-    L1 = 0.048    
-    L2 = 0.18     
-    L3 = 0.1735   
-    L4 = 0.08     
-    L5 = 0.17  
-    angle2 = j2_rad
-    angle3 = angle2 + j3_rad
-    angle4 = angle3 + j4_rad
-
-    height = 0.155 + L1 
-    height += L2 * math.cos(angle2) 
-    height += L3 * math.cos(angle3) 
-    height += L4 * math.cos(angle4) 
-    height += L5 * math.cos(angle4) 
-    return height
 
 class SliderControl(Node):
     def __init__(self, mode):
-        from rclpy.parameter import Parameter
-        if mode == 1:
-            super().__init__('slider_control_gazebo', parameter_overrides=[Parameter('use_sim_time', Parameter.Type.BOOL, True)])
-        else:
-            super().__init__('slider_control_gazebo')
+        super().__init__("slider_control_gazebo")
         self.mode = mode
-        
+
+        self.declare_parameter("pro450_ip", DEFAULT_PRO450_IP)
+        self.declare_parameter("pro450_port", DEFAULT_PRO450_PORT)
+        self.declare_parameter("minimum_real_height_mm", 170.0)
+        # The Pro450 gripper uses irregular visual meshes but simplified
+        # collision boxes.  Keep those boxes above the real Gazebo floor by a
+        # small margin so that the rendered fingertips do not clip through it.
+        self.declare_parameter("floor_clearance_m", 0.02)
+        self.declare_parameter("floor_size_m", 20.0)
+        self.declare_parameter("floor_thickness_m", 0.10)
+        self.declare_parameter("floor_frame", "world")
+        self.pro450_ip = self.get_parameter("pro450_ip").value
+        self.pro450_port = int(self.get_parameter("pro450_port").value)
+        self.minimum_real_height_mm = float(
+            self.get_parameter("minimum_real_height_mm").value
+        )
+        self.floor_clearance_m = max(
+            0.0, float(self.get_parameter("floor_clearance_m").value)
+        )
+        self.floor_size_m = max(1.0, float(self.get_parameter("floor_size_m").value))
+        self.floor_thickness_m = max(
+            0.01, float(self.get_parameter("floor_thickness_m").value)
+        )
+        self.floor_frame = str(self.get_parameter("floor_frame").value)
+
+        self.pub_arm = self.create_publisher(
+            JointTrajectory, "/arm_controller/joint_trajectory", 10
+        )
+        self.pub_gripper = self.create_publisher(
+            JointTrajectory, "/pro_gripper_controller/joint_trajectory", 10
+        )
+        self.status_pub = self.create_publisher(String, "/pro450/slider_status", 10)
+
+        self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
+        self.create_subscription(
+            JointState, "/pro450/slider_targets", self._target_cb, 10
+        )
+        self.create_subscription(
+            JointState, "/pro450/slider_force_targets", self._force_target_cb, 10
+        )
+        self.create_subscription(Empty, "/pro450/slider_stop", self._stop_cb, 10)
+        self.create_subscription(Point, "/pro450/end_effector_coords", self._coords_cb, 10)
+
+        self.validity_client = self.create_client(
+            GetStateValidity, "/check_state_validity"
+        )
+        self.get_scene_client = self.create_client(
+            GetPlanningScene, "/get_planning_scene"
+        )
+        self.apply_scene_client = self.create_client(
+            ApplyPlanningScene, "/apply_planning_scene"
+        )
+
+        self._state_lock = threading.Lock()
+        self._current_positions = None
+        self._feedback_time = 0.0
+        self._feedback_valid = False
+        self._coords = None
+        self._command_active = False
+        self._stop_requested = False
+        self._stop_event = threading.Event()
+
         self.mc = None
-        self.last_angles = None
-        self.last_gripper_angle = None
-        self.last_command_time = 0
-        self.command_queue = queue.Queue(maxsize=5)
-        self.is_stopped = False
-        self.stop_lock = threading.Lock()
-        self.current_end_effector_coords = None
-        self.coords_lock = threading.Lock()
-        
-        if self.mode == 1:
-            self.get_logger().info("Mode 1: Gazebo Sim Only")
-        elif self.mode == 2:
-            self.get_logger().info("Mode 2: Real Robot & Gazebo Sim")
-            if not self.initialize_pro450():
-                self.get_logger().error("Init failed")
-                return
-            
-            threading.Thread(target=self.command_executor, daemon=True).start()
-            threading.Thread(target=self.monitor_height, daemon=True).start()
+        self.command_queue = queue.Queue(maxsize=1)
+        if self.mode == 2:
+            self._initialize_pro450()
+            threading.Thread(target=self._real_robot_worker, daemon=True).start()
+            threading.Thread(target=self._height_monitor, daemon=True).start()
+            self._publish_status("Ready: Real Robot + Gazebo mode.")
+        else:
+            self._publish_status("Ready: Gazebo simulation mode.")
 
-        # 无论在哪个模式下，都创建 Gazebo 的 Publisher 以保证仿真模型联动
-        self.pub_arm = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
-        self.pub_gripper = self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
+    def _publish_status(self, message):
+        self.get_logger().info(message)
+        msg = String()
+        msg.data = message
+        self.status_pub.publish(msg)
 
-        self.create_subscription(JointState, '/joint_states', self.joint_states_cb, 1)
-        self.create_subscription(Point, '/pro450/end_effector_coords', self.coords_cb, 1)
-
-    def initialize_pro450(self):
+    def _initialize_pro450(self):
         try:
-            self.mc = Pro450Client(PRO450_IP, PRO450_PORT)
+            self.get_logger().info(
+                f"Connecting to Pro450 @ {self.pro450_ip}:{self.pro450_port}"
+            )
+            self.mc = Pro450Client(self.pro450_ip, self.pro450_port)
             time.sleep(1.0)
             self.mc.power_on()
             time.sleep(1.0)
-            self.mc.set_servo_calibration(6)
-            time.sleep(0.5)
-            self.get_logger().info(f"Connected, angles: {self.mc.get_angles()}")
-            try: self.mc.get_pro_gripper(1, GRIPPER_ID)
-            except: pass
-            # 移除 self.mc.release_all_servos()，否则滑块控制时实机会掉电软掉，无法执行后续 send_angles 命令
-            time.sleep(0.5)
-            return True
-        except Exception as e:
-            self.get_logger().error(str(e))
-            return False
+            angles = self.mc.get_angles()
+            self.get_logger().info(f"Pro450 connected. Current angles: {angles}")
+        except Exception as exc:
+            self.mc = None
+            raise RuntimeError(f"Unable to initialize Pro450: {exc}") from exc
 
-    def coords_cb(self, msg):
-        with self.coords_lock:
-            self.current_end_effector_coords = msg
-
-    def joint_states_cb(self, msg):
-        arm_deg = [0.0] * 6
-        grip_deg = 0.0
-        name_to_deg = {name: math.degrees(pos) for name, pos in zip(msg.name, msg.position)}
-        
-        for i, joint_name in enumerate(ARM_JOINTS):
-            if joint_name in name_to_deg:
-                arm_deg[i] = round(name_to_deg[joint_name], 1)
-        if GRIPPER_JOINT in name_to_deg:
-            grip_deg = round(name_to_deg[GRIPPER_JOINT], 1)
-
-        for i, (angle, (min_limit, max_limit)) in enumerate(zip(arm_deg, JOINT_LIMITS)):
-            arm_deg[i] = max(min_limit, min(max_limit, angle))
-        grip_deg = max(GRIPPER_LIMITS[0], min(GRIPPER_LIMITS[1], grip_deg))
-
-        current_time = time.time()
-        if current_time - self.last_command_time < 1.0 / MAX_COMMAND_RATE:
+    def _feedback_cb(self, msg):
+        values = dict(zip(msg.name, msg.position))
+        if not all(name in values for name in COMMAND_JOINTS):
             return
-            
-        angle_diff = float('inf')
-        if self.last_angles:
-            angle_diff = sum(abs(a - b) for a, b in zip(arm_deg, self.last_angles))
-        gripper_diff = abs(grip_deg - self.last_gripper_angle) if self.last_gripper_angle is not None else float('inf')
-        
-        if angle_diff < ANGLE_THRESHOLD and gripper_diff < GRIPPER_THRESHOLD:
+        positions = [float(values[name]) for name in COMMAND_JOINTS]
+        velocities = dict(zip(msg.name, msg.velocity)) if len(msg.velocity) == len(msg.name) else {}
+        feedback_valid = all(math.isfinite(value) for value in positions) and all(
+            name in velocities and math.isfinite(float(velocities[name]))
+            for name in COMMAND_JOINTS
+        )
+        with self._state_lock:
+            self._current_positions = positions
+            self._feedback_time = time.monotonic()
+            self._feedback_valid = feedback_valid
+
+    def _coords_cb(self, msg):
+        with self._state_lock:
+            self._coords = (float(msg.x), float(msg.y), float(msg.z))
+
+    def _target_cb(self, msg):
+        self._handle_target(msg, force_collision=False)
+
+    def _force_target_cb(self, msg):
+        if self.mode != 1:
+            self._publish_status(
+                "Rejected: collision override is disabled in Real Robot + Gazebo mode."
+            )
+            return
+        self._handle_target(msg, force_collision=True)
+
+    def _handle_target(self, msg, force_collision):
+        values = dict(zip(msg.name, msg.position))
+        if not all(name in values for name in COMMAND_JOINTS):
+            self._publish_status("Rejected: target message is missing one or more joints.")
             return
 
+        target = [float(values[name]) for name in COMMAND_JOINTS]
+        if not all(math.isfinite(value) for value in target):
+            self._publish_status("Rejected: target contains NaN or infinity.")
+            return
+
+        for name, value, limits in zip(COMMAND_JOINTS, target, JOINT_LIMITS_RAD):
+            if not limits[0] <= value <= limits[1]:
+                self._publish_status(
+                    f"Rejected: {name}={math.degrees(value):.1f} deg is outside its limits."
+                )
+                return
+
+        speed_scale = 0.2
+        if msg.velocity:
+            finite_speeds = [abs(value) for value in msg.velocity if math.isfinite(value)]
+            if finite_speeds:
+                speed_scale = max(finite_speeds)
+        speed_scale = max(0.01, min(1.0, speed_scale))
+        if force_collision:
+            speed_scale = min(speed_scale, FORCE_EXECUTE_MAX_SPEED_SCALE)
+
+        with self._state_lock:
+            if self._command_active:
+                self._publish_status("Rejected: a command is already being validated/executed.")
+                return
+            current = (
+                list(self._current_positions)
+                if self._current_positions is not None
+                else None
+            )
+            feedback_age = time.monotonic() - self._feedback_time
+            feedback_valid = self._feedback_valid
+            self._command_active = True
+            self._stop_requested = False
+            self._stop_event.clear()
+
+        if (
+            current is None
+            or feedback_age > 1.0
+            or not feedback_valid
+        ):
+            with self._state_lock:
+                self._command_active = False
+            self._publish_status(
+                "Rejected: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset simulation."
+            )
+            return
+
+        threading.Thread(
+            target=self._validate_and_execute,
+            args=(current, target, speed_scale, force_collision),
+            daemon=True,
+        ).start()
+
+    def _validate_and_execute(self, current, target, speed_scale, force_collision):
         try:
-            # 同步发布到 Gazebo
-            traj = JointTrajectory()
-            traj.header.stamp = self.get_clock().now().to_msg()
-            traj.joint_names = ARM_JOINTS
-            pt = JointTrajectoryPoint()
-            pt.positions = [math.radians(d) for d in arm_deg]
-            pt.time_from_start = Duration(sec=0, nanosec=200000000)
-            traj.points = [pt]
-            self.pub_arm.publish(traj)
-            
-            traj_g = JointTrajectory()
-            traj_g.header.stamp = self.get_clock().now().to_msg()
-            traj_g.joint_names = [GRIPPER_JOINT]
-            ptg = JointTrajectoryPoint()
-            ptg.positions = [math.radians(grip_deg)]
-            ptg.time_from_start = Duration(sec=0, nanosec=200000000)
-            traj_g.points = [ptg]
-            self.pub_gripper.publish(traj_g)
-            
-            self.last_angles = arm_deg.copy()
-            self.last_gripper_angle = grip_deg
-            self.last_command_time = time.time()
-        except: pass
+            if force_collision:
+                self._publish_status(
+                    "WARNING: simulation-only collision override active; "
+                    "MoveIt collision validation is being skipped."
+                )
+            else:
+                self._publish_status("Validating interpolated path for collisions...")
+                valid, reason = self._path_is_valid(current, target)
+                if not valid:
+                    self._publish_status(f"Rejected: {reason}")
+                    return
 
-        if self.mode == 2:
-            try:
-                self.command_queue.put_nowait(RobotCommand('angles', arm_deg))
-                if gripper_diff >= GRIPPER_THRESHOLD:
-                    self.command_queue.put_nowait(RobotCommand('gripper', grip_deg))
-            except queue.Full:
-                try:
-                    self.command_queue.get_nowait()
-                    self.command_queue.put_nowait(RobotCommand('angles', arm_deg))
-                except: pass
+            if self.mode == 2:
+                target_deg = [math.degrees(value) for value in target[:6]]
+                target_height_mm = 1000.0 * estimate_end_effector_height(
+                    target_deg[1], target_deg[2], target_deg[3]
+                )
+                if target_height_mm < self.minimum_real_height_mm:
+                    self._publish_status(
+                        f"Rejected: estimated real end height {target_height_mm:.1f} mm "
+                        f"is below {self.minimum_real_height_mm:.1f} mm."
+                    )
+                    return
 
-    def command_executor(self):
+            duration = self._trajectory_duration(current, target, speed_scale)
+            if self._stop_requested:
+                self._publish_status("Cancelled before execution.")
+                return
+
+            self._publish_trajectory(target, duration)
+
+            if self.mode == 2:
+                robot_speed = max(1, min(100, round(speed_scale * 100.0)))
+                self._replace_real_command(target, robot_speed)
+
+            execution_kind = "FORCE SIMULATION" if force_collision else "Executing"
+            self._publish_status(
+                f"{execution_kind} at {speed_scale * 100:.0f}% speed; "
+                f"planned duration {duration:.2f} s."
+            )
+            if self._stop_event.wait(duration):
+                self._publish_status("Execution stopped.")
+            else:
+                self._publish_status("Execution complete.")
+        except Exception as exc:
+            self.get_logger().error(f"Slider command failed: {exc}")
+            self._publish_status(f"Execution failed: {exc}")
+        finally:
+            with self._state_lock:
+                self._command_active = False
+
+    def _path_is_valid(self, current, target):
+        floor_ready, floor_reason = self._ensure_floor_collision_scene()
+        if not floor_ready:
+            return False, floor_reason
+
+        if not self.validity_client.wait_for_service(timeout_sec=2.0):
+            return False, "MoveIt /check_state_validity service is unavailable."
+
+        max_delta = max(abs(b - a) for a, b in zip(current, target))
+        sample_count = max(
+            2, min(MAX_COLLISION_SAMPLES, math.ceil(max_delta / COLLISION_SAMPLE_STEP))
+        )
+
+        for index in range(1, sample_count + 1):
+            if self._stop_requested:
+                return False, "STOP requested."
+            ratio = index / sample_count
+            sample = [a + (b - a) * ratio for a, b in zip(current, target)]
+
+            request = GetStateValidity.Request()
+            request.robot_state.is_diff = True
+            request.robot_state.joint_state.name = list(COMMAND_JOINTS)
+            request.robot_state.joint_state.position = sample
+            request.group_name = "arm"
+
+            future = self.validity_client.call_async(request)
+            deadline = time.monotonic() + 2.0
+            while not future.done() and time.monotonic() < deadline:
+                if self._stop_requested:
+                    return False, "STOP requested."
+                time.sleep(0.01)
+            if not future.done():
+                return False, "MoveIt state-validity check timed out."
+            response = future.result()
+            if response is None:
+                return False, "MoveIt state-validity check failed."
+            if not response.valid:
+                detail = ""
+                if response.contacts:
+                    contact = response.contacts[0]
+                    detail = f" ({contact.contact_body_1} vs {contact.contact_body_2})"
+                return False, f"collision detected at {ratio * 100:.0f}% of path{detail}."
+
+        return True, "valid"
+
+    def _wait_for_future(self, future, timeout_sec, operation):
+        deadline = time.monotonic() + timeout_sec
+        while not future.done() and time.monotonic() < deadline:
+            if self._stop_requested:
+                return None, "STOP requested."
+            time.sleep(0.01)
+        if not future.done():
+            return None, f"{operation} timed out."
+        try:
+            response = future.result()
+        except Exception as exc:
+            return None, f"{operation} failed: {exc}"
+        if response is None:
+            return None, f"{operation} failed."
+        return response, ""
+
+    @staticmethod
+    def _ensure_acm_name(acm, name):
+        """Add a symmetric row/column to an AllowedCollisionMatrix."""
+        if name in acm.entry_names:
+            return
+        old_size = len(acm.entry_names)
+        while len(acm.entry_values) < old_size:
+            acm.entry_values.append(AllowedCollisionEntry())
+        for row in acm.entry_values[:old_size]:
+            if len(row.enabled) < old_size:
+                row.enabled.extend([False] * (old_size - len(row.enabled)))
+            elif len(row.enabled) > old_size:
+                del row.enabled[old_size:]
+            row.enabled.append(False)
+        new_row = AllowedCollisionEntry()
+        new_row.enabled = [False] * (old_size + 1)
+        acm.entry_names.append(name)
+        acm.entry_values.append(new_row)
+
+    def _ensure_floor_collision_scene(self):
+        if not self.get_scene_client.wait_for_service(timeout_sec=3.0):
+            return False, "MoveIt /get_planning_scene service is unavailable."
+        if not self.apply_scene_client.wait_for_service(timeout_sec=3.0):
+            return False, "MoveIt /apply_planning_scene service is unavailable."
+
+        get_request = GetPlanningScene.Request()
+        get_request.components.components = (
+            PlanningSceneComponents.ALLOWED_COLLISION_MATRIX
+        )
+        get_future = self.get_scene_client.call_async(get_request)
+        get_response, reason = self._wait_for_future(
+            get_future, 3.0, "Reading MoveIt allowed-collision matrix"
+        )
+        if get_response is None:
+            return False, reason
+
+        scene = PlanningScene()
+        scene.is_diff = True
+        scene.allowed_collision_matrix = get_response.scene.allowed_collision_matrix
+        acm = scene.allowed_collision_matrix
+        self._ensure_acm_name(acm, "base")
+        self._ensure_acm_name(acm, FLOOR_OBJECT_ID)
+
+        base_index = acm.entry_names.index("base")
+        floor_index = acm.entry_names.index(FLOOR_OBJECT_ID)
+        acm.entry_values[base_index].enabled[floor_index] = True
+        acm.entry_values[floor_index].enabled[base_index] = True
+        acm.entry_values[floor_index].enabled[floor_index] = True
+
+        floor = CollisionObject()
+        floor.header.frame_id = self.floor_frame
+        floor.id = FLOOR_OBJECT_ID
+        primitive = SolidPrimitive()
+        primitive.type = SolidPrimitive.BOX
+        primitive.dimensions = [
+            self.floor_size_m,
+            self.floor_size_m,
+            self.floor_thickness_m,
+        ]
+        pose = Pose()
+        pose.orientation.w = 1.0
+        # The collision surface is raised above Gazebo z=0 by the configured
+        # clearance.  Only the fixed base link is allowed to overlap it.
+        pose.position.z = self.floor_clearance_m - self.floor_thickness_m / 2.0
+        floor.primitives = [primitive]
+        floor.primitive_poses = [pose]
+        floor.operation = CollisionObject.ADD
+        scene.world.collision_objects = [floor]
+
+        apply_request = ApplyPlanningScene.Request()
+        apply_request.scene = scene
+        apply_future = self.apply_scene_client.call_async(apply_request)
+        apply_response, reason = self._wait_for_future(
+            apply_future, 3.0, "Applying MoveIt ground collision object"
+        )
+        if apply_response is None:
+            return False, reason
+        if not apply_response.success:
+            return False, "MoveIt rejected the ground collision object."
+
+        self.get_logger().info(
+            f"Installed MoveIt ground safety object in '{self.floor_frame}' "
+            f"with {self.floor_clearance_m * 1000.0:.0f} mm clearance; "
+            "only link 'base' may contact it."
+        )
+        return True, "ready"
+
+    @staticmethod
+    def _trajectory_duration(current, target, speed_scale):
+        durations = []
+        for start, end, maximum in zip(current, target, MAX_VELOCITY_RAD_S):
+            # joint_trajectory_controller uses spline interpolation.  With
+            # zero endpoint velocity, peak speed is about 1.5x the average,
+            # so size the duration for the peak rather than the average.
+            durations.append(
+                SPLINE_PEAK_VELOCITY_FACTOR
+                * abs(end - start)
+                / max(0.01, maximum * speed_scale)
+            )
+        return max(MIN_TRAJECTORY_DURATION, min(MAX_TRAJECTORY_DURATION, max(durations)))
+
+    def _publish_trajectory(self, target, duration):
+        seconds = int(duration)
+        nanoseconds = int((duration - seconds) * 1_000_000_000)
+
+        arm = JointTrajectory()
+        # Keep the header stamp at zero: trajectory controllers interpret this
+        # as "start now".  This avoids mixing wall time from this node with
+        # Gazebo simulation time used by controller_manager.
+        arm.joint_names = list(ARM_JOINTS)
+        arm_point = JointTrajectoryPoint()
+        arm_point.positions = list(target[:6])
+        arm_point.time_from_start = Duration(sec=seconds, nanosec=nanoseconds)
+        arm.points = [arm_point]
+        self.pub_arm.publish(arm)
+
+        gripper = JointTrajectory()
+        gripper.joint_names = [GRIPPER_JOINT]
+        gripper_point = JointTrajectoryPoint()
+        gripper_point.positions = [target[6]]
+        gripper_point.time_from_start = Duration(sec=seconds, nanosec=nanoseconds)
+        gripper.points = [gripper_point]
+        self.pub_gripper.publish(gripper)
+
+    def _replace_real_command(self, target, speed):
+        command = ([math.degrees(value) for value in target[:6]], target[6], speed)
+        try:
+            self.command_queue.get_nowait()
+        except queue.Empty:
+            pass
+        self.command_queue.put_nowait(command)
+
+    def _real_robot_worker(self):
         while rclpy.ok():
             try:
-                try: first_cmd = self.command_queue.get(timeout=0.1)
-                except queue.Empty: continue
-                
-                latest_angles_cmd = first_cmd if first_cmd.type == 'angles' else None
-                latest_gripper_cmd = first_cmd if first_cmd.type == 'gripper' else None
-                
-                while True:
-                    try:
-                        cmd = self.command_queue.get_nowait()
-                        if cmd.type == 'angles': latest_angles_cmd = cmd
-                        elif cmd.type == 'gripper': latest_gripper_cmd = cmd
-                    except queue.Empty: break
-
-                if not self.mc: continue
-
-                if latest_angles_cmd:
-                    j2, j3, j4 = latest_angles_cmd.data[1], latest_angles_cmd.data[2], latest_angles_cmd.data[3]
-                    target_height_m = estimate_end_effector_height(j2, j3, j4)
-                    target_height = target_height_m * 1000
-                    MIN_SAFE_HEIGHT = 170
-
-                    current_height = None
-                    with self.coords_lock:
-                        if self.current_end_effector_coords:
-                            current_height = self.current_end_effector_coords.z
-
-                    if target_height < MIN_SAFE_HEIGHT:
-                        continue 
-                    else:
-                        if current_height is not None and current_height < MIN_SAFE_HEIGHT:
-                            with self.stop_lock:
-                                self.is_stopped = False
-
-                    try:
-                        self.mc.send_angles(latest_angles_cmd.data, 10)
-                        self.last_angles = latest_angles_cmd.data.copy()
-                    except: pass
-                
-                if latest_gripper_cmd:
-                    ga = latest_gripper_cmd.data
-                    ma = map_gripper_angle_to_pro450(ga)
-                    try: self.mc.set_pro_gripper_angle(ma, GRIPPER_ID)
-                    except: pass
-                    self.last_gripper_angle = ga
-                
-                self.last_command_time = time.time()
-            except: pass
-
-    def monitor_height(self):
-        MIN_SAFE_HEIGHT = 170
-        RECOVERY_HEIGHT = 170
-        
-        while rclpy.ok():
+                arm_deg, gripper_rad, speed = self.command_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if self.mc is None or self._stop_requested:
+                continue
             try:
-                with self.coords_lock:
-                    if self.current_end_effector_coords:
-                        end_height = self.current_end_effector_coords.z
-                        if end_height < MIN_SAFE_HEIGHT:
-                            with self.stop_lock:
-                                self.is_stopped = True
-                            try: self.mc.stop()
-                            except: pass
-                        elif end_height >= RECOVERY_HEIGHT:
-                            with self.stop_lock:
-                                self.is_stopped = False
-            except: pass
+                self.mc.send_angles(arm_deg, speed)
+                gripper_value = max(0, min(100, round(gripper_rad * 100.0)))
+                # Pro450Client's force-gripper API takes the requested 0..100
+                # opening value; unlike the serial gripper API it does not
+                # require a Modbus gripper id here.
+                self.mc.set_pro_gripper_angle(gripper_value)
+            except Exception as exc:
+                self._publish_status(f"Real robot command failed: {exc}")
+
+    def _stop_cb(self, _msg):
+        self._stop_requested = True
+        self._stop_event.set()
+        with self._state_lock:
+            current = (
+                list(self._current_positions)
+                if self._current_positions is not None
+                else None
+            )
+            feedback_valid = self._feedback_valid
+        if (
+            feedback_valid
+            and current is not None
+            and all(math.isfinite(value) for value in current)
+        ):
+            self._publish_trajectory(current, MIN_TRAJECTORY_DURATION)
+        if self.mc is not None:
+            try:
+                self.mc.stop()
+            except Exception as exc:
+                self.get_logger().error(f"Real robot STOP failed: {exc}")
+        self._publish_status("STOP applied; controller commanded to hold current position.")
+
+    def _height_monitor(self):
+        while rclpy.ok():
+            with self._state_lock:
+                coords = self._coords
+            if coords is not None and coords[2] < self.minimum_real_height_mm:
+                self._stop_requested = True
+                self._stop_event.set()
+                if self.mc is not None:
+                    try:
+                        self.mc.stop()
+                    except Exception as exc:
+                        self.get_logger().error(f"Automatic height STOP failed: {exc}")
             time.sleep(0.05)
 
 
 def main(args=None):
     print("Select Mode:")
-    print("1: Gazebo Sim")
-    print("2: Real Robot")
-    mode_str = input("Enter 1 or 2 (default 2): ").strip()
-    mode = 1 if mode_str == "1" else 2
+    print("1: Gazebo Simulation (default)")
+    print("2: Real Robot + Gazebo")
+    mode_str = input("Enter 1 or 2 (default 1): ").strip()
+    mode = 2 if mode_str == "2" else 1
 
     rclpy.init(args=args)
-    node = SliderControl(mode)
-    
+    node = None
     try:
+        node = SliderControl(mode)
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+    except Exception as exc:
+        print(f"Failed to start slider controller: {exc}")
     finally:
-        if node.mc:
-            try: node.mc.release_all_servos()
-            except: pass
-        node.destroy_node()
+        if node is not None:
+            if node.mc is not None:
+                try:
+                    # Stop motion but keep servo torque enabled; releasing all
+                    # servos on process exit could let a loaded arm fall.
+                    node.mc.stop()
+                except Exception:
+                    pass
+            node.destroy_node()
         rclpy.try_shutdown()
 
-if __name__ == '__main__':
-    main()
 
+if __name__ == "__main__":
+    main()

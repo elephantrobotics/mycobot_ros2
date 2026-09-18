@@ -16,9 +16,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.10" radius="0.10" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/base_collision.stl" />
             </geometry>
-            <origin xyz="0.0 0.0 0.05" rpy="0 0 1.5708" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="8.0" />
@@ -35,9 +35,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.095" radius="0.043" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link1_collision.stl" />
             </geometry>
-            <origin xyz="0.0 0 0.005" rpy="0 0 1.5708" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="3.5" />
@@ -54,9 +54,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.18" radius="0.020" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link2_collision.stl" />
             </geometry>
-            <origin xyz="0.038 0 0.085" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="2.8" />
@@ -73,9 +73,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.2" radius="0.0205" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link3_collision.stl" />
             </geometry>
-            <origin xyz="-0.04 0.0 0.085" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="2.2" />
@@ -92,9 +92,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.06" radius="0.020" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link4_collision.stl" />
             </geometry>
-            <origin xyz="0.042 -0.0024 0.012" rpy="0 0 1.5708" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="1.2" />
@@ -111,9 +111,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.075" radius="0.019" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link5_collision.stl" />
             </geometry>
-            <origin xyz="0.0 -0.02 0.045" rpy=" -1.5708 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.8" />
@@ -130,9 +130,9 @@
         </visual>
         <collision>
             <geometry>
-                <cylinder length="0.035" radius="0.024" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/link6_collision.stl" />
             </geometry>
-            <origin xyz="0.007 0.0 0" rpy="0 -1.5708  0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.4" />
@@ -149,7 +149,7 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.05 0.05 0.03" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_connection_collision.stl" />
             </geometry>
             <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
@@ -168,9 +168,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.10 0.05 0.035" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_base_collision.stl" />
             </geometry>
-            <origin xyz="0 0.02 -0.015" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.12" />
@@ -189,9 +189,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.02 0.055" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_left1_collision.stl" />
             </geometry>
-            <origin xyz="0 0.025 0" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -209,9 +209,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.055 0.02" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_left2_collision.stl" />
             </geometry>
-            <origin xyz="0 0.025 0" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -230,9 +230,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.055 0.02" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_left3_collision.stl" />
             </geometry>
-            <origin xyz="0 0.025 0" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -251,9 +251,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.02 0.055" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_right1_collision.stl" />
             </geometry>
-            <origin xyz="0 0.025 0" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -272,9 +272,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.055 0.02" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_right2_collision.stl" />
             </geometry>
-            <origin xyz="0 0.025 0" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -293,9 +293,9 @@
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.055 0.02" />
+                <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/collision/gripper_right3_collision.stl" />
             </geometry>
-            <origin xyz="0 0.025 0" rpy="0 0 0" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.02" />
@@ -415,30 +415,30 @@
         <dynamics damping="1.0" friction="0.1" />
     </joint>
     
-    <!-- Gazebo selfCollide declarations (proper location for Gazebo-specific tags) -->
+    <!-- MoveIt handles robot self collision. Gazebo handles external contacts. -->
     <gazebo reference="base">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="link1">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="link2">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="link3">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="link4">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="link5">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="link6">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
     <gazebo reference="gripper_connection">
-        <selfCollide>true</selfCollide>
+        <selfCollide>false</selfCollide>
     </gazebo>
 
     <!-- Gazebo mimic joint plugins for gripper -->
