@@ -16,7 +16,9 @@ install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
 install(PROGRAMS
   scripts/coords_broadcaster.py
   scripts/pro450_slider_gui.py
+  scripts/pro450_pose_gate.py
   scripts/slider_control_gazebo.py
+  scripts/verify_initial_pose.py
   scripts/follow_display_gazebo.py
   scripts/teleop_keyboard_gazebo.py
   DESTINATION lib/${PROJECT_NAME}

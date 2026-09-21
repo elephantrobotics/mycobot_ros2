@@ -19,6 +19,7 @@ from moveit_msgs.msg import (
 )
 from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Empty, String
 from shape_msgs.msg import SolidPrimitive
@@ -75,12 +76,16 @@ def estimate_end_effector_height(j2_deg, j3_deg, j4_deg):
 
 
 class SliderControl(Node):
-    def __init__(self, mode):
+    def __init__(self):
         super().__init__("slider_control_gazebo")
-        self.mode = mode
 
+        self.declare_parameter("mode", "simulation")
         self.declare_parameter("pro450_ip", DEFAULT_PRO450_IP)
         self.declare_parameter("pro450_port", DEFAULT_PRO450_PORT)
+        self.declare_parameter("startup_read_only", True)
+        self.declare_parameter("startup_stable_samples", 5)
+        self.declare_parameter("startup_sample_interval_sec", 0.2)
+        self.declare_parameter("startup_stable_tolerance_deg", 0.2)
         self.declare_parameter("minimum_real_height_mm", 170.0)
         # Keep the MoveIt ground surface coincident with Gazebo's z=0 plane.
         # A positive value is an optional safety margin, not model geometry.
@@ -92,6 +97,24 @@ class SliderControl(Node):
         self.declare_parameter("floor_size_m", 20.0)
         self.declare_parameter("floor_thickness_m", 0.10)
         self.declare_parameter("floor_frame", "world")
+        mode_name = str(self.get_parameter("mode").value).strip().lower()
+        if mode_name not in ("simulation", "real"):
+            raise ValueError("mode must be either 'simulation' or 'real'.")
+        self.mode = 2 if mode_name == "real" else 1
+        self.startup_read_only = bool(
+            self.get_parameter("startup_read_only").value
+        )
+        self.startup_stable_samples = max(
+            2, int(self.get_parameter("startup_stable_samples").value)
+        )
+        self.startup_sample_interval_sec = max(
+            0.05,
+            float(self.get_parameter("startup_sample_interval_sec").value),
+        )
+        self.startup_stable_tolerance_deg = max(
+            0.0,
+            float(self.get_parameter("startup_stable_tolerance_deg").value),
+        )
         self.pro450_ip = self.get_parameter("pro450_ip").value
         self.pro450_port = int(self.get_parameter("pro450_port").value)
         self.minimum_real_height_mm = float(
@@ -117,6 +140,15 @@ class SliderControl(Node):
             JointTrajectory, "/pro_gripper_controller/joint_trajectory", 10
         )
         self.status_pub = self.create_publisher(String, "/pro450/slider_status", 10)
+        snapshot_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.real_snapshot_pub = self.create_publisher(
+            JointState, "/pro450/real_state_snapshot", snapshot_qos
+        )
 
         self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
         self.create_subscription(
@@ -148,12 +180,19 @@ class SliderControl(Node):
         self._stop_event = threading.Event()
 
         self.mc = None
+        self._real_motion_enabled = self.mode == 2 and not self.startup_read_only
         self.command_queue = queue.Queue(maxsize=1)
         if self.mode == 2:
             self._initialize_pro450()
-            threading.Thread(target=self._real_robot_worker, daemon=True).start()
-            threading.Thread(target=self._height_monitor, daemon=True).start()
-            self._publish_status("Ready: Real Robot + Gazebo mode.")
+            if self._real_motion_enabled:
+                threading.Thread(target=self._real_robot_worker, daemon=True).start()
+                threading.Thread(target=self._height_monitor, daemon=True).start()
+                self._publish_status("Ready: Real Robot + Gazebo motion mode.")
+            else:
+                self.create_timer(1.0, self._refresh_read_only_snapshot)
+                self._publish_status(
+                    "Ready: real robot startup is READ ONLY; stable pose snapshot published."
+                )
         else:
             self._publish_status("Ready: Gazebo simulation mode.")
 
@@ -169,14 +208,112 @@ class SliderControl(Node):
                 f"Connecting to Pro450 @ {self.pro450_ip}:{self.pro450_port}"
             )
             self.mc = Pro450Client(self.pro450_ip, self.pro450_port)
-            time.sleep(1.0)
-            self.mc.power_on()
-            time.sleep(1.0)
-            angles = self.mc.get_angles()
-            self.get_logger().info(f"Pro450 connected. Current angles: {angles}")
+            power_state = self.mc.is_power_on()
+            if power_state != 1:
+                raise RuntimeError(
+                    f"robot is not powered and will not be powered automatically "
+                    f"(is_power_on={power_state})"
+                )
+
+            error_code = self.mc.get_error_information()
+            if error_code not in (0, None):
+                raise RuntimeError(f"robot reports error code {error_code}")
+
+            samples = []
+            for index in range(self.startup_stable_samples):
+                moving = self.mc.is_moving()
+                if moving != 0:
+                    raise RuntimeError(
+                        f"robot must be stationary for pose synchronization "
+                        f"(is_moving={moving})"
+                    )
+                angles = self.mc.get_angles()
+                samples.append(self._validate_real_angles(angles))
+                if index + 1 < self.startup_stable_samples:
+                    time.sleep(self.startup_sample_interval_sec)
+
+            for joint_index in range(len(ARM_JOINTS)):
+                values = [sample[joint_index] for sample in samples]
+                if max(values) - min(values) > self.startup_stable_tolerance_deg:
+                    raise RuntimeError(
+                        f"{ARM_JOINTS[joint_index]} did not remain stable during "
+                        "startup sampling"
+                    )
+
+            gripper_value = self.mc.get_pro_gripper_angle()
+            if isinstance(gripper_value, bool) or not isinstance(
+                gripper_value, (int, float)
+            ):
+                raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
+            gripper_value = float(gripper_value)
+            if not math.isfinite(gripper_value) or not 0.0 <= gripper_value <= 100.0:
+                raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
+
+            averaged_angles = [
+                sum(sample[index] for sample in samples) / len(samples)
+                for index in range(len(ARM_JOINTS))
+            ]
+            self._publish_real_snapshot(averaged_angles, gripper_value)
+            self.get_logger().info(
+                "Pro450 connected in read-only startup phase. Stable angles: "
+                f"{averaged_angles}; gripper={gripper_value:.1f}."
+            )
         except Exception as exc:
             self.mc = None
             raise RuntimeError(f"Unable to initialize Pro450: {exc}") from exc
+
+    def _publish_real_snapshot(self, angles_deg, gripper_value):
+        snapshot = JointState()
+        snapshot.header.stamp = self.get_clock().now().to_msg()
+        snapshot.name = list(COMMAND_JOINTS)
+        snapshot.position = [math.radians(value) for value in angles_deg] + [
+            float(gripper_value) / 100.0
+        ]
+        self.real_snapshot_pub.publish(snapshot)
+
+    def _refresh_read_only_snapshot(self):
+        """Refresh the latched pose without issuing any hardware write command."""
+        if self.mc is None or self._real_motion_enabled:
+            return
+        try:
+            moving = self.mc.is_moving()
+            if moving != 0:
+                self.get_logger().warning(
+                    "Real pose snapshot not refreshed because the Pro450 is moving."
+                )
+                return
+            angles = self._validate_real_angles(self.mc.get_angles())
+            gripper_value = self.mc.get_pro_gripper_angle()
+            if isinstance(gripper_value, bool) or not isinstance(
+                gripper_value, (int, float)
+            ):
+                raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
+            gripper_value = float(gripper_value)
+            if not math.isfinite(gripper_value) or not 0.0 <= gripper_value <= 100.0:
+                raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
+            self._publish_real_snapshot(angles, gripper_value)
+        except Exception as exc:
+            self.get_logger().error(f"Read-only Pro450 snapshot refresh failed: {exc}")
+
+    @staticmethod
+    def _validate_real_angles(angles):
+        if not isinstance(angles, (list, tuple)) or len(angles) != len(ARM_JOINTS):
+            raise RuntimeError(f"invalid joint angle response: {angles!r}")
+        result = []
+        for name, raw_value, limits in zip(ARM_JOINTS, angles, JOINT_LIMITS_RAD):
+            if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
+                raise RuntimeError(f"invalid {name} angle: {raw_value!r}")
+            value = float(raw_value)
+            if not math.isfinite(value):
+                raise RuntimeError(f"invalid {name} angle: {raw_value!r}")
+            lower_deg = math.degrees(limits[0])
+            upper_deg = math.degrees(limits[1])
+            if not lower_deg <= value <= upper_deg:
+                raise RuntimeError(
+                    f"{name}={value:.4f} deg is outside [{lower_deg}, {upper_deg}]"
+                )
+            result.append(value)
+        return result
 
     def _feedback_cb(self, msg):
         values = dict(zip(msg.name, msg.position))
@@ -198,6 +335,11 @@ class SliderControl(Node):
             self._coords = (float(msg.x), float(msg.y), float(msg.z))
 
     def _target_cb(self, msg):
+        if self.mode == 2 and not self._real_motion_enabled:
+            self._publish_status(
+                "Rejected: real robot startup is READ ONLY; motion implementation is deferred."
+            )
+            return
         self._handle_target(msg, force_collision=False)
 
     def _force_target_cb(self, msg):
@@ -621,12 +763,19 @@ class SliderControl(Node):
             and all(math.isfinite(value) for value in current)
         ):
             self._publish_trajectory(current, MIN_TRAJECTORY_DURATION)
-        if self.mc is not None:
+        if self.mc is not None and self._real_motion_enabled:
             try:
                 self.mc.stop()
             except Exception as exc:
                 self.get_logger().error(f"Real robot STOP failed: {exc}")
-        self._publish_status("STOP applied; controller commanded to hold current position.")
+        if self.mode == 2 and not self._real_motion_enabled:
+            self._publish_status(
+                "Simulation STOP applied; real robot remains READ ONLY and received no command."
+            )
+        else:
+            self._publish_status(
+                "STOP applied; controller commanded to hold current position."
+            )
 
     def _height_monitor(self):
         while rclpy.ok():
@@ -644,16 +793,10 @@ class SliderControl(Node):
 
 
 def main(args=None):
-    print("Select Mode:")
-    print("1: Gazebo Simulation (default)")
-    print("2: Real Robot + Gazebo")
-    mode_str = input("Enter 1 or 2 (default 1): ").strip()
-    mode = 2 if mode_str == "2" else 1
-
     rclpy.init(args=args)
     node = None
     try:
-        node = SliderControl(mode)
+        node = SliderControl()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
@@ -661,7 +804,7 @@ def main(args=None):
         print(f"Failed to start slider controller: {exc}")
     finally:
         if node is not None:
-            if node.mc is not None:
+            if node.mc is not None and node._real_motion_enabled:
                 try:
                     # Stop motion but keep servo torque enabled; releasing all
                     # servos on process exit could let a loaded arm fall.
