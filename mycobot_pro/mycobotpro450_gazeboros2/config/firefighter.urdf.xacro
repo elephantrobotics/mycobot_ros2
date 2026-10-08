@@ -18,6 +18,13 @@
     <gazebo>
         <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
             <parameters>$(find mycobotpro450_gazeboros2)/config/ros2_controllers.yaml</parameters>
+            <!-- The Gazebo entity is spawned from the namespaced description
+                 publisher because it uses collision_gazebo and, in real-pose
+                 mirror mode, the read-only hardware snapshot.  Do not let the
+                 plugin fall back to the MoveIt robot_state_publisher, whose
+                 ros2_control initial values are the default zero pose. -->
+            <robot_param>robot_description</robot_param>
+            <robot_param_node>/gazebo_spawn/robot_description_publisher</robot_param_node>
         </plugin>
     </gazebo>
 </robot>

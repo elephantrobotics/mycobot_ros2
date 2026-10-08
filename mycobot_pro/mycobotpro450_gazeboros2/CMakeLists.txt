@@ -14,6 +14,7 @@ install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
+  scripts/activate_gazebo_controllers.py
   scripts/coords_broadcaster.py
   scripts/pro450_slider_gui.py
   scripts/pro450_pose_gate.py
@@ -23,5 +24,8 @@ install(PROGRAMS
   scripts/teleop_keyboard_gazebo.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+install(FILES scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
+  DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

@@ -76,6 +76,12 @@ class Pro450PoseGate(Node):
             return
 
         positions = [float(values[name]) for name in COMMAND_JOINTS]
+        if positions[-1] < 0:
+            self.failure_reason = (
+                "Pro450 gripper read failed: negative gripper snapshot; "
+                "Gazebo startup is forbidden")
+            self.get_logger().error(self.failure_reason)
+            return
         if not all(math.isfinite(value) for value in positions):
             self.get_logger().warning("Ignoring non-finite Pro450 pose snapshot.")
             return

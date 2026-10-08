@@ -25,7 +25,10 @@ from std_msgs.msg import Empty, String
 from shape_msgs.msg import SolidPrimitive
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from pymycobot import Pro450Client
+try:
+    from pymycobot import Pro450Client
+except ImportError:
+    Pro450Client = None
 
 
 DEFAULT_PRO450_IP = "192.168.0.232"
@@ -203,6 +206,8 @@ class SliderControl(Node):
         self.status_pub.publish(msg)
 
     def _initialize_pro450(self):
+        if Pro450Client is None:
+            raise RuntimeError("pymycobot is required only for real Pro450 mode")
         try:
             self.get_logger().info(
                 f"Connecting to Pro450 @ {self.pro450_ip}:{self.pro450_port}"
@@ -246,6 +251,10 @@ class SliderControl(Node):
             ):
                 raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
             gripper_value = float(gripper_value)
+            if gripper_value < 0:
+                raise RuntimeError(
+                    f"force-gripper read failed: SDK returned {gripper_value}; "
+                    "Gazebo startup and real motion are blocked")
             if not math.isfinite(gripper_value) or not 0.0 <= gripper_value <= 100.0:
                 raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
 
@@ -289,6 +298,10 @@ class SliderControl(Node):
             ):
                 raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
             gripper_value = float(gripper_value)
+            if gripper_value < 0:
+                raise RuntimeError(
+                    f"force-gripper read failed: SDK returned {gripper_value}; "
+                    "no valid startup snapshot will be published")
             if not math.isfinite(gripper_value) or not 0.0 <= gripper_value <= 100.0:
                 raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
             self._publish_real_snapshot(angles, gripper_value)

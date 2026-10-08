@@ -98,7 +98,7 @@ class InitialPoseVerifier(Node):
             return
         self.success = True
         self.get_logger().info(
-            "Gazebo startup pose verified against the real snapshot; "
+            "Gazebo startup pose verified against the expected pose; "
             f"maximum error {max(errors):.6f} rad."
         )
 

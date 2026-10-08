@@ -8,7 +8,6 @@ from launch.actions import (
     IncludeLaunchDescription,
     LogInfo,
     RegisterEventHandler,
-    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
@@ -32,19 +31,31 @@ CONTROLLER_MANAGER_TIMEOUT = "30"
 DEFAULT_REAL_SNAPSHOT_FILE = "/tmp/mycobotpro450_real_initial_positions.yaml"
 
 
-def controller_spawner(controller_name):
+CONTROLLERS = [
+    "arm_controller",
+    "joint_state_broadcaster",
+    "pro_gripper_controller",
+]
+
+
+def controller_spawner(*, inactive=False):
+    arguments = [
+        *CONTROLLERS,
+        "--controller-manager",
+        "/controller_manager",
+        "--controller-manager-timeout",
+        CONTROLLER_MANAGER_TIMEOUT,
+    ]
+    if inactive:
+        arguments.append("--inactive")
+    else:
+        arguments.append("--activate-as-group")
     return Node(
         package="controller_manager",
         executable="spawner",
-        name=f"spawner_{controller_name}",
+        name="spawner_pro450_controllers",
         output="screen",
-        arguments=[
-            controller_name,
-            "--controller-manager",
-            "/controller_manager",
-            "--controller-manager-timeout",
-            CONTROLLER_MANAGER_TIMEOUT,
-        ],
+        arguments=arguments,
     )
 
 
@@ -72,7 +83,7 @@ def build_simulation_stack(
     moveit_config,
     initial_positions_file,
     pause_gazebo,
-    unpause_before_verify,
+    coordinated_start,
 ):
     """Build one isolated Pro450 Gazebo stack for the selected environment."""
     gazebo_robot_description = {
@@ -139,9 +150,14 @@ def build_simulation_stack(
         output="screen",
     )
 
-    joint_state_spawner = controller_spawner("joint_state_broadcaster")
-    arm_spawner = controller_spawner("arm_controller")
-    gripper_spawner = controller_spawner("pro_gripper_controller")
+    controllers = controller_spawner(inactive=coordinated_start)
+    controller_activator = Node(
+        package="mycobotpro450_gazeboros2",
+        executable="activate_gazebo_controllers.py",
+        name="pro450_controller_activation_coordinator",
+        output="screen",
+        parameters=[{"controllers": CONTROLLERS}],
+    )
     pose_verifier = Node(
         package="mycobotpro450_gazeboros2",
         executable="verify_initial_pose.py",
@@ -154,7 +170,7 @@ def build_simulation_stack(
                 ),
                 "tolerance_rad": LaunchConfiguration("initial_pose_tolerance_rad"),
                 "timeout_sec": LaunchConfiguration("initial_pose_timeout_sec"),
-                "unpause_before_verify": unpause_before_verify,
+                "unpause_before_verify": False,
             }
         ],
     )
@@ -188,46 +204,61 @@ def build_simulation_stack(
         parameters=[{"use_sim_time": True}],
     )
 
-    start_arm_after_joint_state = RegisterEventHandler(
-        OnProcessExit(
-            target_action=joint_state_spawner,
-            on_exit=continue_after_success("joint_state_broadcaster", arm_spawner),
+    if coordinated_start:
+        after_controller_setup = RegisterEventHandler(
+            OnProcessExit(
+                target_action=controllers,
+                on_exit=continue_after_success(
+                    "inactive Pro450 controller configuration",
+                    controller_activator,
+                ),
+            )
         )
-    )
-    start_gripper_after_arm = RegisterEventHandler(
-        OnProcessExit(
-            target_action=arm_spawner,
-            on_exit=continue_after_success("arm_controller", gripper_spawner),
+        after_controller_activation = RegisterEventHandler(
+            OnProcessExit(
+                target_action=controller_activator,
+                on_exit=continue_after_success(
+                    "coordinated Pro450 controller activation",
+                    pose_verifier,
+                ),
+            )
         )
-    )
-    start_verifier_after_gripper = RegisterEventHandler(
-        OnProcessExit(
-            target_action=gripper_spawner,
-            on_exit=continue_after_success(
-                "pro_gripper_controller", pose_verifier
-            ),
+        expose_tools = RegisterEventHandler(
+            OnProcessExit(
+                target_action=pose_verifier,
+                on_exit=continue_after_success(
+                    "Pro450 initial-pose verification",
+                    [move_group, rviz, slider_gui],
+                ),
+            )
         )
-    )
-    expose_tools_after_verification = RegisterEventHandler(
-        OnProcessExit(
-            target_action=pose_verifier,
-            on_exit=continue_after_success(
-                "Pro450 initial-pose verification",
-                [move_group, rviz, slider_gui],
-            ),
+        lifecycle_handlers = [
+            after_controller_setup,
+            after_controller_activation,
+            expose_tools,
+        ]
+    else:
+        # Normal simulation is intentionally not guarded by the real-pose
+        # fail-closed verifier.  The single spawner waits for Gazebo's
+        # controller manager and activates every controller in one update.
+        expose_tools = RegisterEventHandler(
+            OnProcessExit(
+                target_action=controllers,
+                on_exit=continue_after_success(
+                    "grouped Pro450 controller activation",
+                    [move_group, rviz, slider_gui],
+                ),
+            )
         )
-    )
+        lifecycle_handlers = [expose_tools]
 
     return [
         rsp,
         gazebo_description_publisher,
         gazebo,
         spawn_entity,
-        start_arm_after_joint_state,
-        start_gripper_after_arm,
-        start_verifier_after_gripper,
-        expose_tools_after_verification,
-        TimerAction(period=3.0, actions=[joint_state_spawner]),
+        *lifecycle_handlers,
+        controllers,
     ]
 
 
