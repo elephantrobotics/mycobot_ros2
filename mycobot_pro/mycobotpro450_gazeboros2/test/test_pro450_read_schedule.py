@@ -18,7 +18,7 @@ class ReadSdk:
 
     def get_angles(self):
         self.arm_reads += 1
-        return [-90, -120, 120, -90, 90, 0]
+        return list(getattr(self, 'angles', [-90, -120, 120, -90, 90, 0]))
 
     def get_pro_gripper_angle(self, gripper_id=14):
         assert gripper_id == 14
@@ -64,14 +64,56 @@ class ReadScheduleTests(unittest.TestCase):
 
     def test_minus_one_read_reuses_last_valid_gripper(self):
         self.reader()
+        stamp = self.reader.gripper_time
         self.sdk.gripper = -1
         for _ in range(4):
             self.now += .5
             pose = self.reader()
             self.assertEqual(pose[6], .31)
+            self.assertEqual(self.reader.gripper, .31)
+            self.assertEqual(self.reader.gripper_time, stamp)
             self.assertTrue(self.reader.fresh())
         self.assertEqual(self.sdk.gripper_reads, 5)
         self.assertEqual(self.reader.failure_count, 0)
+        self.assertTrue(self.reader.gripper_rejected_minus_one)
+
+    def test_motion_reads_arm_live_and_gripper_from_cache(self):
+        self.reader()
+        arm_reads = self.sdk.arm_reads
+        gripper_reads = self.sdk.gripper_reads
+        self.sdk.angles = [10, -120, 120, -90, 90, 0]
+        self.sdk.gripper = -1
+        self.now += 1.5
+        pose = self.reader(moving=True)
+        self.assertAlmostEqual(pose[0], math.radians(10))
+        self.assertEqual(pose[6], .31)
+        self.assertEqual(self.sdk.arm_reads, arm_reads + 1)
+        self.assertEqual(self.sdk.gripper_reads, gripper_reads)
+        self.assertTrue(self.reader.gripper_from_cache)
+        self.assertTrue(self.reader.fresh())
+
+    def test_transport_tracks_arm_while_moving(self):
+        transport = RealKeyboardTransport(self.sdk, self.reader, lambda _: None,
+            self.reader.limits, clock=lambda: self.now)
+        for i in range(4):
+            self.now = 10 + i * .1
+            transport.cycle()
+        self.assertTrue(transport.arm())
+        self.sdk.moving = 1
+        self.now += .1
+        transport.cycle()
+        arm_reads = self.sdk.arm_reads
+        gripper_reads = self.sdk.gripper_reads
+        for i in range(5):
+            self.now += .1
+            self.sdk.angles = [-90 + i, -120, 120, -90, 90, 0]
+            transport.cycle()
+        self.assertEqual(self.sdk.arm_reads, arm_reads + 5)
+        self.assertEqual(self.sdk.gripper_reads, gripper_reads)
+        self.assertAlmostEqual(transport.pose[0], math.radians(-86))
+        self.assertIsNone(transport.error)
+        self.assertTrue(transport.armed)
+        self.assertIsNotNone(transport.feedback())
 
     def test_minus_one_without_any_valid_value_still_fails(self):
         self.sdk.gripper = -1

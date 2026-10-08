@@ -1,7 +1,7 @@
 """Bounded, single-axis hardware transport. No ROS and no startup writes.
 
-Position-command replacement and firmware braking require hardware acceptance;
-this is not a certified streaming servo or a hardware emergency stop.
+Arm holds use one jog_angle until release or the checked boundary. Gripper
+holds stay finite angle commands. Firmware braking is not a hardware E-stop.
 """
 import math
 import threading
@@ -33,21 +33,49 @@ def sdk_speed_for_rad(velocity, urdf_limit=1.0):
                              SDK_RAD_PER_SPEED)))
 
 
-class RealPoseReader:
-    """Single-owner reads with independent timestamps; never writes to SDK.
+class RosPoseCache:
+    """ROS-side joint cache. Only successful SDK reads are stored."""
 
-    Arm: each owner cycle. Gripper: 2 Hz. Failure: at most two spaced retries,
-    then a 1 s cooldown. A failed/stale gripper blocks the combined pose even
-    if a previous cached value exists. Cache timestamps are never refreshed
-    without a successful physical query.
+    def __init__(self):
+        self.arm = None
+        self.arm_time = None
+        self.gripper = None
+        self.gripper_time = None
+
+    def ready(self):
+        return self.arm is not None and self.gripper is not None
+
+    def store_arm(self, arm, when):
+        self.arm = list(arm)
+        self.arm_time = when
+
+    def store_gripper(self, value, when):
+        self.gripper = float(value)
+        self.gripper_time = when
+
+    def pose(self):
+        return list(self.arm) + [self.gripper]
+
+
+class RealPoseReader:
+    """Single-owner reads with a ROS-side pose cache; never writes to SDK.
+
+    Arm angles are read from the SDK every cycle. While the robot is moving,
+    the gripper opening comes from the cache and the slow gripper query is
+    skipped. A gripper read of -1 is discarded and
+    does not replace the cached opening. Other gripper failures still retry
+    twice, then cool down for 1 s. Cache timestamps change only when a
+    successful reading is stored.
     """
+    supports_motion_cache = True
+
     def __init__(self, sdk, limits, clock=time.monotonic, report=None):
         self.sdk, self.limits, self.clock = sdk, limits, clock
         self.report = report or (lambda _: None)
-        self.arm_time = self.gripper_time = None
-        self.arm = None
-        self.gripper = None
+        self.cache = RosPoseCache()
         self.gripper_valid = False
+        self.gripper_rejected_minus_one = False
+        self.gripper_from_cache = False
         self.next_gripper = 0.0
         self.gripper_period = 0.5
         self.gripper_max_age = 0.8
@@ -56,16 +84,38 @@ class RealPoseReader:
         self.last_raw = None
         self.last_error = ''
 
+    @property
+    def arm(self):
+        return None if self.cache.arm is None else list(self.cache.arm)
+
+    @property
+    def arm_time(self):
+        return self.cache.arm_time
+
+    @property
+    def gripper(self):
+        return self.cache.gripper
+
+    @property
+    def gripper_time(self):
+        return self.cache.gripper_time
+
     def fresh(self):
         now = self.clock()
-        return (self.arm_time is not None and self.gripper_time is not None
-                and self.gripper_valid and now - self.arm_time <= 0.5
-                and now - self.gripper_time <= self.gripper_max_age)
+        if self.cache.arm_time is None or now - self.cache.arm_time > 0.5:
+            return False
+        if not self.gripper_valid or self.cache.gripper is None:
+            return False
+        # Motion skips the gripper query; -1 is refused. Either way the
+        # previous opening stays usable.
+        if self.gripper_from_cache or self.gripper_rejected_minus_one:
+            return True
+        return now - self.cache.gripper_time <= self.gripper_max_age
 
     def force_gripper_read(self):
         self.next_gripper = self.clock()
 
-    def __call__(self):
+    def __call__(self, moving=False):
         raw = self.sdk.get_angles()
         if not isinstance(raw, (list, tuple)) or len(raw) != 6:
             raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
@@ -75,26 +125,35 @@ class RealPoseReader:
         if not all(math.isfinite(v) and lo <= v <= hi
                    for v, (lo, hi) in zip(arm, self.limits[:6])):
             raise RuntimeError(f"Pro450 arm feedback violates joint limits: {raw!r}")
-        self.arm, self.arm_time = arm, self.clock()
+        self.cache.store_arm(arm, self.clock())
+        if moving and self.gripper_valid and self.cache.gripper is not None:
+            self.gripper_from_cache = True
+            return self._combined()
+        self.gripper_from_cache = False
         if self.clock() >= self.next_gripper:
             started = self.clock()
             self.read_count += 1
             self.last_raw = None
             try:
                 self.last_raw = self.sdk.get_pro_gripper_angle(gripper_id=14)
-                if self.last_raw == -1 and self.gripper is not None:
-                    # SDK -1 must not lock motion: keep the last valid opening.
-                    self.gripper_time = self.clock()
-                    self.gripper_valid = True
+                if self.last_raw == -1:
+                    if self.cache.gripper is None:
+                        raise RuntimeError(
+                            "Pro450 gripper read failed: SDK returned -1; "
+                            "Gazebo startup and real motion are blocked")
+                    # Do not store -1. Keep the last successful opening.
+                    self.gripper_rejected_minus_one = True
                     self.retry_count = 0
                     self.next_gripper = self.clock() + self.gripper_period
                     self.report(
-                        f"gripper read returned -1; reusing last valid value "
-                        f"{self.gripper:.3f}, read_elapsed={self.clock() - started:.3f}s")
+                        f"gripper read returned -1; cache unchanged at "
+                        f"{self.cache.gripper:.3f}, "
+                        f"read_elapsed={self.clock() - started:.3f}s")
                     return self._combined()
                 value = valid_gripper_position(self.last_raw)
             except Exception as exc:
                 self.gripper_valid = False
+                self.gripper_rejected_minus_one = False
                 self.failure_count += 1
                 self.retry_count += 1
                 attempt = self.retry_count
@@ -108,8 +167,9 @@ class RealPoseReader:
                     f"total_failures={self.failure_count}, next_read_in={delay:.1f}s")
                 self.report(self.last_error)
                 raise RuntimeError(self.last_error) from exc
-            self.gripper, self.gripper_time = value, self.clock()
+            self.cache.store_gripper(value, self.clock())
             self.gripper_valid = True
+            self.gripper_rejected_minus_one = False
             self.retry_count = 0
             self.success_count += 1
             self.next_gripper = self.clock() + self.gripper_period
@@ -121,14 +181,15 @@ class RealPoseReader:
         return self._combined()
 
     def seed_gripper(self, value):
-        self.gripper, self.gripper_time = float(value), self.clock()
+        self.cache.store_gripper(float(value), self.clock())
         self.gripper_valid = True
+        self.gripper_rejected_minus_one = False
         self.next_gripper = self.clock() + self.gripper_period
 
     def _combined(self):
         if not self.fresh():
             raise RuntimeError(self.last_error or "Pro450 arm/gripper feedback stale")
-        return list(self.arm) + [self.gripper]
+        return self.cache.pose()
 
 
 class RealKeyboardTransport:
@@ -161,6 +222,7 @@ class RealKeyboardTransport:
         self._recovery_samples = 0
         self._recovery_origin = None
         self._last_recovery_read = -1
+        self._interpolation_ready = False
 
     def feedback(self):
         with self.lock:
@@ -201,6 +263,33 @@ class RealKeyboardTransport:
             if lock:
                 self.armed = False
 
+    def _ensure_interpolation_mode(self):
+        """jog_angle is rejected while the controller is in refresh mode."""
+        if self._interpolation_ready:
+            return
+        mode = self.sdk.get_fresh_mode()
+        if mode != 0:
+            switched = self.sdk.set_fresh_mode(0)
+            if isinstance(switched, str) or switched == 0:
+                raise RuntimeError(
+                    f"could not switch to interpolation mode for jog: {switched}")
+        self._interpolation_ready = True
+
+    def _brake_active_motion(self):
+        """Stop an in-flight arm jog at the checked boundary. Keep the arm armed."""
+        with self.lock:
+            self.generation += 1
+            self.command = None
+            if self.motion_sent and self.motion_axis != 6 and self.stop_pending is None:
+                self.stop_pending = False
+
+    def _acquire_pose(self):
+        """During motion, only the gripper opening comes from the ROS cache."""
+        if getattr(self.read_pose, 'supports_motion_cache', False):
+            arm_moving = bool(self.motion_sent or self.moving) and self.motion_axis != 6
+            return self.read_pose(moving=arm_moving)
+        return self.read_pose()
+
     def cycle(self):
         """Only the owner thread calls this; reads and writes cannot overlap."""
         with self.lock:
@@ -223,7 +312,7 @@ class RealKeyboardTransport:
                 self.sdk.stop(deceleration=0 if stop else 1, _async=True)
             self.motion_sent = False
             self.last_signature = None
-        pose = self.read_pose()
+        pose = self._acquire_pose()
         sample_time = getattr(self.read_pose, 'arm_time', None) or self.clock()
         now = self.clock()
         if now - self.last_health >= 1.0:
@@ -265,7 +354,7 @@ class RealKeyboardTransport:
             command = self.command
         if velocities is not None:
             self.publish_pose(pose)
-        if command is None or velocities is None or now - self.last_send < 0.20:
+        if command is None or velocities is None:
             return
         generation, axis, endpoint, velocity, origin, boundary = command
         if any(abs(v) > 1.05 for v in velocities):
@@ -276,21 +365,29 @@ class RealKeyboardTransport:
         # Additional communication/feedback travel reserve beyond the shared
         # mathematical profile. Firmware stop distance still needs calibration.
         reserve = velocity * 0.5 + velocity * velocity / (2 * 1.4) + 0.01
-        safe_boundary = boundary - direction * reserve
-        if direction * (safe_boundary - endpoint) < 0:
-            endpoint = safe_boundary
-        if (direction * (endpoint - pose[axis]) <= 0 or
-                direction * (boundary - endpoint) < 0.01):
+        if axis != 6 and direction * (boundary - pose[axis]) <= reserve:
+            self._brake_active_motion()
             return
-        lo, hi = self.limits[axis]
-        if not lo <= endpoint <= hi:
-            raise RuntimeError("target outside URDF")
-        # Bound every command even if feedback/GUI subsequently stops arriving.
-        endpoint = pose[axis] + max(-0.08, min(0.08, endpoint - pose[axis]))
+        if now - self.last_send < 0.20:
+            return
         speed = sdk_speed_for_rad(velocity)
         if axis != 6 and speed == 0:
             return
-        signature = (axis, round(endpoint, 4), speed)
+        if axis == 6:
+            safe_boundary = boundary - direction * reserve
+            if direction * (safe_boundary - endpoint) < 0:
+                endpoint = safe_boundary
+            if (direction * (endpoint - pose[axis]) <= 0 or
+                    direction * (boundary - endpoint) < 0.01):
+                return
+            lo, hi = self.limits[axis]
+            if not lo <= endpoint <= hi:
+                raise RuntimeError("target outside URDF")
+            endpoint = pose[axis] + max(-0.08, min(0.08, endpoint - pose[axis]))
+            signature = ('gripper', round(endpoint, 4), speed)
+        else:
+            # SDK direction: 1 increases, 0 decreases. One jog runs until stop.
+            signature = ('jog', axis + 1, 1 if direction > 0 else 0, speed)
         with self.lock:
             if (generation != self.generation or not self.armed or self.error
                     or self.stop_pending is not None):
@@ -307,8 +404,8 @@ class RealKeyboardTransport:
                     return
             result = self.sdk.set_pro_gripper_angle(round(endpoint * 100))
         else:
-            result = self.sdk.send_angle(axis + 1, math.degrees(endpoint), speed,
-                                         _async=True)
+            self._ensure_interpolation_mode()
+            result = self.sdk.jog_angle(signature[1], signature[2], speed, _async=True)
         if isinstance(result, str) or result == 0:
             raise RuntimeError(f"SDK rejected motion: {result}")
         self.last_send, self.last_signature = now, signature

@@ -48,6 +48,8 @@ MAX_FEEDBACK_AGE = 1.0
 SETTLE_TOLERANCE = math.radians(1.0)
 MIRROR_TOLERANCE = math.radians(3.0)
 HOLD_VALIDATION_ADVANCE = 0.55
+# First check is short so motion starts quickly; later checks extend it.
+HOLD_FIRST_VALIDATION_ADVANCE = 0.15
 HOLD_VALIDATION_TRIGGER = 0.35
 HOLD_COLLISION_MARGIN = 0.01
 HOLD_MAX_ACCELERATION = 1.40
@@ -124,11 +126,14 @@ class TeleopKeyboard(Node):
         self._hold_velocity = 0.0
         self._hold_validated_limit = None
         self._hold_validation_pending = False
+        self._hold_first_validation = False
         self._hold_validation_worker = None
         self._hold_generation = 0
         self._hold_last_tick = time.monotonic()
         self._hold_speed_gear = DEFAULT_HOLD_SPEED_GEAR
         self._real_braking = False
+        self._releasing_axis = None
+        self._brake_since = 0.0
 
         if self.mode == "real":
             qos = QoSProfile(
@@ -462,10 +467,17 @@ class TeleopKeyboard(Node):
         positions, velocities = feedback
         with self._hold_lock:
             if self._hold_axis is not None:
+                if self._hold_axis == axis and self._hold_direction == direction:
+                    # Auto-repeat presses the held key again. Keep moving.
+                    self._hold_pressed = True
+                    self._hold_pending = None
+                    self._real_braking = False
+                    return "accepted: hold continues"
                 self._hold_pressed = False
                 self._hold_pending = (axis, direction)
                 return "queued: braking before changing direction or joint"
-        if any(abs(value) > 0.02 for value in velocities):
+        if self._hold_axis is None and self.mode != "real" and any(
+                abs(value) > 0.02 for value in velocities):
             return "rejected: wait for the previous motion to settle"
         with self._hold_lock:
             self._hold_axis = axis
@@ -478,18 +490,29 @@ class TeleopKeyboard(Node):
             self._hold_generation += 1
             self._hold_last_tick = time.monotonic()
             self._real_braking = False
+            self._releasing_axis = None
+            self._brake_since = 0.0
             self._hold_validation_origin = list(positions)
+            self._hold_first_validation = True
         self._request_hold_clearance(positions)
         return "accepted: checking collision clearance"
 
     def release_hold(self):
-        """Key-up or focus loss: request a deceleration, not an emergency hold."""
+        """Key-up or focus loss. Real mode stops quickly and accepts the next key."""
         with self._hold_lock:
+            released_axis = self._hold_axis
             self._hold_pending = None
             if self._hold_axis is not None:
                 self._hold_pressed = False
+            if self.mode == "real":
+                # Do not wait for measured standstill. The next key must be able
+                # to start while firmware is still slowing the previous jog.
+                self._releasing_axis = released_axis
+                self._brake_since = time.monotonic()
+                self._hold_axis = None
+                self._hold_velocity = 0.0
         if self.mode == "real" and self.real_transport is not None:
-            self.real_transport.stop(emergency=False)
+            self.real_transport.stop(emergency=True)
             self._real_braking = True
 
     def hold_idle(self):
@@ -504,8 +527,11 @@ class TeleopKeyboard(Node):
             direction = self._hold_direction
             generation = self._hold_generation
             low, high = JOINT_LIMITS_RAD[axis]
-            candidate = max(low, min(high,
-                current[axis] + direction * HOLD_VALIDATION_ADVANCE))
+            advance = (HOLD_FIRST_VALIDATION_ADVANCE
+                       if getattr(self, "_hold_first_validation", False)
+                       else HOLD_VALIDATION_ADVANCE)
+            self._hold_first_validation = False
+            candidate = max(low, min(high, current[axis] + direction * advance))
             joint_boundary = high if direction > 0 else low
             if (abs(candidate - joint_boundary) <= 1e-6 and
                     abs(self._hold_validated_limit - joint_boundary) <= 1e-6):
@@ -574,7 +600,12 @@ class TeleopKeyboard(Node):
                 velocity = self._hold_velocity
                 pressed = self._hold_pressed
             if origin is not None and pressed:
-                self.real_transport.submit(axis, endpoint, velocity, origin, boundary)
+                # Arm jog uses the selected gear immediately. A ramping speed
+                # would restart the jog on every gear step.
+                command_speed = (self._hold_speed_limit(axis)
+                                 if axis != 6 else velocity)
+                self.real_transport.submit(
+                    axis, endpoint, command_speed, origin, boundary)
             return
         # Position-only JTC points interpolate linearly. Bound their requested
         # average speed even if a future gear change bypasses the table guard.
@@ -619,6 +650,9 @@ class TeleopKeyboard(Node):
 
         feedback = self._fresh_feedback()
         if feedback is None:
+            # A slow read while the key is already up must not latch the M lock.
+            if self.mode == "real" and not pressed:
+                return
             self.stop()
             self.get_logger().error("Hold stopped: Gazebo feedback was lost.")
             return
@@ -633,7 +667,14 @@ class TeleopKeyboard(Node):
                 return
             with self._hold_lock:
                 origin = getattr(self, "_hold_validation_origin", positions)
-            if any(abs(positions[j] - origin[j]) > 0.005 for j in range(7) if j != axis):
+                releasing = getattr(self, "_releasing_axis", None)
+                brake_age = time.monotonic() - getattr(self, "_brake_since", 0.0)
+            if brake_age >= 0.40:
+                releasing = None
+            skipped = {axis}
+            if releasing is not None:
+                skipped.add(releasing)
+            if any(abs(positions[j] - origin[j]) > 0.005 for j in range(7) if j not in skipped):
                 self.stop()
                 self.get_logger().error("Real motion stopped: validated corridor changed.")
                 return
@@ -696,6 +737,51 @@ JOINT_KEYS = {"w": (0, 1), "s": (0, -1), "e": (1, 1), "d": (1, -1),
               "y": (4, 1), "h": (4, -1), "u": (5, 1), "j": (5, -1)}
 
 
+def hold_release_action(still_down):
+    """Decide a KeyRelease from the physical key state, not the repeat rate.
+
+    True means the key is still down, so an auto-repeat release is ignored.
+    False means the key is up and the hold must stop. None means the state
+    could not be read and the caller may use a short debounce.
+    """
+    if still_down is True:
+        return "ignore"
+    if still_down is False:
+        return "release"
+    return "debounce"
+
+
+class X11KeyState:
+    """Read the live X11 keymap. Auto-repeat does not clear a held key."""
+
+    def __init__(self):
+        self._lib = None
+        self._display = None
+        self._failed = False
+
+    def down(self, keycode):
+        import ctypes
+        keycode = int(keycode or 0)
+        if keycode <= 0 or keycode >= 256 or self._failed:
+            return None
+        if self._lib is None:
+            try:
+                self._lib = ctypes.CDLL("libX11.so.6")
+                self._lib.XOpenDisplay.restype = ctypes.c_void_p
+                self._lib.XQueryKeymap.argtypes = [
+                    ctypes.c_void_p, ctypes.POINTER(ctypes.c_ubyte)]
+                self._display = self._lib.XOpenDisplay(None)
+            except Exception:
+                self._failed = True
+                return None
+            if not self._display:
+                self._failed = True
+                return None
+        keys = (ctypes.c_ubyte * 32)()
+        self._lib.XQueryKeymap(self._display, keys)
+        return bool(keys[keycode // 8] & (1 << (keycode % 8)))
+
+
 class SimulationHoldWindow:
     """Small Qt window that supplies real press/release events to the node."""
 
@@ -729,6 +815,8 @@ class SimulationHoldWindow:
         self.Qt = Qt
         self.closing = False
         self.pressed_code = None
+        self.pressed_scan = 0
+        self.key_state = X11KeyState()
         self.window = Window(self)
         real = getattr(node, "mode", "simulation") == "real"
         self.window.setWindowTitle("Pro450 Real Hold Control" if real else
@@ -757,7 +845,7 @@ class SimulationHoldWindow:
         self.release_timer = QTimer(self.window)
         self.release_timer.setSingleShot(True)
         self.release_timer.setInterval(70)
-        self.release_timer.timeout.connect(self.release)
+        self.release_timer.timeout.connect(self._release_if_key_up)
 
     def show(self):
         self.window.show()
@@ -767,7 +855,18 @@ class SimulationHoldWindow:
     def release(self):
         self.release_timer.stop()
         self.pressed_code = None
+        self.pressed_scan = 0
         self.node.release_hold()
+
+    def _release_if_key_up(self):
+        """Debounce fallback only. A key that is still down keeps moving."""
+        if hold_release_action(self.key_state.down(self.pressed_scan)) == "ignore":
+            self.release_timer.stop()
+            return
+        self.release()
+        ready = getattr(self.node, "mode", "") == "real"
+        self.status.setText("Ready: hold a key to move." if ready
+                            else "Key released: decelerating.")
 
     def request_exit(self, source):
         self.closing = True
@@ -777,8 +876,8 @@ class SimulationHoldWindow:
             self.window.close()
 
     def key_press(self, event):
-        if event.key() == self.pressed_code and self.release_timer.isActive():
-            # X11 may synthesize release/press pairs for auto-repeat.
+        if event.key() == self.pressed_code:
+            # The held key's auto-repeat is another press, not a new joint.
             self.release_timer.stop()
             return
         if event.isAutoRepeat():
@@ -825,16 +924,32 @@ class SimulationHoldWindow:
         result = self.node.press_hold(axis, direction)
         if result.startswith("rejected"):
             self.pressed_code = None
+            self.pressed_scan = 0
         else:
             self.pressed_code = event.key()
+            self.pressed_scan = int(event.nativeScanCode() or 0)
         self.status.setText(f"Joint {axis + 1}: {result}.")
 
     def key_release(self, event):
         if event.isAutoRepeat():
             return
-        if event.key() == self.pressed_code:
-            self.release_timer.start()
-            self.status.setText("Key release detected: decelerating after debounce.")
+        if event.key() != self.pressed_code:
+            return
+        scan = int(event.nativeScanCode() or self.pressed_scan or 0)
+        action = hold_release_action(self.key_state.down(scan))
+        if action == "ignore":
+            # Linux auto-repeat emits KeyRelease while the key remains down.
+            self.release_timer.stop()
+            return
+        if action == "release":
+            self.release()
+            ready = getattr(self.node, "mode", "") == "real"
+            self.status.setText("Ready: hold a key to move." if ready
+                                else "Key released: decelerating.")
+            return
+        self.pressed_scan = scan
+        self.release_timer.start()
+        self.status.setText("Key release detected: decelerating after debounce.")
 
     def tick(self):
         try:

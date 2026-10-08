@@ -48,6 +48,21 @@ class FakePro450:
     def get_pro_gripper_angle(self, gripper_id=14):
         return self.pose[6] * 100
 
+    def get_fresh_mode(self):
+        return 0
+
+    def set_fresh_mode(self, mode):
+        self.calls.append(('fresh', mode))
+        return 1
+
+    def jog_angle(self, joint_id, direction, speed, _async=True):
+        self.update()
+        self.calls.append(('jog', joint_id, direction, speed))
+        sign = 1 if direction == 1 else -1
+        self.goal = (joint_id - 1, self.pose[joint_id - 1] + sign * 100)
+        self.speed = math.radians(1.5 * speed)
+        return 1
+
     def send_angle(self, joint_id, angle, speed, _async=False):
         self.update()
         self.calls.append(('angle', joint_id, angle, speed))
@@ -116,11 +131,12 @@ def main():
             after = node._fresh_feedback()[0][2]
             assert direction * (after - before) > .003, (direction, before, after)
             assert node.hold_idle(), 'release did not settle'
-        goals = [call for call in node.mc.calls if call[0] == 'angle']
-        assert goals and all(call[1] == 3 and 1 <= call[3] <= 4 for call in goals), goals
+        goals = [call for call in node.mc.calls if call[0] == 'jog']
+        assert goals and all(call[1] == 3 and call[2] in (0, 1) and 1 <= call[3] <= 4
+                             for call in goals), goals
         assert all(abs(node._fresh_feedback()[0][i] - start[i]) < .001
                    for i in range(7) if i != 2), 'other hardware joint changed'
-        assert ('stop', 1) in node.mc.calls, node.mc.calls
+        assert ('stop', 0) in node.mc.calls, node.mc.calls
         result = node.press_hold(6, 1)
         assert result.startswith('rejected'), 'uncalibrated real gripper was enabled'
         node.stop()

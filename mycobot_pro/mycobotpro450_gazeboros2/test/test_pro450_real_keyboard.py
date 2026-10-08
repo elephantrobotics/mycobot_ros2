@@ -22,6 +22,17 @@ class FakeSDK:
     def get_error_information(self):
         return 0
 
+    def get_fresh_mode(self):
+        return 0
+
+    def set_fresh_mode(self, mode):
+        self.calls.append(('fresh', mode))
+        return 1
+
+    def jog_angle(self, joint_id, direction, speed, _async=True):
+        self.calls.append(('jog', joint_id, direction, speed, _async))
+        return 1
+
     def send_angle(self, axis, angle, speed, _async=False):
         self.calls.append(('angle', axis, angle, speed, _async))
         return 1
@@ -67,12 +78,26 @@ class TransportTests(unittest.TestCase):
         self.transport.cycle()
         self.assertEqual(self.sdk.calls, [])
 
-    def test_single_axis_speed_mapping_and_finite_endpoint(self):
+    def test_arm_hold_jogs_once_at_gear_speed(self):
         self.command()
-        call = self.sdk.calls[0]
-        self.assertEqual(call[0:2], ('angle', 3))
-        self.assertEqual(call[3:], (8, True))
-        self.assertLessEqual(math.radians(call[2]), .08)
+        self.assertEqual(self.sdk.calls, [('jog', 3, 1, 8, True)])
+        self.now += .3
+        self.transport.submit(2, self.sdk.pose[2] + 0.2, math.radians(12),
+                              self.sdk.pose, self.sdk.pose[2] + 0.5)
+        self.transport.cycle()
+        self.assertEqual(len(self.sdk.calls), 1)
+
+    def test_jog_stops_inside_checked_boundary(self):
+        self.command()
+        for step in range(1, 6):
+            self.sdk.pose[2] = 0.09 * step
+            self.now += .25
+            origin = list(self.sdk.pose)
+            origin[2] = 0.0
+            self.transport.submit(2, 0.5, math.radians(12), origin, 0.5)
+            self.transport.cycle()
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls[-1], ('stop', 1))
 
     def test_release_uses_decelerating_stop_and_invalidates_command(self):
         self.command()
