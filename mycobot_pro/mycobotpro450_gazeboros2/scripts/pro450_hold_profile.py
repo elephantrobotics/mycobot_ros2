@@ -87,3 +87,114 @@ def hold_setpoint(position, actual_velocity, command_velocity, direction,
         endpoint = safe_limit
         velocity = 0.0
     return endpoint, velocity, duration
+
+
+def absolute_samples(start, goal, step):
+    """Absolute grid points from just beyond ``start`` through ``goal``."""
+    if step <= 0:
+        raise ValueError("grid step must be positive")
+    direction = 1 if goal >= start else -1
+    if direction * (goal - start) <= 1e-12:
+        return
+    if direction > 0:
+        point = (math.floor(start / step) + 1) * step
+        while point < goal - 1e-12:
+            yield point
+            point += step
+    else:
+        point = (math.ceil(start / step) - 1) * step
+        while point > goal + 1e-12:
+            yield point
+            point -= step
+    yield goal
+
+
+def collision_stop_angle(start, goal, margin, grid, fine, blocked):
+    """Stop angle for one joint, independent of when the scan is started.
+
+    ``blocked(angle)`` is true when that angle is in collision. Samples lie on
+    a fixed absolute grid. The first blocked sample brackets the boundary, and
+    bisection refines it. A clear path returns ``goal``. No travel room returns
+    ``start``.
+    """
+    if grid <= 0 or fine <= 0 or margin < 0:
+        raise ValueError("invalid collision scan settings")
+    if not all(math.isfinite(value) for value in (start, goal, margin, grid, fine)):
+        raise ValueError("non-finite collision scan input")
+    direction = 1 if goal >= start else -1
+    if direction * (goal - start) <= 1e-9:
+        return start
+    if blocked(start):
+        return start
+    # Ten grid steps per probe keeps a full-range scan inside a short press.
+    # The bracket is still absolute, so the refined boundary does not depend
+    # on the exact start angle.
+    last_free = start
+    hit = None
+    for sample in absolute_samples(start, goal, grid * 10):
+        if blocked(sample):
+            hit = sample
+            break
+        last_free = sample
+    if hit is None:
+        return goal
+    while abs(hit - last_free) > fine:
+        mid = (hit + last_free) / 2.0
+        if blocked(mid):
+            hit = mid
+        else:
+            last_free = mid
+    target = hit - direction * margin
+    if direction * (target - start) < 0:
+        target = start
+    if direction * (target - goal) > 0:
+        target = goal
+    return target
+
+
+def trapezoid_samples(start, goal, speed, acceleration, period=0.05):
+    """Sample one trapezoid from ``start`` to ``goal``.
+
+    Returns ``(times, positions)`` in seconds from the start of the move.
+    ``speed`` and ``acceleration`` are positive magnitudes.
+    """
+    if speed <= 0 or acceleration <= 0 or period <= 0:
+        raise ValueError("trapezoid rates must be positive")
+    if not all(math.isfinite(value) for value in (start, goal, speed, acceleration, period)):
+        raise ValueError("non-finite trapezoid input")
+    distance = abs(goal - start)
+    direction = 1 if goal >= start else -1
+    if distance <= 1e-9:
+        return [0.0], [start]
+    accel_time = speed / acceleration
+    accel_distance = 0.5 * acceleration * accel_time * accel_time
+    if 2.0 * accel_distance >= distance:
+        accel_time = math.sqrt(distance / acceleration)
+        cruise_time = 0.0
+        peak = acceleration * accel_time
+    else:
+        cruise_time = (distance - 2.0 * accel_distance) / speed
+        peak = speed
+
+    def traveled(elapsed):
+        if elapsed <= accel_time:
+            return 0.5 * acceleration * elapsed * elapsed
+        if elapsed <= accel_time + cruise_time:
+            return (0.5 * acceleration * accel_time * accel_time +
+                    peak * (elapsed - accel_time))
+        decel = elapsed - accel_time - cruise_time
+        return (0.5 * acceleration * accel_time * accel_time +
+                peak * cruise_time +
+                peak * decel - 0.5 * acceleration * decel * decel)
+
+    total = 2.0 * accel_time + cruise_time
+    times = []
+    positions = []
+    elapsed = 0.0
+    while elapsed < total - 1e-9:
+        times.append(elapsed)
+        positions.append(start + direction * traveled(elapsed))
+        elapsed += period
+    times.append(total)
+    positions.append(goal)
+    return times, positions

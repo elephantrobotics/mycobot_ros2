@@ -22,6 +22,7 @@ install(PROGRAMS
   scripts/verify_initial_pose.py
   scripts/follow_display_gazebo.py
   scripts/teleop_keyboard_gazebo.py
+  scripts/calibrate_pro450_hold_speed.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

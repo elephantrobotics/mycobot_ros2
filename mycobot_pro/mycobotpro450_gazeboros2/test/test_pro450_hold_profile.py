@@ -6,7 +6,9 @@ import unittest
 import math
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from pro450_hold_profile import PositionVelocityEstimator, hold_setpoint  # noqa: E402
+from pro450_hold_profile import (  # noqa: E402
+    PositionVelocityEstimator, collision_stop_angle, hold_setpoint, trapezoid_samples,
+)
 
 
 class HoldProfileTests(unittest.TestCase):
@@ -104,6 +106,37 @@ class HoldProfileTests(unittest.TestCase):
         self.assertGreater(endpoint, 0.0)
         self.assertLessEqual(command_velocity, speed)
         self.assertLessEqual(endpoint / duration, urdf_velocity_limit)
+
+
+class CollisionStopTests(unittest.TestCase):
+    def test_same_boundary_from_different_starts(self):
+        blocked = lambda angle: angle <= -0.40
+
+        def stop(start):
+            return collision_stop_angle(
+                start, -1.5, math.radians(1.0), math.radians(1.0),
+                math.radians(0.05), blocked)
+
+        first = stop(0.0)
+        second = stop(-0.15)
+        self.assertAlmostEqual(first, second, delta=math.radians(0.05))
+        self.assertGreater(first, -0.40)
+        self.assertLess(first, -0.40 + math.radians(1.0) + math.radians(0.05))
+
+    def test_clear_path_stops_at_the_limit(self):
+        goal = collision_stop_angle(0.2, 1.0, 0.02, 0.02, 0.001, lambda _angle: False)
+        self.assertEqual(goal, 1.0)
+
+    def test_no_room_stays_put(self):
+        self.assertEqual(
+            collision_stop_angle(0.0, 0.0, 0.02, 0.02, 0.001, lambda _angle: False),
+            0.0)
+
+    def test_trapezoid_ends_on_the_goal_at_the_requested_speed(self):
+        times, positions = trapezoid_samples(0.0, 1.0, 0.2, 1.4, period=0.05)
+        self.assertEqual(positions[-1], 1.0)
+        self.assertGreater(times[-1], 1.0)
+        self.assertLess(times[-1], 1.0 / 0.2 + 2.0 * 0.2 / 1.4)
 
 
 if __name__ == "__main__":

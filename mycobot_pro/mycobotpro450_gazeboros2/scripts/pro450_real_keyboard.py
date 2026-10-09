@@ -1,7 +1,10 @@
 """Bounded, single-axis hardware transport. No ROS and no startup writes.
 
-Arm holds use one jog_angle until release or the checked boundary. Gripper
-holds stay finite angle commands. Firmware braking is not a hardware E-stop.
+Arm holds jog until the collision scan finishes, then stops that jog and
+sends one send_angle to the same stop angle the simulation tracks. A gripper
+hold sends one opening command at the keyboard gear's SDK speed. Release
+stops the arm, or writes the measured gripper opening.
+Firmware braking is not a hardware E-stop.
 """
 import math
 import threading
@@ -215,6 +218,7 @@ class RealKeyboardTransport:
         self.estimator = PositionVelocityEstimator(window=0.25)
         self.last_send = 0.0
         self.last_signature = None
+        self._gripper_speed_sent = None
         self.command_time = 0.0
         self.moving = True
         self.last_health = 0.0
@@ -223,6 +227,7 @@ class RealKeyboardTransport:
         self._recovery_origin = None
         self._last_recovery_read = -1
         self._interpolation_ready = False
+        self._handoff_pending = False
 
     def feedback(self):
         with self.lock:
@@ -246,12 +251,13 @@ class RealKeyboardTransport:
             self.armed = True
             return True
 
-    def submit(self, axis, endpoint, velocity, origin, validated_limit):
+    def submit(self, axis, endpoint, velocity, origin, validated_limit,
+               position_goal=False):
         with self.lock:
             if not self.armed or self.error or self.stop_pending is not None:
                 return False
             self.command = (self.generation, axis, endpoint, abs(velocity),
-                            list(origin), validated_limit)
+                            list(origin), validated_limit, bool(position_goal))
             self.command_time = self.clock()
             return True
 
@@ -259,6 +265,7 @@ class RealKeyboardTransport:
         with self.lock:
             self.generation += 1
             self.command = None
+            self._handoff_pending = False
             self.stop_pending = bool(emergency) or bool(self.stop_pending)
             if lock:
                 self.armed = False
@@ -312,6 +319,7 @@ class RealKeyboardTransport:
                 self.sdk.stop(deceleration=0 if stop else 1, _async=True)
             self.motion_sent = False
             self.last_signature = None
+            self._gripper_speed_sent = None
         pose = self._acquire_pose()
         sample_time = getattr(self.read_pose, 'arm_time', None) or self.clock()
         now = self.clock()
@@ -356,35 +364,58 @@ class RealKeyboardTransport:
             self.publish_pose(pose)
         if command is None or velocities is None:
             return
-        generation, axis, endpoint, velocity, origin, boundary = command
-        if any(abs(v) > 1.05 for v in velocities):
-            raise RuntimeError("measured speed exceeds URDF limit")
-        if any(abs(pose[j] - origin[j]) > 0.005 for j in range(7) if j != axis):
-            raise RuntimeError("uncommanded joint changed; collision corridor invalid")
+        if len(command) == 7:
+            generation, axis, endpoint, velocity, origin, boundary, position_goal = command
+        else:
+            generation, axis, endpoint, velocity, origin, boundary = command
+            position_goal = False
         direction = 1 if boundary > origin[axis] else -1
         # Additional communication/feedback travel reserve beyond the shared
         # mathematical profile. Firmware stop distance still needs calibration.
+        # A position goal is the firmware's own stop; do not brake ahead of it.
         reserve = velocity * 0.5 + velocity * velocity / (2 * 1.4) + 0.01
-        if axis != 6 and direction * (boundary - pose[axis]) <= reserve:
+        if (not position_goal and axis != 6 and
+                direction * (boundary - pose[axis]) <= reserve):
             self._brake_active_motion()
             return
+        if position_goal and axis != 6:
+            # The scanned stop is the same angle simulation tracks. Stop a jog
+            # before sending it, and stop again if the arm runs past it.
+            if direction * (pose[axis] - endpoint) > 0.0:
+                if self.motion_sent or self.last_signature is not None or self._handoff_pending:
+                    self.sdk.stop(deceleration=1, _async=True)
+                self.motion_sent = False
+                self.last_signature = None
+                self._handoff_pending = False
+                return
+            was_jogging = (isinstance(self.last_signature, tuple) and
+                           self.last_signature and self.last_signature[0] == 'jog')
+            if was_jogging or self._handoff_pending:
+                if not self._handoff_pending:
+                    self.sdk.stop(deceleration=1, _async=True)
+                    self._handoff_pending = True
+                    self.last_signature = None
+                still = self.sdk.is_moving()
+                if still == 1:
+                    return
+                if still != 0:
+                    raise RuntimeError("invalid hardware moving status")
+                self._handoff_pending = False
         if now - self.last_send < 0.20:
             return
         speed = sdk_speed_for_rad(velocity)
-        if axis != 6 and speed == 0:
+        if speed == 0:
             return
         if axis == 6:
-            safe_boundary = boundary - direction * reserve
-            if direction * (safe_boundary - endpoint) < 0:
-                endpoint = safe_boundary
-            if (direction * (endpoint - pose[axis]) <= 0 or
-                    direction * (boundary - endpoint) < 0.01):
-                return
-            lo, hi = self.limits[axis]
-            if not lo <= endpoint <= hi:
-                raise RuntimeError("target outside URDF")
-            endpoint = pose[axis] + max(-0.08, min(0.08, endpoint - pose[axis]))
-            signature = ('gripper', round(endpoint, 4), speed)
+            # One opening command for the whole hold. A scanned goal uses that
+            # opening; otherwise 100 follows a positive direction and 0 a negative one.
+            if position_goal:
+                opening = max(0, min(100, int(round(endpoint * 100))))
+            else:
+                opening = 100 if direction > 0 else 0
+            signature = ('gripper', opening)
+        elif position_goal:
+            signature = ('angle', axis + 1, round(math.degrees(endpoint), 2), speed)
         else:
             # SDK direction: 1 increases, 0 decreases. One jog runs until stop.
             signature = ('jog', axis + 1, 1 if direction > 0 else 0, speed)
@@ -392,17 +423,28 @@ class RealKeyboardTransport:
             if (generation != self.generation or not self.armed or self.error
                     or self.stop_pending is not None):
                 return
-            if signature == self.last_signature:
+            speed_changed = axis == 6 and self._gripper_speed_sent != speed
+            if signature == self.last_signature and not speed_changed:
                 return
             # Mark before calling: even an ambiguous timeout requires a STOP.
             self.motion_sent, self.motion_axis = True, axis
         if axis == 6:
-            if self.sdk.set_pro_gripper_speed(30) != 1:
-                raise RuntimeError("gripper speed setting rejected")
+            if speed_changed or self.last_signature != signature:
+                if self.sdk.set_pro_gripper_speed(speed) != 1:
+                    raise RuntimeError("gripper speed setting rejected")
+                self._gripper_speed_sent = speed
+            if self.last_signature == signature:
+                self.last_send = now
+                return
             with self.lock:
                 if generation != self.generation or not self.armed:
                     return
-            result = self.sdk.set_pro_gripper_angle(round(endpoint * 100))
+            result = self.sdk.set_pro_gripper_angle(opening)
+        elif signature[0] == 'angle':
+            self._ensure_interpolation_mode()
+            result = self.sdk.send_angle(signature[1], signature[2], speed, _async=True)
+            if isinstance(result, str) or result == 0:
+                result = self.sdk.send_angle(signature[1], signature[2], speed, _async=True)
         else:
             self._ensure_interpolation_mode()
             result = self.sdk.jog_angle(signature[1], signature[2], speed, _async=True)
@@ -420,6 +462,7 @@ class RealKeyboardTransport:
             self._recovery_origin = None
             # A pre-fault cached sample cannot count as successful recovery.
             self._last_recovery_read = getattr(self.read_pose, 'success_count', -1)
+            self._handoff_pending = False
         if changed:
             self.report_error(f"Real feedback/control failed; motion locked: {exc}")
 

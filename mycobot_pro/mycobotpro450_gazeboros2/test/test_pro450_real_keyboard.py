@@ -12,6 +12,7 @@ class FakeSDK:
     def __init__(self):
         self.calls = []
         self.pose = [0.0] * 6 + [0.5]
+        self.angle_results = [1]
 
     def is_power_on(self):
         return 1
@@ -35,7 +36,7 @@ class FakeSDK:
 
     def send_angle(self, axis, angle, speed, _async=False):
         self.calls.append(('angle', axis, angle, speed, _async))
-        return 1
+        return self.angle_results.pop(0) if self.angle_results else 1
 
     def stop(self, deceleration=0, _async=False):
         self.calls.append(('stop', deceleration))
@@ -115,14 +116,14 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(self.sdk.calls[-1], ('stop', 0))
         self.assertFalse(self.transport.armed)
 
-    def test_other_joint_drift_rejects_goal(self):
+    def test_other_joint_drift_does_not_lock(self):
         self.assertTrue(self.transport.arm())
         origin = list(self.sdk.pose)
         self.sdk.pose[1] = .02
         self.transport.submit(2, .2, .2, origin, .5)
-        with self.assertRaisesRegex(RuntimeError, 'uncommanded'):
-            self.transport.cycle()
-        self.assertEqual(self.sdk.calls, [])
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls[0][0], 'jog')
+        self.assertTrue(self.transport.armed)
 
     def test_stale_gui_command_requests_stop(self):
         self.command()
@@ -131,10 +132,76 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(self.sdk.calls[-1], ('stop', 0))
         self.assertFalse(self.transport.armed)
 
-    def test_gripper_speed_only_after_explicit_command(self):
+    def test_position_goal_replaces_jog_with_one_send_angle(self):
+        self.command()
+        self.now += 0.3
+        self.assertTrue(self.transport.submit(
+            2, 0.40, math.radians(12), self.sdk.pose, 0.40, position_goal=True))
+        self.transport.cycle()
+        self.assertEqual([call[0] for call in self.sdk.calls], ['jog', 'stop', 'angle'])
+        self.assertEqual(self.sdk.calls[-1], ('angle', 3, round(math.degrees(0.40), 2), 8, True))
+        self.now += 0.3
+        self.transport.submit(2, 0.40, math.radians(12), self.sdk.pose, 0.40, position_goal=True)
+        self.transport.cycle()
+        self.assertEqual(len([call for call in self.sdk.calls if call[0] == 'angle']), 1)
+
+    def test_measurement_past_the_stop_angle_stops_again(self):
+        self.command()
+        self.now += 0.3
+        self.transport.submit(2, 0.40, math.radians(12), self.sdk.pose, 0.40, position_goal=True)
+        self.transport.cycle()
+        self.sdk.pose[2] = 0.45
+        self.now += 0.3
+        self.transport.submit(2, 0.40, math.radians(12), [0.0] * 6 + [0.5], 0.40, position_goal=True)
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls[-1], ('stop', 1))
+        self.assertEqual(len([call for call in self.sdk.calls if call[0] == 'angle']), 1)
+
+    def test_rejected_send_angle_stops_the_jog_and_retries(self):
+        self.command()
+        self.sdk.angle_results = [0, 1]
+        self.now += 0.3
+        self.transport.submit(2, 0.40, math.radians(12), self.sdk.pose, 0.40, position_goal=True)
+        self.transport.cycle()
+        kinds = [call[0] for call in self.sdk.calls]
+        self.assertEqual(kinds, ['jog', 'stop', 'angle', 'angle'])
+        self.assertEqual(self.sdk.calls[1], ('stop', 1))
+
+    def test_gripper_opens_once_at_gear_speed(self):
         self.command(6)
-        self.assertEqual(self.sdk.calls[0], ('gripper_speed', 30))
-        self.assertEqual(self.sdk.calls[1][0], 'gripper_angle')
+        self.assertEqual(self.sdk.calls, [
+            ('gripper_speed', 8), ('gripper_angle', 100)])
+        self.now += 0.3
+        self.transport.submit(6, self.sdk.pose[6] + 0.2, math.radians(12),
+                              self.sdk.pose, self.sdk.pose[6] + 0.5)
+        self.transport.cycle()
+        self.assertEqual(len(self.sdk.calls), 2)
+
+    def test_gripper_closes_to_zero(self):
+        self.assertTrue(self.transport.arm())
+        opening = self.sdk.pose[6]
+        self.transport.submit(6, opening - 0.2, math.radians(6),
+                              self.sdk.pose, opening - 0.5)
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls, [
+            ('gripper_speed', 4), ('gripper_angle', 0)])
+
+    def test_gripper_gear_change_updates_speed_only(self):
+        self.command(6)
+        self.now += 0.3
+        opening = self.sdk.pose[6]
+        self.transport.submit(6, opening + 0.2, math.radians(24),
+                              self.sdk.pose, opening + 0.5)
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls, [
+            ('gripper_speed', 8), ('gripper_angle', 100), ('gripper_speed', 16)])
+
+    def test_gripper_release_writes_measured_opening(self):
+        self.command(6)
+        self.sdk.pose[6] = 0.42
+        self.transport.stop(emergency=True)
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls[-1], ('gripper_angle', 42))
 
     def test_urdf_speed_clamp_never_rounds_up(self):
         self.assertEqual(sdk_speed_for_rad(10), 38)
