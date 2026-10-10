@@ -1,9 +1,9 @@
 """Bounded, single-axis hardware transport. No ROS and no startup writes.
 
-Arm holds jog until the collision scan finishes, then stops that jog and
-sends one send_angle to the same stop angle the simulation tracks. A gripper
+Arm holds wait until the collision scan finishes, then send one send_angle
+to the same stop angle the simulation tracks. A gripper
 hold sends one opening command at the keyboard gear's SDK speed. Release
-stops the arm, or writes the measured gripper opening.
+stops the arm, or reads and writes the measured gripper opening on release.
 Firmware braking is not a hardware E-stop.
 """
 import math
@@ -345,6 +345,19 @@ class RealKeyboardTransport:
             if self.motion_sent and self.motion_axis != 6 and self.stop_pending is None:
                 self.stop_pending = False
 
+    def _stop_active_motion(self, emergency):
+        if self.motion_axis == 6:
+            self._stop_gripper()
+        else:
+            self.sdk.stop(deceleration=0 if emergency else 1, _async=True)
+
+    def _stop_gripper(self):
+        """Original key-up behavior: read current opening and hold that angle."""
+        if hasattr(self.read_pose, 'force_gripper_read'):
+            self.read_pose.force_gripper_read()
+        pose = self.read_pose()
+        self.sdk.set_pro_gripper_angle(round(pose[6] * 100))
+
     def _acquire_pose(self):
         """During motion, only the gripper opening comes from the ROS cache."""
         if getattr(self.read_pose, 'supports_motion_cache', False):
@@ -366,15 +379,8 @@ class RealKeyboardTransport:
             stop = self.stop_pending
             self.stop_pending = None
         if stop is not None and self.motion_sent:
-            if self.motion_axis == 6:
-                # No independent gripper STOP exists in the inspected SDK.
-                # Replace the finite target by measured opening; not an E-stop.
-                if hasattr(self.read_pose, 'force_gripper_read'):
-                    self.read_pose.force_gripper_read()
-                pose = self.read_pose()
-                self.sdk.set_pro_gripper_angle(round(pose[6] * 100))
-            else:
-                self.sdk.stop(deceleration=0 if stop else 1, _async=True)
+            # Arm uses STOP; gripper restores the original measured-angle hold.
+            self._stop_active_motion(stop)
             self.motion_sent = False
             self.last_signature = None
             self._gripper_speed_sent = None
@@ -539,12 +545,7 @@ class RealKeyboardTransport:
                 # A failed read/send may have left a finite goal active.
                 if self.motion_sent:
                     try:
-                        if self.motion_axis != 6:
-                            self.sdk.stop(deceleration=0, _async=True)
-                        else:
-                            if hasattr(self.read_pose, 'force_gripper_read'):
-                                self.read_pose.force_gripper_read()
-                            self.sdk.set_pro_gripper_angle(round(self.read_pose()[6] * 100))
+                        self._stop_active_motion(True)
                         self.motion_sent = False
                     except Exception:
                         pass  # Keep latch; operator must use hardware E-stop.

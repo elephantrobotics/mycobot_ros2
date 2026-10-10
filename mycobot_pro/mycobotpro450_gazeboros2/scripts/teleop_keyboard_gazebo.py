@@ -577,7 +577,8 @@ class TeleopKeyboard(Node):
             self._hold_first_validation = True
             self._hold_final_target = None
             self._hold_goal_sent = False
-        self._request_hold_clearance(positions)
+        if self.mode != "real":
+            self._request_hold_clearance(positions)
         self._request_collision_stop(positions)
         return "accepted: checking collision clearance"
 
@@ -724,7 +725,14 @@ class TeleopKeyboard(Node):
                 raise RuntimeError(reason)
             target = collision_stop_angle(start, goal, margin, grid, fine, blocked)
         except Exception as exc:
-            self.get_logger().warning(f"Collision scan failed; jog stays inside the short check: {exc}")
+            if self.mode == "real":
+                with self._hold_lock:
+                    if generation != self._hold_generation or axis != self._hold_axis:
+                        return
+                    self._hold_pressed = False
+                self.get_logger().warning(f"Collision scan failed; no real motion sent: {exc}")
+            else:
+                self.get_logger().warning(f"Collision scan failed; jog stays inside the short check: {exc}")
             return
         with self._hold_lock:
             if generation != self._hold_generation or axis != self._hold_axis:
@@ -750,18 +758,13 @@ class TeleopKeyboard(Node):
         if self.mode == "real":
             with self._hold_lock:
                 origin = getattr(self, "_hold_validation_origin", None)
-                boundary = self._hold_validated_limit
                 pressed = self._hold_pressed
                 gear = self._hold_speed_gear
                 final = self._hold_final_target
-            if origin is not None and pressed and axis != 6:
+            if origin is not None and pressed and axis != 6 and final is not None:
                 speed = HOLD_SPEED_GEARS[gear - 1]
-                if final is not None:
-                    self.real_transport.submit(
-                        axis, final, speed, origin, final, position_goal=True)
-                else:
-                    # Jog only inside the short check until the full scan returns.
-                    self.real_transport.submit(axis, endpoint, speed, origin, boundary)
+                self.real_transport.submit(
+                    axis, final, speed, origin, final, position_goal=True)
             return
         # Position-only JTC points interpolate linearly. Bound their requested
         # average speed even if a future gear change bypasses the table guard.
@@ -852,6 +855,10 @@ class TeleopKeyboard(Node):
         with self._hold_lock:
             final_target = self._hold_final_target
             goal_sent = self._hold_goal_sent
+        if self.mode == "real" and final_target is None:
+            # A key-down only requests the full collision scan. Do not jog
+            # before its finite stop target is available.
+            return
         if final_target is not None and self.mode == "real" and pressed and axis != 6:
             self._publish_hold_waypoint(positions, axis, final_target, max(dt, 0.05))
             return

@@ -196,12 +196,35 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(self.sdk.calls, [
             ('gripper_speed', 8), ('gripper_angle', 100), ('gripper_speed', 16)])
 
-    def test_gripper_release_writes_measured_opening(self):
+    def test_gripper_release_restores_measured_angle_hold_without_any_stop(self):
         self.command(6)
-        self.sdk.pose[6] = 0.42
+        self.sdk.pose[6] = .42
         self.transport.stop(emergency=True)
         self.transport.cycle()
-        self.assertEqual(self.sdk.calls[-1], ('gripper_angle', 42))
+        self.assertEqual(self.sdk.calls, [
+            ('gripper_speed', 8), ('gripper_angle', 100), ('gripper_angle', 42)])
+        self.assertFalse(self.transport.motion_sent)
+
+    def test_gripper_release_forces_new_read_before_position_hold(self):
+        from unittest.mock import Mock
+        self.command(6)
+        events = []
+        reader = Mock(spec=['force_gripper_read'], side_effect=lambda: events.append('read') or list(self.sdk.pose))
+        reader.force_gripper_read.side_effect = lambda: events.append('force')
+        self.transport.read_pose = reader
+        original = self.sdk.set_pro_gripper_angle
+        self.sdk.set_pro_gripper_angle = lambda angle: events.append(('hold', angle)) or original(angle)
+        self.sdk.pose[6] = .42
+        self.transport.stop(emergency=True)
+        self.transport.cycle()
+        self.assertEqual(events[:3], ['force', 'read', ('hold', 42)])
+
+    def test_checked_position_goal_starts_with_send_angle_without_jog_or_stop(self):
+        self.assertTrue(self.transport.arm())
+        self.transport.submit(2, .40, math.radians(12), self.sdk.pose, .40,
+                              position_goal=True)
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls, [('angle', 3, round(math.degrees(.40), 2), 8, True)])
 
     def test_urdf_speed_clamp_never_rounds_up(self):
         self.assertEqual(sdk_speed_for_rad(10), 38)

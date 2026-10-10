@@ -101,7 +101,8 @@ def tick_for(node, seconds):
 
 
 def main():
-    rclpy.init(args=['--ros-args', '-p', 'mode:=real', '-p', 'real_hold_enabled:=true'])
+    rclpy.init(args=['--ros-args', '-p', 'mode:=real', '-p', 'real_hold_enabled:=true',
+                    '-p', 'real_gripper_hold_enabled:=false'])
     node = TeleopKeyboard()
     spinner = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     spinner.start()
@@ -119,14 +120,14 @@ def main():
         result = node.arm_real()
         assert result.startswith('armed'), result
         assert not node.mc.calls, 'arming issued a motion write'
-        original_validator = node._path_is_valid
-        node._path_is_valid = lambda *_: (False, 'collision (fake rejection test)')
+        original_validator = node._state_is_valid
+        node._state_is_valid = lambda *_: (False, [], 'collision (fake rejection test)')
         assert node.press_hold(2, 1).startswith('accepted')
         tick_for(node, .8)
         node.release_hold()
         tick_for(node, .5)
         assert not node.mc.calls, 'rejected collision corridor issued motion'
-        node._path_is_valid = original_validator
+        node._state_is_valid = original_validator
         start = node._fresh_feedback()[0]
         for direction in (1, -1):
             before = node._fresh_feedback()[0][2]
@@ -138,9 +139,10 @@ def main():
             after = node._fresh_feedback()[0][2]
             assert direction * (after - before) > .003, (direction, before, after)
             assert node.hold_idle(), 'release did not settle'
-        goals = [call for call in node.mc.calls if call[0] == 'jog']
-        assert goals and all(call[1] == 3 and call[2] in (0, 1) and 1 <= call[3] <= 4
+        goals = [call for call in node.mc.calls if call[0] == 'angle']
+        assert goals and all(call[1] == 3 and math.isfinite(call[2]) and 1 <= call[3] <= 4
                              for call in goals), goals
+        assert not any(call[0] == 'jog' for call in node.mc.calls), node.mc.calls
         assert all(abs(node._fresh_feedback()[0][i] - start[i]) < .001
                    for i in range(7) if i != 2), 'other hardware joint changed'
         assert ('stop', 0) in node.mc.calls, node.mc.calls
