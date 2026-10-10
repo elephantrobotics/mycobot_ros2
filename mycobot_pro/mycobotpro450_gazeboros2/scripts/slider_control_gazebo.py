@@ -69,6 +69,7 @@ REAL_ARRIVAL_MARGIN_S = 10.0
 # operator-facing status text, so the previous wording can be restored easily.
 SHOW_COLLISION_PATH_PERCENT = False
 SHOW_COLLISION_DEPTH = False
+SHOW_COLLISION_BODIES = False
 
 
 def sdk_motion_accepted(result):
@@ -257,8 +258,12 @@ class SliderControl(Node):
         self.gripper_estimate_pub = self.create_publisher(Float64MultiArray, "/pro450/gripper_estimate", 1)
 
     def _on_real_sample(self, pose):
-        if self._pose_reader.gripper_valid and self._pose_reader.gripper_time is not None:
-            self._gripper_model.observe(self._pose_reader.gripper, self._pose_reader.gripper_time)
+        with self._pose_reader.cache.lock:
+            value = self._pose_reader.gripper
+            measured = self._pose_reader.gripper_time
+            valid = self._pose_reader.gripper_valid
+        if valid and measured is not None:
+            self._gripper_model.observe(value, measured)
         publish_feedback(self, pose, self._pose_reader, COMMAND_JOINTS)
 
     def _mirror_loop(self):
@@ -269,17 +274,18 @@ class SliderControl(Node):
                 publish_age(self, self._pose_reader)
             try:
                 rendered = self._real_mirror.render()
-                estimate = self._gripper_model.sample()
+                gripper = self._gripper_model.render()
                 msg = Float64MultiArray()
-                msg.data = [estimate[0], estimate[1], 1.0] if estimate is not None else [0.0, 0.0, 0.0]
+                msg.data = list(gripper) if gripper is not None else [0.0, 0.0, 0.0]
                 self.gripper_estimate_pub.publish(msg)
-                if rendered is not None:
+                if rendered is not None and gripper is not None:
                     pose, velocity = rendered
-                    if estimate is not None:
-                        pose[6], velocity[6] = estimate[:2]
+                    # Gripper readings have their own timestamps. Never return
+                    # to the arm buffer's old opening or interpolated slope.
+                    pose[6], velocity[6] = gripper[:2]
                     self._publish_trajectory(pose, 0.04, velocity)
-                elif estimate is not None:
-                    self._publish_gripper_trajectory(estimate[0], 0.04, estimate[1])
+                elif gripper is not None:
+                    self._publish_gripper_trajectory(gripper[0], 0.04, gripper[1])
             except Exception:
                 self.get_logger().debug("Could not render the measured pose.")
             delay = next_tick - time.monotonic()
@@ -720,10 +726,12 @@ class SliderControl(Node):
         if SHOW_COLLISION_PATH_PERCENT:
             summary += f" at {ratio * 100:.0f}% of path"
 
-        details = [f"{pair[0]} vs {pair[1]}"]
+        details = []
+        if SHOW_COLLISION_BODIES:
+            details.append(f"{pair[0]} vs {pair[1]}")
         if SHOW_COLLISION_DEPTH:
             details.append(f"depth {depth * 1000.0:.3f} mm")
-        return f"{summary} ({', '.join(details)})."
+        return f"{summary} ({', '.join(details)})." if details else f"{summary}."
 
     def _wait_for_future(self, future, timeout_sec, operation):
         deadline = time.monotonic() + timeout_sec
@@ -1128,7 +1136,7 @@ class SliderControl(Node):
             return
         self._publish_status(
             f"Executing at {speed_scale * 100:.0f}% speed; "
-            f"planned duration {duration:.2f} s; gripper SDK speed {grip_speed}."
+            f"planned duration {duration:.2f} s."
         )
         if grip_speed is not None:
             if not self._confirm_gripper_speed(grip_speed):

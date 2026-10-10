@@ -95,8 +95,8 @@ class TeleopKeyboard(Node):
     def __init__(self):
         super().__init__("teleop_keyboard_gazebo")
         self.declare_parameter("mode", "simulation")
-        self.declare_parameter("real_hold_enabled", False)
-        self.declare_parameter("real_gripper_hold_enabled", False)
+        self.declare_parameter("real_hold_enabled", True)
+        self.declare_parameter("real_gripper_hold_enabled", True)
         self.real_hold_enabled = bool(self.get_parameter("real_hold_enabled").value)
         self.real_gripper_hold_enabled = bool(
             self.get_parameter("real_gripper_hold_enabled").value)

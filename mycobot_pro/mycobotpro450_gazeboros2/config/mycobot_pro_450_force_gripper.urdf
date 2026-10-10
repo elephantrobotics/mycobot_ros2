@@ -378,13 +378,17 @@
         <limit effort="1000.0" lower="-2.8797" upper="2.8797" velocity="1" />
         <parent link="link5" />
         <child link="link6" />
-        <origin xyz="0 0.04 0.0435" rpy="0.7853981634 0 1.5708" />
+        <!-- Add +90 deg about the existing local X axis to the zero-pose mounting. -->
+        <origin xyz="0 0.04 0.0435" rpy="2.3561944901948966 0 1.5708" />
         <dynamics damping="0.2" friction="0.1" />
     </joint>
     <joint name="joint6_to_gripper_connect" type="fixed">
         <parent link="link6" />
         <child link="gripper_connection" />
-        <origin xyz="0.03 0.0 -0.01" rpy="-1.5708 0 -1.5708" />
+        <!-- Rotate the original complete gripper mounting -90 deg about the
+             link6 frame's X axis through its origin, including translation.
+             T_new = Rx(-pi/2) * T_original. -->
+        <origin xyz="0.03 -0.01 0" rpy="-0.0000036732217733577977 -1.5707926535897934 -3.1415926535731233" />
     </joint>
     <joint name="joint6_to_gripper_base" type="fixed">
         <parent link="gripper_connection" />
@@ -471,45 +475,6 @@
         <selfCollide>false</selfCollide>
     </gazebo>
 
-    <!-- Gazebo mimic joint plugins for gripper -->
-    <gazebo>
-        <plugin name="mimic_1" filename="libroboticsgroup_upatras_gazebo_mimic_joint_plugin.so">
-            <joint>gripper_controller</joint>
-            <mimicJoint>gripper_base_to_gripper_left2</mimicJoint>
-            <multiplier>1.0</multiplier>
-            <sensitiveness>0.001</sensitiveness>
-        </plugin>
-    </gazebo>
-    <gazebo>
-        <plugin name="mimic_2" filename="libroboticsgroup_upatras_gazebo_mimic_joint_plugin.so">
-            <joint>gripper_controller</joint>
-            <mimicJoint>gripper_left3_to_gripper_left1</mimicJoint>
-            <multiplier>-1.0</multiplier>
-            <sensitiveness>0.001</sensitiveness>
-        </plugin>
-    </gazebo>
-    <gazebo>
-        <plugin name="mimic_3" filename="libroboticsgroup_upatras_gazebo_mimic_joint_plugin.so">
-            <joint>gripper_controller</joint>
-            <mimicJoint>gripper_base_to_gripper_right3</mimicJoint>
-            <multiplier>-1.0</multiplier>
-            <sensitiveness>0.001</sensitiveness>
-        </plugin>
-    </gazebo>
-    <gazebo>
-        <plugin name="mimic_4" filename="libroboticsgroup_upatras_gazebo_mimic_joint_plugin.so">
-            <joint>gripper_controller</joint>
-            <mimicJoint>gripper_base_to_gripper_right2</mimicJoint>
-            <multiplier>-1.0</multiplier>
-            <sensitiveness>0.001</sensitiveness>
-        </plugin>
-    </gazebo>
-    <gazebo>
-        <plugin name="mimic_5" filename="libroboticsgroup_upatras_gazebo_mimic_joint_plugin.so">
-            <joint>gripper_controller</joint>
-            <mimicJoint>gripper_right3_to_gripper_right1</mimicJoint>
-            <multiplier>1.0</multiplier>
-            <sensitiveness>0.001</sensitiveness>
-        </plugin>
-    </gazebo>
+    <!-- GazeboSystem follows the URDF mimic signs through ros2_control.
+         Do not also load position-writing mimic plugins here. -->
 </robot>

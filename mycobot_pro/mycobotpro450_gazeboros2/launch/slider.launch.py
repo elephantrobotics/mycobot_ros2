@@ -38,6 +38,17 @@ CONTROLLERS = [
 ]
 
 
+def use_current_planning_start(moveit_config):
+    """Resolve RViz's cached query start before all existing request adapters."""
+    adapter = "pro450_gazebo/UseCurrentStartState"
+    for pipeline in moveit_config.planning_pipelines["planning_pipelines"]:
+        config = moveit_config.planning_pipelines[pipeline]
+        existing = config.get("request_adapters", "").split()
+        config["request_adapters"] = " ".join(
+            [adapter] + [name for name in existing if name != adapter])
+    return moveit_config
+
+
 def controller_spawner(*, inactive=False):
     arguments = [
         *CONTROLLERS,
@@ -279,9 +290,9 @@ def build_simulation_stack(
 
 
 def generate_launch_description():
-    moveit_config = MoveItConfigsBuilder(
+    moveit_config = use_current_planning_start(MoveItConfigsBuilder(
         "firefighter", package_name="mycobotpro450_gazeboros2"
-    ).to_moveit_configs()
+    ).to_moveit_configs())
     environment = LaunchConfiguration("environment")
     real_snapshot_file = LaunchConfiguration("real_snapshot_file")
     default_initial_positions = os.path.join(

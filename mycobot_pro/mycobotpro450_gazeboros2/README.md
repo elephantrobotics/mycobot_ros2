@@ -39,6 +39,11 @@ MyCobot_450_m5-Gazebo使用说明
 
 使用项目自带的 Pro450 Confirmed Slider Control 页面控制机械臂。滑块只编辑目标，
 点击英文 `Execute` 按钮后才执行；`Speed (%)` 同时控制 Gazebo 轨迹速度和真机速度。
+在 `slider.launch.py` 启动的 MoveIt 中，每次新建规划都会以监测中的当前关节状态
+为起点（与白色透明的 Scene Robot 相同来源），不使用 RViz 留存的启动姿态。
+橙色 Query Goal 仍是用户自定义目标。工程内的 `UseCurrentStartState` 请求适配器
+在原有规划适配器之前处理起点，不替换碰撞检查或时间参数化；适用于 OMPL、CHOMP
+和 Pilz 管线。Plan 后若机械臂位置再次变化，应重新 Plan，原有 Execute 起点检查保留。
 执行前会检查关节限位、反馈 NaN，并通过 MoveIt 检查插值路径碰撞。
 控制程序还会向 MoveIt 规划场景加入与 Gazebo `z=0` 地面对应的碰撞体；只有固定
 底座 `base` 允许接触地面。Pro450 本体和力控夹爪的 15 个可视部件使用由 DAE
@@ -97,7 +102,8 @@ ros2 run mycobotpro450_gazeboros2 slider_control_gazebo.py
 
 `Force Execute (Sim Only)` 用于核对碰撞模型：它通过独立话题绕过 MoveIt
 碰撞拒绝，但仅允许 Gazebo 模式，速度强制不超过 10%，且仍检查关节限位、
-反馈超时和 NaN。真机模式会在后台强制拒绝该命令。Gazebo 内部物理自碰撞已关闭，
+反馈超时和 NaN。真机模式保留该按钮，点击仅弹出“Force Execute Unavailable”，不发布
+运动命令；后台也会强制拒绝外部强制执行请求。Gazebo 内部物理自碰撞已关闭，
 Force Execute 可能让机器人连杆视觉穿透；它只能用于验证 MoveIt 拒绝结果，不能
 用来验证 ODE 接触力。
 
@@ -105,6 +111,21 @@ Force Execute 可能让机器人连杆视觉穿透；它只能用于验证 MoveI
 负责机器人与地面、工作台及其他外部物体的物理接触。不要把 link1～link6 的
 `selfCollide` 改回 `true`：力控夹爪的 mimic 机构与安装端凸碰撞包络存在预期重叠，
 ODE 接触约束会与位置控制器互相对抗，表现为夹爪抖动、越过关节限位并拖慢仿真。
+
+夹爪的五个从动关节由 `GazeboSystem` 原生 mimic 支持与主关节同步更新，
+正反方向及启动开度在 `firefighter.ros2_control.xacro` 中配置；已在 er 的
+`gazebo_ros2_control 0.4.10` 上验证。不要重新加载旧的
+`roboticsgroup_upatras_gazebo_mimic_joint_plugin`：它会把从动关节的 `fmax`
+设成 effort 上限 1000，覆盖原来的摩擦值 0.1，并独立改写关节位置，引发大开度
+抖动及腕部扰动。`/joint_states` 保留六轴和夹爪主关节共七个坐标，夹指通过
+URDF mimic 关系显示；夹爪控制器只接收主关节目标。更新此配置后需重新启动
+Gazebo 和控制器，运行中的模型不会自动重载 URDF 插件。
+
+真机模式下，夹爪显示使用校准速度估算运动；到位后保留独立的夹爪输出，
+只接收带新测量时间戳的真实夹爪读回。估算与读回存在量化差异时，显示平滑校正，
+Actual 数值保留估算与校正结果，界面不再额外显示夹爪状态行。夹爪不再切回六轴的延时历史，
+避免旧开度和缓存插值速度造成到位回跳。显示估算不会写入真实角度缓存，也不代替
+真机到位判断。修改控制脚本后需要重新启动 slider 控制器及 GUI。
 
 `/joint_states` 仅作为 Gazebo 实际反馈，不再作为滑块命令。GUI 的确认目标使用
 `/pro450/slider_targets`，因此不会再由两个 `/joint_states` 发布者形成反馈回路。

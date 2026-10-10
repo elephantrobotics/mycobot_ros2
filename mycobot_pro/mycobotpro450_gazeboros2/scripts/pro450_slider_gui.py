@@ -139,7 +139,7 @@ class SliderGuiNode(Node):
         if len(msg.data) != 3 or not all(math.isfinite(v) for v in msg.data):
             return
         with self._lock:
-            self._gripper_estimate = tuple(msg.data[:2]) if msg.data[2] == 1.0 else None
+            self._gripper_estimate = tuple(msg.data) if msg.data[2] in (1.0, 2.0) else None
             self._gripper_estimate_time = time.monotonic()
 
     def gripper_estimate(self):
@@ -156,6 +156,8 @@ class SliderGuiNode(Node):
             return time.monotonic() - self._gripper_sample_time
 
     def execute(self, positions_rad, speed_percent, force_collision=False):
+        if force_collision and self.environment != "simulation":
+            return False
         with self._lock:
             if self._command_pending or self._command_busy:
                 return False
@@ -249,12 +251,6 @@ class Pro450SliderWindow(QMainWindow):
             self.actual_labels.append(actual_label)
 
         outer.addWidget(joint_group)
-        # Reserve the age indicator independently of the joint grid. Text
-        # changes cannot take width away from any slider.
-        self.gripper_cache_label = QLabel("")
-        self.gripper_cache_label.setFixedHeight(24)
-        outer.addWidget(self.gripper_cache_label)
-
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Speed (%)"))
         self.speed_box = QSpinBox()
@@ -278,7 +274,7 @@ class Pro450SliderWindow(QMainWindow):
         controls.addWidget(self.execute_button)
 
         self.force_execute_button = QPushButton("Force Execute (Sim Only)")
-        self.force_execute_button.setEnabled(False)
+        self.force_execute_button.setEnabled(self.node.environment != "simulation")
         self.force_execute_button.setStyleSheet(
             "font-weight: bold; color: #7a3e00; background: #ffd180;"
         )
@@ -319,17 +315,9 @@ class Pro450SliderWindow(QMainWindow):
                     else f"{value:.{RAD_DISPLAY_DECIMALS}f}"
                 )
             if self.node.environment == "real":
-                gripper_age = self.node.gripper_age()
                 estimate = self.node.gripper_estimate()
                 if estimate is not None:
                     self.actual_labels[-1].setText(f"{estimate[0]:.{RAD_DISPLAY_DECIMALS}f}")
-                    self.gripper_cache_label.setText(
-                        f"Gripper: estimated from measured speed ({estimate[1]:.3f} rad/s)")
-                elif gripper_age > 0.8:
-                    self.gripper_cache_label.setText(
-                        f"Gripper feedback: cached {gripper_age:.1f}s")
-                else:
-                    self.gripper_cache_label.setText("")
 
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True
@@ -344,7 +332,7 @@ class Pro450SliderWindow(QMainWindow):
 
         can_execute = feedback_ok and not self.node.command_busy()
         self.execute_button.setEnabled(can_execute)
-        self.force_execute_button.setEnabled(can_execute)
+        self.force_execute_button.setEnabled(self.node.environment != "simulation" or can_execute)
         if not feedback_ok:
             self.status_label.setText(
                 (f"Execute disabled: real robot feedback is stale (age {time.monotonic() - actual_time:.1f}s)."
@@ -361,12 +349,19 @@ class Pro450SliderWindow(QMainWindow):
         if not self.node.execute(positions, self.speed_box.value()):
             return
         self.execute_button.setEnabled(False)
-        self.force_execute_button.setEnabled(False)
+        self.force_execute_button.setEnabled(self.node.environment != "simulation")
         self.last_status = self.node.snapshot()[3]
         self.status_label.setText("Command submitted; waiting for validation...")
         self.user_edited_target = False
 
     def _force_execute(self):
+        if self.node.environment != "simulation":
+            QMessageBox.warning(
+                self, "Force Execute Unavailable",
+                "Force Execute is available only in Simulation mode.\n"
+                "This action is disabled in Real Robot mode. No motion command has been sent.",
+            )
+            return
         if self.node.command_busy():
             return
         answer = QMessageBox.warning(

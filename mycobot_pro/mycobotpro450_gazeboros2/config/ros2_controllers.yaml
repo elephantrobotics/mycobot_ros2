@@ -1,4 +1,20 @@
 # This config file is used by ros2_control
+joint_state_broadcaster:
+  ros__parameters:
+    # GazeboSystem exposes internal follower interfaces with a _mimic suffix.
+    # Publish the seven independent coordinates; URDF mimic handles the fingers.
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+      - gripper_controller
+    interfaces:
+      - position
+      - velocity
+
 controller_manager:
   ros__parameters:
     update_rate: 100  # Hz

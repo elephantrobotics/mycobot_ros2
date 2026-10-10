@@ -257,7 +257,7 @@ class GripperTargetTests(unittest.TestCase):
         self.assertEqual(model.sample(), (.6, 0, True))
         model.observe(.51, 11)
         self.assertIsNotNone(model.sample())
-        model.observe(.59, 11)
+        model.observe(.59, 11.01)
         self.assertIsNone(model.sample())
 
     def test_stop_holds_the_estimate_without_continuing_toward_goal(self):
@@ -274,7 +274,7 @@ class GripperTargetTests(unittest.TestCase):
         stop.is_set.side_effect = [False, True]
         obj = SimpleNamespace(_mirror_stop=stop, _pose_reader=None,
                               _real_mirror=SimpleNamespace(render=lambda: None),
-                              _gripper_model=SimpleNamespace(sample=lambda: (.55, .29, False)),
+                              _gripper_model=SimpleNamespace(render=lambda: (.55, .29, 1)),
                               gripper_estimate_pub=Mock(), _publish_trajectory=Mock(),
                               _publish_gripper_trajectory=Mock(), get_logger=Mock(return_value=Mock()))
         ns['_mirror_loop'](obj)

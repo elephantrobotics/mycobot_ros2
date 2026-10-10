@@ -65,7 +65,7 @@ class FeedbackTimeTests(unittest.TestCase):
         self.assertEqual(self.reader.gripper_time, old_gripper_stamp)
 
     def test_gui_uses_source_stamp_rather_than_callback_time(self):
-        tree = ast.parse((scripts / 'pro450_slider_gui.py').read_text())
+        tree = ast.parse((scripts / 'pro450_slider_gui.py').read_text(encoding='utf-8'))
         cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'SliderGuiNode')
         method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == '_joint_cb')
         ns = dict(time=time, math=math, COMMAND_JOINTS=self.joints)

@@ -27,7 +27,7 @@ class SliderBusyTests(unittest.TestCase):
     def gui_node(self):
         ns = load_methods('pro450_slider_gui.py', 'SliderGuiNode',
                           {'execute', '_busy_cb', '_status_cb', 'command_busy'})
-        obj = SimpleNamespace(_lock=threading.Lock(), _command_pending=False,
+        obj = SimpleNamespace(environment='simulation', _lock=threading.Lock(), _command_pending=False,
                               _command_busy=False, _status='', target_pub=Mock(),
                               force_target_pub=Mock(), get_clock=Mock())
         for name in ('execute', '_busy_cb', '_status_cb', 'command_busy'):
