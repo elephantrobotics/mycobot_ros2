@@ -65,21 +65,50 @@ class Reader:
 gate_ns = load_methods('pro450_pose_gate.py', 'Pro450PoseGate', {'_snapshot_cb'},
                        dict(math=math, COMMAND_JOINTS=['joint' + str(i) for i in range(6)] +
                             ['gripper_controller'], JOINT_LIMITS_RAD=[(-3, 3)] * 6 + [(0, 1)]))
+handoff_ns = load_methods('pro450_pose_gate.py', 'Pro450PoseGate',
+                         {'_request_release', '_released_cb'}, dict(String=SimpleNamespace))
 
 
 class Gate:
     _snapshot_cb = gate_ns['_snapshot_cb']
+    _request_release = handoff_ns['_request_release']
+    _released_cb = handoff_ns['_released_cb']
 
     def __init__(self):
         self.success, self.failure_reason = False, ''
         self.max_snapshot_age_sec = 2.5
         self.output_file = 'unused'
         self._write_yaml_atomically = Mock()
+        self._handoff_token = None
+        self._handoff_pub = Mock()
         self.get_clock = lambda: SimpleNamespace(now=lambda: SimpleNamespace(nanoseconds=10**10))
         self.get_logger = Mock(return_value=Mock())
 
 
 class GripperGateTests(unittest.TestCase):
+    def test_read_only_snapshot_waits_for_matching_connection_release(self):
+        gate = Gate()
+        msg = SimpleNamespace(header=SimpleNamespace(frame_id='pro450:handoff:test-owner',
+                              stamp=SimpleNamespace(sec=10, nanosec=0)),
+                              name=gate_ns['COMMAND_JOINTS'], position=[0] * 6 + [.3])
+        gate._snapshot_cb(msg)
+        self.assertFalse(gate.success)
+        gate._write_yaml_atomically.assert_called_once()
+        self.assertEqual(gate._handoff_pub.publish.call_args[0][0].data, 'test-owner')
+        gate._released_cb(SimpleNamespace(data='other-owner'))
+        self.assertFalse(gate.success)
+        gate._released_cb(SimpleNamespace(data='test-owner'))
+        self.assertTrue(gate.success)
+
+    def test_keyboard_retains_its_connection_after_snapshot(self):
+        gate = Gate()
+        msg = SimpleNamespace(header=SimpleNamespace(frame_id='pro450:retain:keyboard-owner',
+                              stamp=SimpleNamespace(sec=10, nanosec=0)),
+                              name=gate_ns['COMMAND_JOINTS'], position=[0] * 6 + [.3])
+        gate._snapshot_cb(msg)
+        self.assertTrue(gate.success)
+        gate._handoff_pub.publish.assert_not_called()
+
     def test_negative_sdk_is_error_before_conversion(self):
         for value in (-1, -0.01, -100):
             with self.subTest(value=value), self.assertRaisesRegex(RuntimeError, 'read failed'):
@@ -102,7 +131,7 @@ class GripperGateTests(unittest.TestCase):
                 values[index] = -1
                 sdk = ReadOnlyFakeSdk(values)
                 fake_module = SimpleNamespace(Pro450Client=lambda *_: sdk)
-                with patch.dict(sys.modules, pymycobot=fake_module):
+                with patch.dict(sys.modules, pro450_sdk_adapter=fake_module):
                     with self.assertRaisesRegex(RuntimeError, 'gripper read failed'):
                         reader._connect_read_only()
                 reader._publish_snapshot.assert_not_called()
@@ -110,7 +139,7 @@ class GripperGateTests(unittest.TestCase):
     def test_valid_all_joint_startup_can_publish(self):
         reader = Reader()
         sdk = ReadOnlyFakeSdk([50] * 5)
-        with patch.dict(sys.modules, pymycobot=SimpleNamespace(Pro450Client=lambda *_: sdk)):
+        with patch.dict(sys.modules, pro450_sdk_adapter=SimpleNamespace(Pro450Client=lambda *_: sdk)):
             reader._connect_read_only()
         reader._publish_snapshot.assert_called_once_with([0] * 6 + [.5])
 

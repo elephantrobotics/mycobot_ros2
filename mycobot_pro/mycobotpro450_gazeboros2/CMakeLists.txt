@@ -27,6 +27,9 @@ install(PROGRAMS
 )
 
 install(FILES scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
+  scripts/pro450_real_mirror.py
+  scripts/pro450_sdk_adapter.py scripts/pro450_feedback.py
+  scripts/pro450_gripper_profile.py scripts/pro450_gripper_speed.json
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

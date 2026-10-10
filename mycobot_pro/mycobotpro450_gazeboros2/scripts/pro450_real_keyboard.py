@@ -40,6 +40,7 @@ class RosPoseCache:
     """ROS-side joint cache. Only successful SDK reads are stored."""
 
     def __init__(self):
+        self.lock = threading.RLock()
         self.arm = None
         self.arm_time = None
         self.gripper = None
@@ -49,15 +50,19 @@ class RosPoseCache:
         return self.arm is not None and self.gripper is not None
 
     def store_arm(self, arm, when):
-        self.arm = list(arm)
-        self.arm_time = when
+        with self.lock:
+            if self.arm_time is None or when > self.arm_time:
+                self.arm = list(arm)
+                self.arm_time = when
 
     def store_gripper(self, value, when):
-        self.gripper = float(value)
-        self.gripper_time = when
+        with self.lock:
+            self.gripper = float(value)
+            self.gripper_time = when
 
     def pose(self):
-        return list(self.arm) + [self.gripper]
+        with self.lock:
+            return list(self.arm) + [self.gripper]
 
 
 class RealPoseReader:
@@ -86,6 +91,31 @@ class RealPoseReader:
         self.read_count = self.failure_count = self.success_count = 0
         self.last_raw = None
         self.last_error = ''
+        self.arm_wall_time = None
+
+    def _sample_stamp(self, kind):
+        if hasattr(self.sdk, 'sample_time'):
+            stamp = self.sdk.sample_time(kind)
+            if stamp is None:
+                raise RuntimeError(f"Pro450 {kind} sample has no receive timestamp")
+            return stamp
+        return self.clock(), time.time()
+
+    def observe_arm(self, raw, when, wall_time):
+        """Commit a received arm sample without waiting for a gripper query."""
+        if not isinstance(raw, (list, tuple)) or len(raw) != 6:
+            raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in raw):
+            raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
+        arm = [math.radians(v) for v in raw]
+        if not all(math.isfinite(v) and lo <= v <= hi
+                   for v, (lo, hi) in zip(arm, self.limits[:6])):
+            raise RuntimeError(f"Pro450 arm feedback violates joint limits: {raw!r}")
+        with self.cache.lock:
+            if self.cache.arm_time is None or when > self.cache.arm_time:
+                self.cache.store_arm(arm, when)
+                self.arm_wall_time = wall_time
+            return self.cache.pose() if self.cache.ready() else None
 
     @property
     def arm(self):
@@ -107,6 +137,12 @@ class RealPoseReader:
         now = self.clock()
         if self.cache.arm_time is None or now - self.cache.arm_time > 0.5:
             return False
+        if self.gripper_from_cache:
+            try:
+                self.cached_gripper()
+                return True
+            except RuntimeError:
+                return False
         if not self.gripper_valid or self.cache.gripper is None:
             return False
         # Motion skips the gripper query; -1 is refused. Either way the
@@ -118,19 +154,38 @@ class RealPoseReader:
     def force_gripper_read(self):
         self.next_gripper = self.clock()
 
+    def cached_gripper(self):
+        """Last successful measured opening; no SDK call or age refresh."""
+        with self.cache.lock:
+            value = self.cache.gripper
+            if (value is None or self.cache.gripper_time is None or
+                    not math.isfinite(value) or not 0.0 <= value <= 1.0):
+                raise RuntimeError("No valid gripper angle is available in cache")
+            return float(value)
+
+    def read_fresh_gripper(self):
+        """One successful hardware read; never satisfy a preflight with cache."""
+        raw = self.sdk.get_pro_gripper_angle(gripper_id=14)
+        value = valid_gripper_position(raw)
+        stamp, _ = self._sample_stamp('gripper')
+        if self.clock() - stamp > self.gripper_max_age:
+            raise RuntimeError("new gripper response is stale")
+        self.cache.store_gripper(value, stamp)
+        self.gripper_valid = True
+        self.gripper_rejected_minus_one = False
+        self.gripper_from_cache = False
+        self.next_gripper = self.clock() + self.gripper_period
+        return value
+
     def __call__(self, moving=False):
         raw = self.sdk.get_angles()
-        if not isinstance(raw, (list, tuple)) or len(raw) != 6:
-            raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
-        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in raw):
-            raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
-        arm = [math.radians(v) for v in raw]
-        if not all(math.isfinite(v) and lo <= v <= hi
-                   for v, (lo, hi) in zip(arm, self.limits[:6])):
-            raise RuntimeError(f"Pro450 arm feedback violates joint limits: {raw!r}")
-        self.cache.store_arm(arm, self.clock())
-        if moving and self.gripper_valid and self.cache.gripper is not None:
+        stamp, wall = self._sample_stamp('arm')
+        self.observe_arm(raw, stamp, wall)
+        if moving and self.cache.gripper is not None:
+            self.cached_gripper()
             self.gripper_from_cache = True
+            # Use a known valid historical sample even after an idle read
+            # fails. Do not turn that failure into a new pre-motion query.
             return self._combined()
         self.gripper_from_cache = False
         if self.clock() >= self.next_gripper:
@@ -170,7 +225,7 @@ class RealPoseReader:
                     f"total_failures={self.failure_count}, next_read_in={delay:.1f}s")
                 self.report(self.last_error)
                 raise RuntimeError(self.last_error) from exc
-            self.cache.store_gripper(value, self.clock())
+            self.cache.store_gripper(value, self._sample_stamp('gripper')[0])
             self.gripper_valid = True
             self.gripper_rejected_minus_one = False
             self.retry_count = 0
@@ -184,7 +239,7 @@ class RealPoseReader:
         return self._combined()
 
     def seed_gripper(self, value):
-        self.cache.store_gripper(float(value), self.clock())
+        self.cache.store_gripper(float(value), self._sample_stamp('gripper')[0])
         self.gripper_valid = True
         self.gripper_rejected_minus_one = False
         self.next_gripper = self.clock() + self.gripper_period
@@ -293,8 +348,11 @@ class RealKeyboardTransport:
     def _acquire_pose(self):
         """During motion, only the gripper opening comes from the ROS cache."""
         if getattr(self.read_pose, 'supports_motion_cache', False):
-            arm_moving = bool(self.motion_sent or self.moving) and self.motion_axis != 6
-            return self.read_pose(moving=arm_moving)
+            arm_moving = bool(self.motion_sent or self.moving) and self.motion_axis != 6 and not self.error
+            pending_start = self.command is not None and not self.motion_sent
+            if pending_start:
+                self.read_pose.cached_gripper()
+            return self.read_pose(moving=arm_moving or pending_start)
         return self.read_pose()
 
     def cycle(self):
@@ -419,6 +477,12 @@ class RealKeyboardTransport:
         else:
             # SDK direction: 1 increases, 0 decreases. One jog runs until stop.
             signature = ('jog', axis + 1, 1 if direction > 0 else 0, speed)
+        if signature != self.last_signature and hasattr(self.read_pose, 'cached_gripper'):
+            try:
+                self.read_pose.cached_gripper()
+            except Exception as exc:
+                self.report_error(f"Gripper cache unavailable before motion: {exc}")
+                return
         with self.lock:
             if (generation != self.generation or not self.armed or self.error
                     or self.stop_pending is not None):
@@ -484,7 +548,7 @@ class RealKeyboardTransport:
                         self.motion_sent = False
                     except Exception:
                         pass  # Keep latch; operator must use hardware E-stop.
-            self.closed.wait(0.10)
+            self.closed.wait(0.02)
 
     def close(self):
         self.stop(emergency=True, lock=True)

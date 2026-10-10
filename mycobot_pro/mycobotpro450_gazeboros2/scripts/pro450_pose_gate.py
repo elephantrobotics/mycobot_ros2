@@ -10,6 +10,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 
 
 ARM_JOINTS = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
@@ -43,6 +44,9 @@ class Pro450PoseGate(Node):
         )
         self.success = False
         self.failure_reason = ""
+        self._handoff_token = None
+        self._handoff_pub = self.create_publisher(String, "/pro450/snapshot_consumed", 10)
+        self.create_subscription(String, "/pro450/snapshot_released", self._released_cb, 10)
 
         snapshot_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -64,6 +68,8 @@ class Pro450PoseGate(Node):
 
     def _snapshot_cb(self, msg):
         if self.success or self.failure_reason:
+            return
+        if getattr(self, '_handoff_token', None):
             return
         stamp_sec = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) / 1e9
         now_sec = self.get_clock().now().nanoseconds / 1e9
@@ -99,11 +105,27 @@ class Pro450PoseGate(Node):
             self.get_logger().error(self.failure_reason)
             return
 
+        frame_id = getattr(msg.header, 'frame_id', '')
+        if frame_id.startswith('pro450:handoff:'):
+            self._handoff_token = frame_id.split(':', 2)[2]
+            self._request_release()
+            self.get_logger().info("Snapshot saved; waiting for the read-only robot connection to release.")
+            return
         self.success = True
         self.get_logger().info(
             f"Stable Pro450 pose snapshot saved to {self.output_file}; "
             "Gazebo startup may continue."
         )
+
+    def _request_release(self):
+        msg = String()
+        msg.data = self._handoff_token
+        self._handoff_pub.publish(msg)
+
+    def _released_cb(self, msg):
+        if self._handoff_token and msg.data == self._handoff_token:
+            self.success = True
+            self.get_logger().info("Read-only connection released; Gazebo startup may continue.")
 
     def _write_yaml_atomically(self, positions):
         output_dir = os.path.dirname(self.output_file) or "."
@@ -132,6 +154,8 @@ class Pro450PoseGate(Node):
     def _timeout_cb(self):
         if self.success or self.failure_reason:
             return
+        if self._handoff_token:
+            self._request_release()
         if time.monotonic() >= self.deadline:
             self.failure_reason = "Timed out waiting for a stable Pro450 pose snapshot."
             self.get_logger().error(self.failure_reason)

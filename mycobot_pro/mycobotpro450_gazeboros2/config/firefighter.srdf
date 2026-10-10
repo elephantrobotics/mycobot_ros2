@@ -22,6 +22,7 @@
     </group>
     <group name="gripper">
         <joint name="joint6_to_gripper_base"/>
+        <joint name="gripper_base_to_cable_terminal"/>
         <joint name="gripper_base_to_gripper_left2"/>
         <joint name="gripper_base_to_gripper_right2"/>
         <joint name="gripper_base_to_gripper_right3"/>
@@ -102,6 +103,9 @@
     <disable_collisions link1="gripper_right1" link2="link6" reason="Never"/>
     <disable_collisions link1="gripper_right2" link2="link6" reason="Never"/>
     <disable_collisions link1="gripper_right3" link2="link6" reason="Never"/>
+    <!-- The collision-only terminal touches its mounting cover. Its collisions
+         against every other link remain enabled in this existing matrix. -->
+    <disable_collisions link1="gripper_base" link2="gripper_cable_terminal" reason="Adjacent"/>
     <disable_collisions link1="link1" link2="link2" reason="Adjacent"/>
     <disable_collisions link1="link2" link2="link3" reason="Adjacent"/>
     <disable_collisions link1="link3" link2="link4" reason="Adjacent"/>

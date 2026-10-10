@@ -1,0 +1,98 @@
+{
+  "units": "SDK opening units per second (100 units = 1 model rad)",
+  "scope": "Empty gripper near opening 51..59; speeds 1,2,4,8 only; short-stroke effective velocity, not guaranteed cruise velocity",
+  "opening": [
+    [
+      1,
+      29.0535
+    ],
+    [
+      2,
+      29.1702
+    ],
+    [
+      4,
+      38.7297
+    ],
+    [
+      8,
+      39.0826
+    ]
+  ],
+  "closing": [
+    [
+      1,
+      29.2295
+    ],
+    [
+      2,
+      29.1171
+    ],
+    [
+      4,
+      38.8408
+    ],
+    [
+      8,
+      39.0845
+    ]
+  ],
+  "runs": [
+    {
+      "speed": 1,
+      "direction": "opening",
+      "rate": 29.053485384803892,
+      "start": 55,
+      "measured_end": 58
+    },
+    {
+      "speed": 1,
+      "direction": "closing",
+      "rate": 29.22945486505943,
+      "start": 58,
+      "measured_end": 52
+    },
+    {
+      "speed": 2,
+      "direction": "opening",
+      "rate": 29.17015091977037,
+      "start": 52,
+      "measured_end": 58
+    },
+    {
+      "speed": 2,
+      "direction": "closing",
+      "rate": 29.117055147858117,
+      "start": 58,
+      "measured_end": 52
+    },
+    {
+      "speed": 4,
+      "direction": "opening",
+      "rate": 38.72965467477533,
+      "start": 52,
+      "measured_end": 58
+    },
+    {
+      "speed": 4,
+      "direction": "closing",
+      "rate": 38.84081151646237,
+      "start": 58,
+      "measured_end": 52
+    },
+    {
+      "speed": 8,
+      "direction": "opening",
+      "rate": 39.08260693237763,
+      "start": 52,
+      "measured_end": 58
+    },
+    {
+      "speed": 8,
+      "direction": "closing",
+      "rate": 39.08451633808433,
+      "start": 58,
+      "measured_end": 52
+    }
+  ]
+}

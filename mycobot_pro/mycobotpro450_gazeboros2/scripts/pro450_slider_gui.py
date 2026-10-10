@@ -13,7 +13,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Empty, String
+from std_msgs.msg import Empty, String, Float64MultiArray, Bool
 
 from python_qt_binding.QtCore import Qt, QTimer
 from python_qt_binding.QtWidgets import (
@@ -55,6 +55,10 @@ class SliderGuiNode(Node):
 
     def __init__(self):
         super().__init__("pro450_slider_gui")
+        self.declare_parameter("environment", "simulation")
+        self.environment = str(self.get_parameter("environment").value).strip().lower()
+        if self.environment not in ("simulation", "real"):
+            raise ValueError("environment must be simulation or real")
         self.target_pub = self.create_publisher(
             JointState, "/pro450/slider_targets", 10
         )
@@ -62,14 +66,30 @@ class SliderGuiNode(Node):
             JointState, "/pro450/slider_force_targets", 10
         )
         self.stop_pub = self.create_publisher(Empty, "/pro450/slider_stop", 10)
-        self.create_subscription(JointState, "/joint_states", self._joint_cb, 10)
+        feedback_topic = (
+            "/pro450/real_joint_states" if self.environment == "real" else "/joint_states"
+        )
+        self.create_subscription(JointState, feedback_topic, self._joint_cb, 1)
         self.create_subscription(String, "/pro450/slider_status", self._status_cb, 10)
 
         self._lock = threading.Lock()
+        self._command_busy = False
+        self._command_pending = False
+        self.create_subscription(Bool, "/pro450/slider_busy", self._busy_cb, 10)
         self._actual = None
         self._actual_time = 0.0
         self._feedback_valid = False
-        self._status = "Waiting for Gazebo joint feedback..."
+        self._gripper_sample_time = 0.0
+        self._gripper_estimate = None
+        self._gripper_estimate_time = 0.0
+        if self.environment == "real":
+            self.create_subscription(Float64MultiArray, "/pro450/real_feedback_age", self._age_cb, 1)
+            self.create_subscription(Float64MultiArray, "/pro450/gripper_estimate", self._estimate_cb, 1)
+        self._status = (
+            "Waiting for real robot feedback..."
+            if self.environment == "real"
+            else "Waiting for Gazebo joint feedback..."
+        )
 
     def _joint_cb(self, msg):
         values = dict(zip(msg.name, msg.position))
@@ -82,20 +102,65 @@ class SliderGuiNode(Node):
             for name in COMMAND_JOINTS
         )
         with self._lock:
+            age = 0.0
+            if self.environment == "real":
+                stamp = msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
+                age = max(0.0, time.time() - stamp) if stamp > 0 else float('inf')
             self._actual = positions
-            self._actual_time = time.monotonic()
+            self._actual_time = time.monotonic() - age
             self._feedback_valid = feedback_valid
+
+    def _age_cb(self, msg):
+        if len(msg.data) >= 2 and math.isfinite(msg.data[1]) and msg.data[1] >= 0:
+            with self._lock:
+                self._gripper_sample_time = time.monotonic() - msg.data[1]
 
     def _status_cb(self, msg):
         with self._lock:
             self._status = msg.data
+            # A request can be rejected before the controller enters busy.
+            # Clearing pending does not override the controller's busy state.
+            if msg.data.startswith(("Rejected:", "Cancelled", "Execution complete",
+                                    "Execution stopped", "Execution failed:",
+                                    "Real robot command failed:")):
+                self._command_pending = False
+
+    def _busy_cb(self, msg):
+        with self._lock:
+            self._command_busy = bool(msg.data)
+            if self._command_busy:
+                self._command_pending = False
+
+    def command_busy(self):
+        with self._lock:
+            return self._command_pending or self._command_busy
+
+    def _estimate_cb(self, msg):
+        if len(msg.data) != 3 or not all(math.isfinite(v) for v in msg.data):
+            return
+        with self._lock:
+            self._gripper_estimate = tuple(msg.data[:2]) if msg.data[2] == 1.0 else None
+            self._gripper_estimate_time = time.monotonic()
+
+    def gripper_estimate(self):
+        with self._lock:
+            return self._gripper_estimate if time.monotonic() - self._gripper_estimate_time < 0.5 else None
 
     def snapshot(self):
         with self._lock:
             actual = list(self._actual) if self._actual is not None else None
             return actual, self._actual_time, self._feedback_valid, self._status
 
+    def gripper_age(self):
+        with self._lock:
+            return time.monotonic() - self._gripper_sample_time
+
     def execute(self, positions_rad, speed_percent, force_collision=False):
+        with self._lock:
+            if self._command_pending or self._command_busy:
+                return False
+            # Block another click immediately, before ROS acknowledges it.
+            self._command_pending = True
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = list(COMMAND_JOINTS)
@@ -106,7 +171,13 @@ class SliderGuiNode(Node):
         speed_rad_s = max(0.01, min(1.0, speed_percent / 100.0))
         msg.velocity = [speed_rad_s] * len(COMMAND_JOINTS)
         publisher = self.force_target_pub if force_collision else self.target_pub
-        publisher.publish(msg)
+        try:
+            publisher.publish(msg)
+        except Exception:
+            with self._lock:
+                self._command_pending = False
+            raise
+        return True
 
     def stop(self):
         self.stop_pub.publish(Empty())
@@ -146,6 +217,7 @@ class Pro450SliderWindow(QMainWindow):
             target_box.setSingleStep(0.01)
 
             slider = QSlider(Qt.Horizontal)
+            slider.setFixedWidth(560)
             slider.setRange(
                 round(minimum * RAD_SLIDER_SCALE),
                 round(maximum * RAD_SLIDER_SCALE),
@@ -153,7 +225,7 @@ class Pro450SliderWindow(QMainWindow):
             slider.setSingleStep(round(0.01 * RAD_SLIDER_SCALE))
 
             actual_label = QLabel("--")
-            actual_label.setMinimumWidth(90)
+            actual_label.setFixedWidth(100)
 
             slider.valueChanged.connect(
                 lambda value, box=target_box: box.setValue(
@@ -177,6 +249,11 @@ class Pro450SliderWindow(QMainWindow):
             self.actual_labels.append(actual_label)
 
         outer.addWidget(joint_group)
+        # Reserve the age indicator independently of the joint grid. Text
+        # changes cannot take width away from any slider.
+        self.gripper_cache_label = QLabel("")
+        self.gripper_cache_label.setFixedHeight(24)
+        outer.addWidget(self.gripper_cache_label)
 
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Speed (%)"))
@@ -214,7 +291,7 @@ class Pro450SliderWindow(QMainWindow):
         controls.addWidget(self.stop_button)
         outer.addLayout(controls)
 
-        self.status_label = QLabel("Waiting for Gazebo joint feedback...")
+        self.status_label = QLabel(self.node._status)
         self.status_label.setWordWrap(True)
         outer.addWidget(self.status_label)
 
@@ -241,6 +318,18 @@ class Pro450SliderWindow(QMainWindow):
                     if not math.isfinite(value)
                     else f"{value:.{RAD_DISPLAY_DECIMALS}f}"
                 )
+            if self.node.environment == "real":
+                gripper_age = self.node.gripper_age()
+                estimate = self.node.gripper_estimate()
+                if estimate is not None:
+                    self.actual_labels[-1].setText(f"{estimate[0]:.{RAD_DISPLAY_DECIMALS}f}")
+                    self.gripper_cache_label.setText(
+                        f"Gripper: estimated from measured speed ({estimate[1]:.3f} rad/s)")
+                elif gripper_age > 0.8:
+                    self.gripper_cache_label.setText(
+                        f"Gripper feedback: cached {gripper_age:.1f}s")
+                else:
+                    self.gripper_cache_label.setText("")
 
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True
@@ -253,11 +342,15 @@ class Pro450SliderWindow(QMainWindow):
                 slider.blockSignals(False)
             self.user_edited_target = False
 
-        self.execute_button.setEnabled(feedback_ok)
-        self.force_execute_button.setEnabled(feedback_ok)
+        can_execute = feedback_ok and not self.node.command_busy()
+        self.execute_button.setEnabled(can_execute)
+        self.force_execute_button.setEnabled(can_execute)
         if not feedback_ok:
             self.status_label.setText(
-                "Execute disabled: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset the simulation first."
+                (f"Execute disabled: real robot feedback is stale (age {time.monotonic() - actual_time:.1f}s)."
+                 if actual is not None else "Execute disabled: waiting for real robot feedback.")
+                if self.node.environment == "real"
+                else "Execute disabled: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset the simulation first."
             )
         elif status != self.last_status:
             self.last_status = status
@@ -265,11 +358,17 @@ class Pro450SliderWindow(QMainWindow):
 
     def _execute(self):
         positions = self._target_positions_rad()
-        self.node.execute(positions, self.speed_box.value())
+        if not self.node.execute(positions, self.speed_box.value()):
+            return
+        self.execute_button.setEnabled(False)
+        self.force_execute_button.setEnabled(False)
+        self.last_status = self.node.snapshot()[3]
         self.status_label.setText("Command submitted; waiting for validation...")
         self.user_edited_target = False
 
     def _force_execute(self):
+        if self.node.command_busy():
+            return
         answer = QMessageBox.warning(
             self,
             "Simulation Collision Override",
@@ -288,7 +387,11 @@ class Pro450SliderWindow(QMainWindow):
         forced_speed = min(
             self.speed_box.value(), FORCE_EXECUTE_MAX_SPEED_PERCENT
         )
-        self.node.execute(positions, forced_speed, force_collision=True)
+        if not self.node.execute(positions, forced_speed, force_collision=True):
+            return
+        self.execute_button.setEnabled(False)
+        self.force_execute_button.setEnabled(False)
+        self.last_status = self.node.snapshot()[3]
         self.status_label.setText(
             f"FORCE simulation command submitted at {forced_speed}% maximum; "
             "collision validation and physical self-contact will be bypassed."

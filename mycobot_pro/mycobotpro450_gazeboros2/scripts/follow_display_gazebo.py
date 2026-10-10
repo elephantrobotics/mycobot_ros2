@@ -11,7 +11,7 @@ import rclpy
 from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
-from pymycobot import Pro450Client
+from pro450_sdk_adapter import Pro450Client
 
 PRO450_IP = "192.168.0.232"
 PRO450_PORT = 4500
@@ -150,10 +150,7 @@ def main(args=None):
         pass
     finally:
         if node.mc:
-            try:
-                node.mc.release_all_servos()
-            except Exception:
-                pass
+            node.mc.close()
         node.destroy_node()
         rclpy.try_shutdown()
 

@@ -75,12 +75,19 @@ class FakePro450:
         self.goal = None
         return 1
 
+    def set_angle_callback(self, callback):
+        # This fixture updates on reads; the production socket callback is tested separately.
+        self.angle_callback = callback
+
+    def close(self):
+        pass
+
 
 # Neither import nor instantiate pymycobot. Missing methods fail rather than
 # falling through to any physical transport.
-fake_module = types.ModuleType('pymycobot')
+fake_module = types.ModuleType('pro450_sdk_adapter')
 fake_module.Pro450Client = FakePro450
-sys.modules['pymycobot'] = fake_module
+sys.modules['pro450_sdk_adapter'] = fake_module
 
 import rclpy
 from teleop_keyboard_gazebo import TeleopKeyboard

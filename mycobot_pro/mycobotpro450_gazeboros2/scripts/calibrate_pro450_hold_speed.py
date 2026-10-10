@@ -62,7 +62,7 @@ def main():
     if not 1 <= args.joint <= 6:
         raise SystemExit("joint must be 1..6")
 
-    from pymycobot import Pro450Client
+    from pro450_sdk_adapter import Pro450Client
     robot = Pro450Client(args.ip, args.port)
     if robot.is_power_on() != 1:
         raise SystemExit("Pro450 is not powered")

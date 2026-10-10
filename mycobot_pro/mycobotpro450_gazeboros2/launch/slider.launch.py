@@ -84,6 +84,8 @@ def build_simulation_stack(
     initial_positions_file,
     pause_gazebo,
     coordinated_start,
+    control_mode,
+    startup_read_only,
 ):
     """Build one isolated Pro450 Gazebo stack for the selected environment."""
     gazebo_robot_description = {
@@ -201,7 +203,21 @@ def build_simulation_stack(
         executable="pro450_slider_gui.py",
         name="pro450_slider_gui",
         output="screen",
-        parameters=[{"use_sim_time": True}],
+        parameters=[{
+            "use_sim_time": control_mode != "real",
+            "environment": control_mode,
+        }],
+    )
+    slider_control = Node(
+        package="mycobotpro450_gazeboros2",
+        executable="slider_control_gazebo.py",
+        name="slider_control_gazebo",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "mode": control_mode,
+            "startup_read_only": startup_read_only,
+        }],
     )
 
     if coordinated_start:
@@ -228,7 +244,7 @@ def build_simulation_stack(
                 target_action=pose_verifier,
                 on_exit=continue_after_success(
                     "Pro450 initial-pose verification",
-                    [move_group, rviz, slider_gui],
+                    [move_group, rviz, slider_gui, slider_control],
                 ),
             )
         )
@@ -246,7 +262,7 @@ def build_simulation_stack(
                 target_action=controllers,
                 on_exit=continue_after_success(
                     "grouped Pro450 controller activation",
-                    [move_group, rviz, slider_gui],
+                    [move_group, rviz, slider_gui, slider_control],
                 ),
             )
         )
@@ -275,10 +291,12 @@ def generate_launch_description():
     )
 
     simulation_stack = build_simulation_stack(
-        moveit_config, default_initial_positions, "false", False
+        moveit_config, default_initial_positions, "false", False,
+        "simulation", False,
     )
     real_stack = build_simulation_stack(
-        moveit_config, real_snapshot_file, "true", True
+        moveit_config, real_snapshot_file, "true", True,
+        "real", False,
     )
 
     pose_gate = Node(

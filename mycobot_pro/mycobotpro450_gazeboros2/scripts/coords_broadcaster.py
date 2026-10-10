@@ -5,7 +5,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
-from pymycobot import Pro450Client
+from pro450_sdk_adapter import Pro450Client
 
 DEFAULT_PRO450_IP = "192.168.0.232"
 DEFAULT_PRO450_PORT = 4500
@@ -63,6 +63,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        if node.mc is not None:
+            node.mc.close()
         node.destroy_node()
         rclpy.try_shutdown()
 

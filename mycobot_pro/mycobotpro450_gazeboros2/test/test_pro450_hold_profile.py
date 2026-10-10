@@ -7,7 +7,8 @@ import math
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from pro450_hold_profile import (  # noqa: E402
-    PositionVelocityEstimator, collision_stop_angle, hold_setpoint, trapezoid_samples,
+    PositionVelocityEstimator, collision_stop_angle, hold_setpoint,
+    shared_progress_samples, smoothstep, trapezoid_samples,
 )
 
 
@@ -137,6 +138,28 @@ class CollisionStopTests(unittest.TestCase):
         self.assertEqual(positions[-1], 1.0)
         self.assertGreater(times[-1], 1.0)
         self.assertLess(times[-1], 1.0 / 0.2 + 2.0 * 0.2 / 1.4)
+
+
+class SharedProgressTests(unittest.TestCase):
+    def test_samples_stay_on_one_line_and_end_together(self):
+        start = [0.0, -0.2, 0.4, 0.0, 0.1, -0.1, 0.2]
+        goal = [0.3, -0.2, -0.1, 0.05, 0.1, 0.2, 0.8]
+        duration = 4.0
+        step = math.radians(1.0)
+        samples = shared_progress_samples(start, goal, duration, step)
+        self.assertEqual(samples[-1][1], goal)
+        self.assertAlmostEqual(samples[-1][0], duration)
+        max_delta = max(abs(b - a) for a, b in zip(start, goal))
+        for previous, current in zip(samples, samples[1:]):
+            moved = max(abs(b - a) for a, b in zip(previous[1], current[1]))
+            self.assertLessEqual(moved, step + 1e-9)
+            self.assertLess(previous[0], current[0])
+        for stamp, position in samples:
+            progress = smoothstep(stamp / duration)
+            for value, start_value, goal_value in zip(position, start, goal):
+                expected = start_value + (goal_value - start_value) * progress
+                self.assertAlmostEqual(value, expected, delta=1e-6)
+        self.assertGreaterEqual(len(samples), math.ceil(max_delta / step))
 
 
 if __name__ == "__main__":

@@ -198,3 +198,54 @@ def trapezoid_samples(start, goal, speed, acceleration, period=0.05):
     times.append(total)
     positions.append(goal)
     return times, positions
+
+
+def smoothstep(fraction):
+    """Zero-velocity cubic used by a one-point joint trajectory."""
+    fraction = min(1.0, max(0.0, fraction))
+    return fraction * fraction * (3.0 - 2.0 * fraction)
+
+
+def inverse_smoothstep(progress):
+    """Time fraction at which ``smoothstep`` reaches ``progress``."""
+    progress = min(1.0, max(0.0, progress))
+    if progress <= 0.0 or progress >= 1.0:
+        return progress
+    low, high = 0.0, 1.0
+    for _ in range(50):
+        mid = 0.5 * (low + high)
+        if smoothstep(mid) < progress:
+            low = mid
+        else:
+            high = mid
+    return 0.5 * (low + high)
+
+
+def shared_progress_samples(start, goal, duration, step):
+    """Samples of one straight joint-space line that share a single progress.
+
+    Positions stay on the collision-checked line. Their timestamps follow the
+    same smoothstep the simulation trajectory controller uses, so every joint,
+    including the gripper, arrives together.
+    """
+    if duration <= 0 or step <= 0:
+        raise ValueError("duration and step must be positive")
+    if len(start) != len(goal) or not start:
+        raise ValueError("sample endpoints differ in length")
+    if not all(math.isfinite(value) for value in (*start, *goal, duration, step)):
+        raise ValueError("non-finite shared-progress input")
+    deltas = [goal_value - start_value for start_value, goal_value in zip(start, goal)]
+    max_delta = max(abs(value) for value in deltas)
+    if max_delta <= 1e-9:
+        return [(duration, list(goal))]
+    count = max(1, math.ceil(max_delta / step - 1e-12))
+    samples = []
+    for index in range(1, count + 1):
+        progress = index / count
+        position = [
+            start_value + delta * progress
+            for start_value, delta in zip(start, deltas)
+        ]
+        samples.append((duration * inverse_smoothstep(progress), position))
+    samples[-1] = (duration, list(goal))
+    return samples

@@ -12,12 +12,14 @@ import time
 import tty
 
 import rclpy
-from builtin_interfaces.msg import Duration
+from builtin_interfaces.msg import Duration, Time
 from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
+from pro450_feedback import attach_feedback, publish_feedback, publish_age
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from pro450_hold_profile import (
     PositionVelocityEstimator, collision_stop_angle, hold_setpoint, trapezoid_samples,
@@ -25,6 +27,7 @@ from pro450_hold_profile import (
 from pro450_real_keyboard import (
     RealKeyboardTransport, RealPoseReader, SDK_RAD_PER_SPEED, valid_gripper_position,
 )
+from pro450_real_mirror import RealPoseBuffer
 
 # Borrow the existing Pro450 slider's collision implementation, not its node
 # constructor. This keeps the same floor, contact tolerance and path sampling.
@@ -99,6 +102,11 @@ class TeleopKeyboard(Node):
             self.get_parameter("real_gripper_hold_enabled").value)
         self.real_transport = None
         self._real_thread = None
+        self._real_mirror = None
+        self._mirror_thread = None
+        self._mirror_stop = threading.Event()
+        self._sample_velocity = [0.0] * 7
+        self.real_joint_pub = None
         self._mirror_positions = None
         self._mirror_time = 0.0
         self.mode = str(self.get_parameter("mode").value).strip().lower()
@@ -163,11 +171,25 @@ class TeleopKeyboard(Node):
             self._real_pose_reader = RealPoseReader(
                 self.mc, JOINT_LIMITS_RAD, report=self.get_logger().debug)
             self._real_pose_reader.seed_gripper(self._startup_pose[6])
+            if hasattr(self.mc, 'sample_time'):
+                stamp = self.mc.sample_time('arm')
+                if stamp is not None:
+                    self._real_pose_reader.observe_arm(
+                        [math.degrees(v) for v in self._startup_pose[:6]], *stamp)
             self.real_transport = RealKeyboardTransport(
                 self.mc, self._real_pose_reader, self._mirror_real_pose, JOINT_LIMITS_RAD,
                 report_error=self.get_logger().error)
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
+            self._real_mirror = RealPoseBuffer()
+            self._sample_publish_lock = threading.Lock()
+            self.real_joint_pub = self.create_publisher(
+                JointState, "/pro450/real_joint_states", 1)
+            self.real_age_pub = self.create_publisher(Float64MultiArray, "/pro450/real_feedback_age", 1)
+            self._on_real_sample(self._startup_pose)
+            attach_feedback(self, self._real_pose_reader)
             self._real_thread.start()
+            self._mirror_thread = threading.Thread(target=self._mirror_loop, daemon=True)
+            self._mirror_thread.start()
             self.get_logger().info("Real robot READ ONLY. Wait for Gazebo sync before arming.")
         else:
             self.get_logger().info("Simulation mode; no real connection or startup motion.")
@@ -226,8 +248,8 @@ class TeleopKeyboard(Node):
         if (feedback is not None and not self.real_transport.moving and
                 all(abs(v) <= 0.01 for v in feedback[1])):
             self._publish_snapshot(pose)
-        # Gazebo receives measured hardware pose, never a future hardware goal.
-        self._publish_trajectory(pose, 0.10)
+        # Gazebo receives the measured pose through the delayed render thread.
+        self._on_real_sample(pose)
 
     def arm_real(self):
         if self.mode != "real" or not self.real_hold_enabled:
@@ -264,6 +286,7 @@ class TeleopKeyboard(Node):
     def _publish_snapshot(self, pose):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = "pro450:retain:" + getattr(self.mc, "owner_token", "")
         reader = getattr(self, "_real_pose_reader", None)
         if reader is not None:
             if not reader.fresh():
@@ -271,15 +294,21 @@ class TeleopKeyboard(Node):
             # JointState has one stamp: use the oldest constituent sample,
             # not a new stamp that would disguise the cached gripper's age.
             age = max(0.0, time.monotonic() - min(reader.arm_time, reader.gripper_time))
-            stamp_ns = max(0, self.get_clock().now().nanoseconds - int(age * 1e9))
+            stamp_ns = max(0, int((time.time() - age) * 1e9))
             msg.header.stamp.sec = stamp_ns // 1000000000
             msg.header.stamp.nanosec = stamp_ns % 1000000000
+        elif hasattr(self.mc, 'sample_time'):
+            stamps = [self.mc.sample_time(kind) for kind in ('arm', 'gripper')]
+            if all(stamp is not None for stamp in stamps):
+                wall = min(stamp[1] for stamp in stamps)
+                seconds = int(wall)
+                msg.header.stamp = Time(sec=seconds, nanosec=int((wall - seconds) * 1e9))
         msg.name = list(COMMAND_JOINTS)
         msg.position = list(pose)
         self.snapshot_pub.publish(msg)
 
     def _connect_read_only(self):
-        from pymycobot import Pro450Client
+        from pro450_sdk_adapter import Pro450Client
         self.get_logger().info(
             f"Connecting to Pro450 @ {DEFAULT_PRO450_IP}:{DEFAULT_PRO450_PORT} (read-only)")
         self.mc = Pro450Client(DEFAULT_PRO450_IP, DEFAULT_PRO450_PORT)
@@ -322,7 +351,7 @@ class TeleopKeyboard(Node):
         return max(MIN_DURATION, 1.5 * d / MAX_VELOCITY,
                    math.sqrt(6.0 * d / MAX_ACCELERATION))
 
-    def _publish_trajectory(self, target, duration, gripper_only=False):
+    def _publish_trajectory(self, target, duration, gripper_only=False, velocities=None):
         sec = int(duration)
         nanosec = int((duration - sec) * 1e9)
         if not gripper_only:
@@ -330,6 +359,8 @@ class TeleopKeyboard(Node):
             arm.joint_names = list(ARM_JOINTS)
             point = JointTrajectoryPoint()
             point.positions = list(target[:6])
+            if velocities is not None:
+                point.velocities = list(velocities[:6])
             point.time_from_start = Duration(sec=sec, nanosec=nanosec)
             arm.points = [point]
             self.pub_arm.publish(arm)
@@ -337,9 +368,33 @@ class TeleopKeyboard(Node):
         gripper.joint_names = [GRIPPER_JOINT]
         point = JointTrajectoryPoint()
         point.positions = [target[6]]
+        if velocities is not None:
+            point.velocities = [velocities[6]]
         point.time_from_start = Duration(sec=sec, nanosec=nanosec)
         gripper.points = [point]
         self.pub_gripper.publish(gripper)
+
+    def _on_real_sample(self, pose):
+        publish_feedback(self, pose, self._real_pose_reader, COMMAND_JOINTS)
+
+    def _mirror_loop(self):
+        next_tick = time.monotonic()
+        while rclpy.ok() and not self._mirror_stop.is_set():
+            next_tick += 0.02
+            if int(next_tick * 50) % 25 == 0:
+                publish_age(self, self._real_pose_reader)
+            try:
+                rendered = self._real_mirror.render()
+                if rendered is not None:
+                    pose, velocity = rendered
+                    self._publish_trajectory(pose, 0.04, velocities=velocity)
+            except Exception:
+                self.get_logger().debug("Could not render the measured pose.")
+            delay = next_tick - time.monotonic()
+            if delay > 0.0:
+                self._mirror_stop.wait(delay)
+            else:
+                next_tick = time.monotonic()
 
     def request_step(self, index, delta):
         if self.mode == "real":
@@ -1201,6 +1256,9 @@ def main(args=None):
             if node.real_transport is not None:
                 node.real_transport.close()
                 node._real_thread.join(timeout=2.0)
+            if node._mirror_thread is not None:
+                node._mirror_stop.set()
+                node._mirror_thread.join(timeout=0.5)
             node._armed = False
             node._stop_requested = True
             if node.mode == "simulation" and not node.hold_idle():
@@ -1223,6 +1281,8 @@ def main(args=None):
             if node._hold_validation_worker is not None:
                 node._hold_validation_worker.join(timeout=2.0)
             # Never release servo torque; the loaded real robot could fall.
+            if node.mc is not None and hasattr(node.mc, "close"):
+                node.mc.close()
             node.destroy_node()
         rclpy.try_shutdown()
         if ros_thread is not None:

@@ -182,6 +182,33 @@
         </inertial>
     </link>
     
+    <!-- Collision-only cable terminal. The 41-vertex outer rim of the cover
+         recess gives diameter 0.013248532 m. Extrude outward (+mesh Y) by
+         0.020 m from the cover at Y=0.029504446 m. This same primitive is
+         included in both MoveIt and Gazebo descriptions, without a visual.
+         A separate fixed collision link avoids inheriting gripper_base's
+         mounting exemptions against link5/link6. -->
+    <link name="gripper_cable_terminal">
+        <collision name="gripper_cable_terminal_collision">
+            <origin xyz="-0.029086814 0.039504446 0.106890604" rpy="-1.570796326795 0 0" />
+            <geometry>
+                <cylinder radius="0.006624266" length="0.020" />
+            </geometry>
+        </collision>
+        <!-- Negligible positive proxy inertia keeps the collision-only fixed
+             child in Gazebo's URDF conversion; no visual mesh is introduced. -->
+        <inertial>
+            <origin xyz="-0.029086814 0.039504446 0.106890604" rpy="0 0 0" />
+            <mass value="0.000001" />
+            <inertia ixx="4.430356e-11" iyy="2.194045e-11" izz="4.430356e-11" ixy="0" ixz="0" iyz="0" />
+        </inertial>
+    </link>
+    <joint name="gripper_base_to_cable_terminal" type="fixed">
+        <parent link="gripper_base" />
+        <child link="gripper_cable_terminal" />
+        <origin xyz="-0.107 0.012 0.0" rpy="1.5708 0 1.5708" />
+    </joint>
+
     <!-- Gripper Left 1 -->
     <link name="gripper_left1">
         <visual>
