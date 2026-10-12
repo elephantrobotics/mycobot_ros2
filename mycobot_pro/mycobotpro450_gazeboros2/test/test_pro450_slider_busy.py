@@ -3,6 +3,7 @@ import ast
 import math
 from pathlib import Path
 import queue
+import random
 import threading
 import time
 from types import SimpleNamespace, MethodType
@@ -17,13 +18,45 @@ def load_methods(file, cls, names):
     tree = ast.parse((scripts / file).read_text(encoding='utf-8'))
     node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls)
     ns = dict(math=math, time=time, queue=queue, JointState=Mock, Bool=SimpleNamespace,
-              COMMAND_JOINTS=['joint1'] * 7, RAD_DISPLAY_DECIMALS=4)
+              COMMAND_JOINTS=['joint1'] * 7, RAD_DISPLAY_DECIMALS=4,
+              JOINT_DISPLAY_DECIMALS=[4] * 6 + [2], GRIPPER_DISPLAY_DECIMALS=2,
+              JOINT_LIMITS_RAD=[(-3.0, 3.0)] * 6 + [(0.0, 1.0)], random=random)
     exec(compile(ast.Module(body=[n for n in node.body if isinstance(n, ast.FunctionDef)
                                 and n.name in names], type_ignores=[]), file, 'exec'), ns)
     return ns
 
 
 class SliderBusyTests(unittest.TestCase):
+    def test_gripper_target_is_quantized_without_rounding_arm_targets(self):
+        ns = load_methods('pro450_slider_gui.py', 'Pro450SliderWindow', {'_target_positions_rad'})
+        for opening, expected in ((0.0, 0.0), (0.5586, 0.56), (0.0313, 0.03), (1.0, 1.0)):
+            obj = SimpleNamespace(target_boxes=[Mock(value=Mock(return_value=0.1234)) for _ in range(6)]
+                                  + [Mock(value=Mock(return_value=opening))])
+            self.assertEqual(ns['_target_positions_rad'](obj), [0.1234] * 6 + [expected])
+
+    def test_random_gripper_target_uses_discrete_openings_including_endpoints(self):
+        ns = load_methods('pro450_slider_gui.py', 'Pro450SliderWindow', {'_randomize_target'})
+        rng = SimpleNamespace(uniform=Mock(return_value=0.123456), randint=Mock())
+        ns['random'] = rng
+        obj = SimpleNamespace(target_boxes=[Mock() for _ in range(7)], status_label=Mock())
+        for integer in (0, 1, 56, 100):
+            rng.randint.return_value = integer
+            ns['_randomize_target'](obj)
+            obj.target_boxes[-1].setValue.assert_called_with(integer / 100.0)
+            obj.target_boxes[0].setValue.assert_called_with(0.123456)
+        rng.randint.assert_called_with(0, 100)
+
+    def test_actual_gripper_has_two_decimals_and_arm_retains_four(self):
+        ns = load_methods('pro450_slider_gui.py', 'Pro450SliderWindow', {'_refresh'})
+        node = SimpleNamespace(environment='real', command_busy=lambda: False,
+                               snapshot=lambda: ([0.1234] * 6 + [0.5586], time.monotonic(), True, 'Ready'),
+                               gripper_estimate=lambda: (0.5586, 0.0))
+        obj = SimpleNamespace(node=node, target_initialized=True, actual_labels=[Mock() for _ in range(7)],
+                              execute_button=Mock(), force_execute_button=Mock(), status_label=Mock(), last_status=None)
+        ns['_refresh'](obj)
+        obj.actual_labels[0].setText.assert_called_with('0.1234')
+        obj.actual_labels[-1].setText.assert_called_with('0.56')
+
     def gui_node(self):
         ns = load_methods('pro450_slider_gui.py', 'SliderGuiNode',
                           {'execute', '_busy_cb', '_status_cb', 'command_busy'})

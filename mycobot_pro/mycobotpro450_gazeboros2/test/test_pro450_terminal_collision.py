@@ -20,15 +20,15 @@ class TerminalCollisionTests(unittest.TestCase):
         self.assertEqual(len(self.link.findall('collision')), 1)
         self.assertEqual(self.link.findall('visual'), [])
         cylinder = self.link.find('collision/geometry/cylinder')
-        self.assertAlmostEqual(float(cylinder.get('length')), .020)
+        self.assertAlmostEqual(float(cylinder.get('length')), .025)
         self.assertAlmostEqual(float(cylinder.get('radius')), .006624266)
 
-    def test_cylinder_starts_at_cover_and_extends_twenty_mm_outward(self):
+    def test_cylinder_starts_at_cover_and_extends_twenty_five_mm_outward(self):
         xyz = [float(x) for x in self.link.find('collision/origin').get('xyz').split()]
         rpy = [float(x) for x in self.link.find('collision/origin').get('rpy').split()]
         self.assertAlmostEqual(rpy[0], -math.pi / 2)
-        self.assertAlmostEqual(xyz[1] - .01, .029504446)
-        self.assertAlmostEqual(xyz[1] + .01, .049504446)
+        self.assertAlmostEqual(xyz[1] - .0125, .029504446)
+        self.assertAlmostEqual(xyz[1] + .0125, .054504446)
         self.assertAlmostEqual(xyz[0], -.029086814)
         self.assertAlmostEqual(xyz[2], .106890604)
         # Match the existing visual transform: both are mesh-local geometry.

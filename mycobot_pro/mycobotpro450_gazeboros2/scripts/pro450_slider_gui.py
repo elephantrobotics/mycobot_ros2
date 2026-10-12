@@ -47,6 +47,9 @@ JOINT_LIMITS_RAD = [
 ]
 RAD_DISPLAY_DECIMALS = 4
 RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
+GRIPPER_DISPLAY_DECIMALS = 2
+JOINT_DISPLAY_DECIMALS = [RAD_DISPLAY_DECIMALS] * 6 + [GRIPPER_DISPLAY_DECIMALS]
+JOINT_SLIDER_SCALES = [10 ** decimals for decimals in JOINT_DISPLAY_DECIMALS]
 
 
 class SliderGuiNode(Node):
@@ -212,30 +215,32 @@ class Pro450SliderWindow(QMainWindow):
         labels = ["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5", "Joint 6", "Gripper"]
         for row, (label, limits) in enumerate(zip(labels, JOINT_LIMITS_RAD), start=1):
             minimum, maximum = limits
+            decimals = JOINT_DISPLAY_DECIMALS[row - 1]
+            scale = JOINT_SLIDER_SCALES[row - 1]
             target_box = QDoubleSpinBox()
             target_box.setRange(minimum, maximum)
-            target_box.setDecimals(RAD_DISPLAY_DECIMALS)
+            target_box.setDecimals(decimals)
             target_box.setSingleStep(0.01)
 
             slider = QSlider(Qt.Horizontal)
             slider.setFixedWidth(560)
             slider.setRange(
-                round(minimum * RAD_SLIDER_SCALE),
-                round(maximum * RAD_SLIDER_SCALE),
+                round(minimum * scale),
+                round(maximum * scale),
             )
-            slider.setSingleStep(round(0.01 * RAD_SLIDER_SCALE))
+            slider.setSingleStep(round(0.01 * scale))
 
             actual_label = QLabel("--")
             actual_label.setFixedWidth(100)
 
             slider.valueChanged.connect(
-                lambda value, box=target_box: box.setValue(
-                    value / RAD_SLIDER_SCALE
+                lambda value, box=target_box, scale=scale: box.setValue(
+                    value / scale
                 )
             )
             target_box.valueChanged.connect(
-                lambda value, control=slider: control.setValue(
-                    round(value * RAD_SLIDER_SCALE)
+                lambda value, control=slider, scale=scale: control.setValue(
+                    round(value * scale)
                 )
             )
             target_box.valueChanged.connect(self._target_edited)
@@ -307,24 +312,24 @@ class Pro450SliderWindow(QMainWindow):
         )
 
         if actual is not None:
-            for label, value in zip(self.actual_labels, actual):
+            for index, (label, value) in enumerate(zip(self.actual_labels, actual)):
                 label.setText(
                     "NaN"
                     if not math.isfinite(value)
-                    else f"{value:.{RAD_DISPLAY_DECIMALS}f}"
+                    else f"{value:.{JOINT_DISPLAY_DECIMALS[index]}f}"
                 )
             if self.node.environment == "real":
                 estimate = self.node.gripper_estimate()
                 if estimate is not None:
-                    self.actual_labels[-1].setText(f"{estimate[0]:.{RAD_DISPLAY_DECIMALS}f}")
+                    self.actual_labels[-1].setText(f"{estimate[0]:.{GRIPPER_DISPLAY_DECIMALS}f}")
 
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True
-            for box, slider, value in zip(self.target_boxes, self.sliders, actual):
+            for index, (box, slider, value) in enumerate(zip(self.target_boxes, self.sliders, actual)):
                 box.blockSignals(True)
                 slider.blockSignals(True)
                 box.setValue(value)
-                slider.setValue(round(value * RAD_SLIDER_SCALE))
+                slider.setValue(round(box.value() * JOINT_SLIDER_SCALES[index]))
                 box.blockSignals(False)
                 slider.blockSignals(False)
             self.user_edited_target = False
@@ -333,6 +338,7 @@ class Pro450SliderWindow(QMainWindow):
         self.execute_button.setEnabled(can_execute)
         self.force_execute_button.setEnabled(self.node.environment != "simulation" or can_execute)
         if not feedback_ok:
+            self.last_status = None
             self.status_label.setText(
                 (f"Execute disabled: real robot feedback is stale (age {time.monotonic() - actual_time:.1f}s)."
                  if actual is not None else "Execute disabled: waiting for real robot feedback.")
@@ -392,8 +398,10 @@ class Pro450SliderWindow(QMainWindow):
 
     def _randomize_target(self):
         """Generate a target locally; motion still requires Execute."""
-        for box, limits in zip(self.target_boxes, JOINT_LIMITS_RAD):
+        for box, limits in zip(self.target_boxes[:-1], JOINT_LIMITS_RAD[:-1]):
             box.setValue(random.uniform(*limits))
+        # Match the integer 0..100 opening accepted by the gripper interface.
+        self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
         self.user_edited_target = True
         self.status_label.setText(
             "Random target generated. Review it, then press Execute to validate and move."
@@ -410,10 +418,12 @@ class Pro450SliderWindow(QMainWindow):
 
     def _target_positions_rad(self):
         """Read radian targets and clamp display rounding to exact URDF limits."""
-        return [
+        positions = [
             min(max(box.value(), lower), upper)
             for box, (lower, upper) in zip(self.target_boxes, JOINT_LIMITS_RAD)
         ]
+        positions[-1] = round(positions[-1] * 100) / 100.0
+        return positions
 
     def _stop(self):
         self.node.stop()

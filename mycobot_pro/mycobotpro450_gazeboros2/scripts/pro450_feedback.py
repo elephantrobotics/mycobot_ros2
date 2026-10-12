@@ -16,6 +16,8 @@ def attach_feedback(node, reader):
 
 def publish_feedback(node, pose, reader, joints):
     """Use measurement time, deduplicate samples, and never overwrite newer data."""
+    if getattr(getattr(node, 'mc', None), 'public_feedback', False) is True:
+        return
     with node._sample_publish_lock:
         now = time.monotonic()
         with reader.cache.lock:
@@ -42,6 +44,8 @@ def publish_feedback(node, pose, reader, joints):
 
 
 def publish_age(node, reader):
+    if getattr(getattr(node, 'mc', None), 'public_feedback', False) is True:
+        return
     now = time.monotonic()
     arm = reader.arm_time
     gripper = reader.gripper_time

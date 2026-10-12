@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real-only six-axis motor switching and latest measured pose mirroring."""
+"""Real-only combined arm/gripper enable switching and measured pose mirroring."""
 import math
 import signal
 import sys
@@ -12,8 +12,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from pro450_drag_support import DragState, set_arm_enabled
-from pro450_sdk_adapter import Pro450Client
+from pro450_drag_support import DragState, set_drag_enabled
+from pro450_public_client import PublicPro450Client as Pro450Client
 from pro450_session_support import read_initial_gripper
 
 ARM_JOINTS = [f'joint{i}' for i in range(1, 7)]
@@ -32,19 +32,15 @@ class DragFollow(Node):
         try:
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
-            self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20.0, ownership_timeout=0)
+            self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20.0, ownership_timeout=0, feature="drag")
             if not self.get_parameter('startup_enabled').value:
                 if self.sdk.is_moving() != 0:
                     raise RuntimeError('Stop robot motion before starting drag following')
-                set_arm_enabled(self.sdk, True)
+                set_drag_enabled(self.sdk, True)
             self.gripper = float(self.get_parameter('initial_gripper').value)
             if not math.isfinite(self.gripper) or not 0 <= self.gripper <= 1:
                 self.gripper = read_initial_gripper(self.sdk) / 100.0
             self.state = DragState(self.sdk)
-            self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
-            self.gripper_pub = self.create_publisher(
-                JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
-            self.real_pub = self.create_publisher(JointState, '/pro450/real_joint_states', 1)
             self.sdk.set_angle_callback(self._sample)
             self.worker = threading.Thread(target=self._read_loop, daemon=True)
             self.worker.start()
@@ -82,18 +78,6 @@ class DragFollow(Node):
         enabled, pending, message, sample = self.state.snapshot()
         if sample is None or time.monotonic() - sample[0] > .5:
             return enabled, pending, message, False
-        measured, wall, angles, sequence = sample
-        if sequence != self.rendered_sequence:
-            self.arm_pub.publish(self.trajectory(ARM_JOINTS, angles))
-            if not self.gripper_published:
-                self.gripper_pub.publish(self.trajectory(['gripper_controller'], [self.gripper]))
-                self.gripper_published = True
-            sec = int(wall)
-            msg = JointState()
-            msg.header.stamp = Time(sec=sec, nanosec=int((wall - sec) * 1e9))
-            msg.name, msg.position = list(ARM_JOINTS), list(angles)
-            self.real_pub.publish(msg)
-            self.rendered_sequence = sequence
         return enabled, pending, message, True
 
     def close(self):
@@ -109,7 +93,8 @@ class DragFollow(Node):
 def main():
     from PyQt5.QtCore import Qt, QTimer
     from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
-    rclpy.init()
+    from rclpy.signals import SignalHandlerOptions
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = None
     app = QApplication(sys.argv[:1])
 
@@ -131,10 +116,10 @@ def main():
         window.setFocusPolicy(Qt.StrongFocus)
         layout = QVBoxLayout(window)
         layout.addWidget(QLabel(
-            'All six arm joints are enabled once at startup.\n'
-            'M: toggle six-axis motor enable. Q: close this window.\n'
+            'All six arm joints and the gripper are enabled once at startup.\n'
+            'M: release / lock all six arm joints and the gripper together. Q: close this window.\n'
             'When disabled, support the arm and drag it by hand. Gazebo follows the measured pose.\n'
-            'The gripper is not controlled. Closing this window preserves the motor state.'))
+            'Closing this window preserves arm and gripper enable states.'))
         status = QLabel('Waiting for joint feedback...')
         layout.addWidget(status)
         window.resize(720, 190)

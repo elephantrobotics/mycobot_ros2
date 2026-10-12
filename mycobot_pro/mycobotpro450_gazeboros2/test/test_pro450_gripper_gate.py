@@ -130,8 +130,8 @@ class GripperGateTests(unittest.TestCase):
                 values = [0] * 5
                 values[index] = -1
                 sdk = ReadOnlyFakeSdk(values)
-                fake_module = SimpleNamespace(Pro450Client=lambda *_: sdk)
-                with patch.dict(sys.modules, pro450_sdk_adapter=fake_module):
+                fake_module = SimpleNamespace(PublicPro450Client=lambda *_, **__: sdk)
+                with patch.dict(sys.modules, pro450_public_client=fake_module):
                     with self.assertRaisesRegex(RuntimeError, 'gripper read failed'):
                         reader._connect_read_only()
                 reader._publish_snapshot.assert_not_called()
@@ -139,7 +139,7 @@ class GripperGateTests(unittest.TestCase):
     def test_valid_all_joint_startup_can_publish(self):
         reader = Reader()
         sdk = ReadOnlyFakeSdk([50] * 5)
-        with patch.dict(sys.modules, pro450_sdk_adapter=SimpleNamespace(Pro450Client=lambda *_: sdk)):
+        with patch.dict(sys.modules, pro450_public_client=SimpleNamespace(PublicPro450Client=lambda *_, **__: sdk)):
             reader._connect_read_only()
         reader._publish_snapshot.assert_called_once_with([0] * 6 + [.5])
 

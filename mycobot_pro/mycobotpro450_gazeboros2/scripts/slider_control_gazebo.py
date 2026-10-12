@@ -5,6 +5,7 @@
 
 import math
 import queue
+import signal
 import threading
 import time
 
@@ -28,7 +29,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from pro450_real_keyboard import RealPoseReader, sdk_speed_for_rad
 from pro450_real_mirror import RealPoseBuffer
 
-from pro450_sdk_adapter import Pro450Client
+from pro450_public_client import PublicPro450Client as Pro450Client
 from pro450_feedback import attach_feedback, publish_feedback, publish_age
 from pro450_gripper_profile import gripper_speed_for_percentage, gripper_display_rate, GripperMotionEstimate
 
@@ -109,6 +110,7 @@ class SliderControl(Node):
         if mode_name not in ("simulation", "real"):
             raise ValueError("mode must be either 'simulation' or 'real'.")
         self.mode = 2 if mode_name == "real" else 1
+        self._public_scene_managed = True
         self.startup_read_only = bool(
             self.get_parameter("startup_read_only").value
         )
@@ -155,9 +157,7 @@ class SliderControl(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
-        self.real_snapshot_pub = self.create_publisher(
-            JointState, "/pro450/real_state_snapshot", snapshot_qos
-        )
+        self.real_snapshot_pub = None
 
         self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
         self.create_subscription(
@@ -219,9 +219,6 @@ class SliderControl(Node):
             self._on_real_sample(self._startup_pose)
             if self._real_motion_enabled:
                 attach_feedback(self, self._pose_reader)
-                self._mirror_thread = threading.Thread(
-                    target=self._mirror_loop, daemon=True)
-                self._mirror_thread.start()
                 self._real_thread = threading.Thread(
                     target=self._real_robot_worker, daemon=True)
                 self._real_thread.start()
@@ -251,10 +248,7 @@ class SliderControl(Node):
 
     def _setup_real_mirror(self):
         self._real_mirror = RealPoseBuffer()
-        self.real_joint_pub = self.create_publisher(
-            JointState, "/pro450/real_joint_states", 1)
-        self.real_age_pub = self.create_publisher(Float64MultiArray, "/pro450/real_feedback_age", 1)
-        self.gripper_estimate_pub = self.create_publisher(Float64MultiArray, "/pro450/gripper_estimate", 1)
+        self.real_joint_pub = self.real_age_pub = self.gripper_estimate_pub = None
 
     def _on_real_sample(self, pose):
         with self._pose_reader.cache.lock:
@@ -347,7 +341,7 @@ class SliderControl(Node):
                 f"Connecting to Pro450 @ {self.pro450_ip}:{self.pro450_port}"
             )
             self.mc = Pro450Client(self.pro450_ip, self.pro450_port,
-                                   feedback_hz=float(self.get_parameter("feedback_hz").value))
+                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider")
             power_state = self.mc.is_power_on()
             if power_state != 1:
                 raise RuntimeError(
@@ -401,6 +395,8 @@ class SliderControl(Node):
             raise RuntimeError(f"Unable to initialize Pro450: {exc}") from exc
 
     def _publish_real_snapshot(self, angles_deg, gripper_value):
+        if getattr(self.mc, 'public_feedback', False) is True:
+            return  # Initial pose and continuous truth are owned by the public environment.
         snapshot = JointState()
         snapshot.header.stamp = self.get_clock().now().to_msg()
         stamps = [self.mc.sample_time(kind) for kind in ('arm', 'gripper')]
@@ -525,6 +521,9 @@ class SliderControl(Node):
                     f"Rejected: {name}={value:.4f} rad is outside its limits."
                 )
                 return
+
+        # Validate and execute the same discrete opening sent to the SDK.
+        target[-1] = round(target[-1] * 100) / 100.0
 
         speed_scale = 0.2
         if msg.velocity:
@@ -766,6 +765,8 @@ class SliderControl(Node):
         acm.entry_values.append(new_row)
 
     def _ensure_floor_collision_scene(self):
+        if getattr(self, '_public_scene_managed', False):
+            return True, ""  # Public environment readiness includes scene installation.
         if not self.get_scene_client.wait_for_service(timeout_sec=3.0):
             return False, "MoveIt /get_planning_scene service is unavailable."
         if not self.apply_scene_client.wait_for_service(timeout_sec=3.0):
@@ -1234,7 +1235,11 @@ class SliderControl(Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    from rclpy.signals import SignalHandlerOptions
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
+    def interrupted(*_):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, interrupted)
     node = None
     try:
         node = SliderControl()
@@ -1244,6 +1249,8 @@ def main(args=None):
     except Exception as exc:
         print(f"Failed to start slider controller: {exc}")
     finally:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if node is not None:
             if node._real_thread is not None:
                 node._stop_requested = True

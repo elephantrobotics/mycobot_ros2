@@ -11,7 +11,7 @@ from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidi
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool, Float64MultiArray
 
 from pro450_session_support import JOINTS
 
@@ -27,6 +27,13 @@ class EnvironmentState(Node):
         self.verified = False
         self.acknowledged = False
         self.feedback_time = None
+        self.collision_ready = False
+        self.real_feedback_time = None
+        self.real_arm_age = None
+        qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Bool, '/pro450/collision_scene_ready',
+                                 lambda msg: setattr(self, 'collision_ready', msg.data), qos)
+        self.create_subscription(Float64MultiArray, '/pro450/real_feedback_age', self._real_age, 1)
         self.controllers_time = None
         self.controllers_active = False
         self.pending = None
@@ -62,6 +69,11 @@ class EnvironmentState(Node):
         if all(name in positions and math.isfinite(positions[name]) for name in JOINTS):
             self.feedback_time = time.monotonic()
 
+    def _real_age(self, msg):
+        if msg.data:
+            self.real_feedback_time = time.monotonic()
+            self.real_arm_age = msg.data[0]
+
     def tick(self):
         if self.announce:
             self.pub.publish(String(data=self.session))
@@ -84,13 +96,16 @@ class EnvironmentState(Node):
         if self.pending is None and self.controllers.service_is_ready():
             self.pending = self.controllers.call_async(ListControllers.Request())
             self.pending_since = now
-        ready = (self.verified and self.feedback_time is not None
+        ready = (self.verified and self.collision_ready and self.feedback_time is not None
                  and now - self.feedback_time < 1.0 and self.controllers_active
                  and self.controllers_time is not None and now - self.controllers_time < 2.0
                  and all(c.service_is_ready() for c in self.moveit_clients))
         self.pub.publish(String(data=json.dumps({
             'session_id': self.session, 'environment': self.environment,
-            'verified': self.verified, 'ready': bool(ready)})))
+            'verified': self.verified, 'ready': bool(ready),
+            'tracking_ready': (self.environment == 'simulation' or
+                (self.real_feedback_time is not None and now - self.real_feedback_time < 1.
+                 and self.real_arm_age is not None and 0 <= self.real_arm_age < .5))})))
 
 
 def main():

@@ -298,6 +298,8 @@ def build_simulation_stack(
 
     return [
         RegisterEventHandler(OnProcessStart(on_start=filter_gazebo_multicast_logs)),
+        Node(package='mycobotpro450_gazeboros2', executable='pro450_collision_scene.py',
+             output='screen', parameters=[{'use_sim_time': False}]),
         rsp,
         gazebo_description_publisher,
         gazebo,
@@ -340,6 +342,11 @@ def generate_launch_description():
                 "timeout_sec": ParameterValue(LaunchConfiguration("real_snapshot_timeout_sec"), value_type=float),
             }
         ],
+        condition=IfCondition(PythonExpression(["'", environment, "' == 'real'"])),
+    )
+    robot_bridge = Node(
+        package='mycobotpro450_gazeboros2', executable='pro450_robot_bridge.py',
+        output='screen', parameters=[{'use_sim_time': False}],
         condition=IfCondition(PythonExpression(["'", environment, "' == 'real'"])),
     )
     start_real_stack_after_snapshot = RegisterEventHandler(
@@ -399,6 +406,9 @@ def generate_launch_description():
                 }],
             ),
             pose_gate,
+            RegisterEventHandler(OnProcessExit(target_action=robot_bridge,
+                on_exit=[EmitEvent(event=Shutdown(reason='Public robot bridge ended'))])),
+            robot_bridge,
             start_real_stack_after_snapshot,
         ]
     )

@@ -11,6 +11,15 @@ def set_arm_enabled(sdk, enabled):
         raise RuntimeError(f'Arm motor command was not acknowledged (result={result!r}); state unknown')
 
 
+def set_drag_enabled(sdk, enabled):
+    """Switch six-axis and gripper enable together; partial failure is unknown."""
+    set_arm_enabled(sdk, enabled)
+    result = sdk.set_pro_gripper_enabled(int(enabled))
+    if isinstance(result, bool) or result != 1:
+        raise RuntimeError(f'Arm command acknowledged, but gripper command was not acknowledged '
+                           f'(result={result!r}); combined state unknown')
+
+
 class DragState:
     def __init__(self, sdk, enabled=True, clock=time.monotonic):
         self.sdk, self.clock = sdk, clock
@@ -18,7 +27,7 @@ class DragState:
         self.enabled = enabled
         self.pending = False
         self.request = None
-        self.message = 'Robot enabled. Press M to disable all six joints.'
+        self.message = 'Arm and gripper enabled. Press M to release both.'
         self.latest = None
         self.sequence = 0
 
@@ -32,7 +41,7 @@ class DragState:
             # Enabled -> disable; unknown -> enable for explicit recovery.
             self.request = False if self.enabled is True else True
             self.pending = True
-            self.message = 'Switching arm motor state...'
+            self.message = 'Switching arm and gripper enable states...'
             return True
 
     def apply_request(self):
@@ -45,7 +54,7 @@ class DragState:
                 self.message = 'Motor switch cancelled: joint feedback is stale.'
                 return
         try:
-            set_arm_enabled(self.sdk, target)
+            set_drag_enabled(self.sdk, target)
         except Exception as exc:
             with self.lock:
                 self.enabled = None
@@ -53,8 +62,8 @@ class DragState:
         else:
             with self.lock:
                 self.enabled = target
-                self.message = ('Robot enabled. Press M to disable all six joints.' if target else
-                                'Drag mode active. Press M to enable all six joints.')
+                self.message = ('Arm and gripper enabled. Press M to release both.' if target else
+                                'Arm and gripper released. Drag by hand. Press M to lock both.')
         finally:
             with self.lock:
                 self.pending = False

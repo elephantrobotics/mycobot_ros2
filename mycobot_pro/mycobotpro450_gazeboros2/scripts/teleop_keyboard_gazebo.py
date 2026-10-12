@@ -124,6 +124,7 @@ class TeleopKeyboard(Node):
             GetPlanningScene, "/get_planning_scene")
         self.apply_scene_client = self.create_client(
             ApplyPlanningScene, "/apply_planning_scene")
+        self._public_scene_managed = True
         self.floor_clearance_m = 0.0
         self.collision_depth_tolerance_m = DEFAULT_COLLISION_DEPTH_TOLERANCE_M
         self.floor_size_m = 20.0
@@ -165,8 +166,7 @@ class TeleopKeyboard(Node):
                 history=HistoryPolicy.KEEP_LAST, depth=1,
                 reliability=ReliabilityPolicy.RELIABLE,
                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
-            self.snapshot_pub = self.create_publisher(
-                JointState, "/pro450/real_state_snapshot", qos)
+            self.snapshot_pub = None
             self._connect_read_only()
             self._real_pose_reader = RealPoseReader(
                 self.mc, JOINT_LIMITS_RAD, report=self.get_logger().debug)
@@ -182,14 +182,10 @@ class TeleopKeyboard(Node):
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
             self._real_mirror = RealPoseBuffer()
             self._sample_publish_lock = threading.Lock()
-            self.real_joint_pub = self.create_publisher(
-                JointState, "/pro450/real_joint_states", 1)
-            self.real_age_pub = self.create_publisher(Float64MultiArray, "/pro450/real_feedback_age", 1)
+            self.real_joint_pub = self.real_age_pub = None
             self._on_real_sample(self._startup_pose)
             attach_feedback(self, self._real_pose_reader)
             self._real_thread.start()
-            self._mirror_thread = threading.Thread(target=self._mirror_loop, daemon=True)
-            self._mirror_thread.start()
             self.get_logger().info("Real robot READ ONLY. Wait for Gazebo sync before arming.")
         else:
             self.get_logger().info("Simulation mode; no real connection or startup motion.")
@@ -284,6 +280,8 @@ class TeleopKeyboard(Node):
         return pose
 
     def _publish_snapshot(self, pose):
+        if getattr(self.mc, 'public_feedback', False) is True:
+            return
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = "pro450:retain:" + getattr(self.mc, "owner_token", "")
@@ -308,10 +306,10 @@ class TeleopKeyboard(Node):
         self.snapshot_pub.publish(msg)
 
     def _connect_read_only(self):
-        from pro450_sdk_adapter import Pro450Client
+        from pro450_public_client import PublicPro450Client as Pro450Client
         self.get_logger().info(
             f"Connecting to Pro450 @ {DEFAULT_PRO450_IP}:{DEFAULT_PRO450_PORT} (read-only)")
-        self.mc = Pro450Client(DEFAULT_PRO450_IP, DEFAULT_PRO450_PORT)
+        self.mc = Pro450Client(DEFAULT_PRO450_IP, DEFAULT_PRO450_PORT, feature='keyboard')
         if self.mc.is_power_on() != 1:
             raise RuntimeError("Pro450 not powered; automatic power-on is forbidden")
         code = self.mc.get_error_information()
@@ -1035,13 +1033,16 @@ class SimulationHoldWindow:
             ("Real Robot: M enables control. N stops and locks. Keep the hardware E-stop accessible."
              if real else "Simulation mode: controls Gazebo only.")
         ))
+        self.speed_label = QLabel()
+        layout.addWidget(self.speed_label)
+        self._refresh_speed_display()
         gear, speed = self.node.hold_speed_status()
         self.status = QLabel(
             f"Gear {gear}: arm {speed:.1f} deg/s; "
             f"gripper {4 * gear}; "
             "Waiting for Gazebo feedback.")
         layout.addWidget(self.status)
-        self.window.resize(570, 190)
+        self.window.resize(570, 220)
         self.timer = QTimer(self.window)
         self.timer.setInterval(50)
         self.timer.timeout.connect(self.tick)
@@ -1159,8 +1160,14 @@ class SimulationHoldWindow:
         self.release_timer.start()
         self.status.setText("Key release detected: decelerating after debounce.")
 
+    def _refresh_speed_display(self):
+        gear, speed = self.node.hold_speed_status()
+        self.speed_label.setText(
+            f"Current speed — Gear {gear}: arm {speed:.1f} deg/s; gripper {4 * gear}.")
+
     def tick(self):
         try:
+            self._refresh_speed_display()
             self.node.hold_tick()
             transport = getattr(self.node, "real_transport", None)
             if transport is not None and transport.error:
@@ -1215,7 +1222,8 @@ def keyboard_loop(node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    from rclpy.signals import SignalHandlerOptions
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     node = None
     keyboard = None
     ros_thread = None
@@ -1252,10 +1260,8 @@ def main(args=None):
         exit_code = 1
         print(f"Failed to start Pro450 keyboard: {exc}", file=sys.stderr)
     finally:
-        if previous_sigint is not None:
-            signal.signal(signal.SIGINT, previous_sigint)
-        if previous_sigterm is not None:
-            signal.signal(signal.SIGTERM, previous_sigterm)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if node is not None:
             if node.real_transport is not None:
                 node.real_transport.close()
@@ -1293,6 +1299,10 @@ def main(args=None):
             ros_thread.join(timeout=1.0)
         if keyboard is not None:
             keyboard.join(timeout=1.0)
+        if previous_sigint is not None:
+            signal.signal(signal.SIGINT, previous_sigint)
+        if previous_sigterm is not None:
+            signal.signal(signal.SIGTERM, previous_sigterm)
     if exit_code:
         raise SystemExit(exit_code)
 

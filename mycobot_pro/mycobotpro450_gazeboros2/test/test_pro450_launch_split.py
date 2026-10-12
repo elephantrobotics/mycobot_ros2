@@ -156,116 +156,57 @@ def session_methods():
 
 class SessionOrderTests(unittest.TestCase):
     def setUp(self):
-        self.node = session_methods().__new__(session_methods())
+        cls = session_methods()
+        self.node = cls.__new__(cls)
         n = self.node
-        n.failure = None; n.children = []; n.sdk = Mock(owner_token='mine')
-        n.released = None; n.consumed = None; n.environment = 'real'
-        n.feature = 'slider'; n.drag_startup_enabled = False
+        n.failure = None; n.children = []; n.environment = 'real'; n.feature = 'slider'
         n.deadline = time.monotonic() + 30; n.base_unready_since = None
-        n.snapshot_wall = time.time(); n.snapshot = [0.0] * 7
+        n._startup_stale_since = None
         n.latch = EnvironmentLatch('real')
         n.latch.observe(dict(environment='real', session_id='one', verified=False, ready=False))
-        n.ack_pub = Mock(); n._start_controls = Mock(); n._publish_snapshot = Mock()
-        n._prepare_snapshot = Mock(); n._refresh_snapshot = Mock()
+        n._start_controls = Mock(); n.get_logger = Mock(return_value=Mock())
 
     def test_no_control_before_environment_ready(self):
         self.assertTrue(self.node.tick())
         self.node._start_controls.assert_not_called()
-        self.node._publish_snapshot.assert_called_once()
 
-    def test_startup_waits_for_first_environment_without_connecting(self):
-        self.node.latch.received = None
-        self.assertTrue(self.node.tick())
-        self.node._prepare_snapshot.assert_not_called()
+    def test_ready_waits_for_public_real_tracking(self):
+        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True, tracking_ready=False))
+        self.node.tick()
         self.node._start_controls.assert_not_called()
+        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True, tracking_ready=True))
+        self.node.tick()
+        self.node._start_controls.assert_called_once()
+
+    def test_simulation_ready_does_not_require_hardware_tracking(self):
+        self.node.environment = 'simulation'
+        self.node.latch = EnvironmentLatch('simulation')
+        self.node.latch.observe(dict(environment='simulation', session_id='one', verified=True, ready=True))
+        self.node.tick()
+        self.node._start_controls.assert_called_once()
 
     def test_startup_environment_loss_does_not_wait_full_startup_timeout(self):
         self.node.latch.received = time.monotonic() - 3
-        self.assertTrue(self.node.tick())  # Callback catch-up after a slow SDK read.
+        self.assertTrue(self.node.tick())
         self.node._startup_stale_since = time.monotonic() - 3
         with self.assertRaisesRegex(RuntimeError, 'heartbeat lost during startup'):
             self.node.tick()
-        self.node._start_controls.assert_not_called()
 
-    def test_startup_heartbeat_recovery_clears_catchup_deadline(self):
-        self.node._startup_stale_since = time.monotonic() - 3
-        self.node.tick()
-        self.assertIsNone(self.node._startup_stale_since)
-
-    def test_wrong_token_does_not_release_sdk(self):
-        self.node._consumed(SimpleNamespace(data='other'))
-        self.assertIsNone(self.node.consumed)
-        self.node.sdk.close.assert_not_called()
-
-    def test_consumption_releases_before_ack_and_does_not_start_control(self):
-        self.node._consumed(SimpleNamespace(data='mine'))
-        sdk = self.node.sdk
-        events = []
-        sdk.close.side_effect = lambda: events.append('close')
-        self.node.ack_pub.publish.side_effect = lambda _: events.append('ack')
-        self.node.tick()
-        self.assertEqual(events, ['close', 'ack'])
-        self.assertIsNone(self.node.sdk)
-        self.node._start_controls.assert_not_called()
-        self.node.tick()
-        self.node._prepare_snapshot.assert_not_called()
-
-    def test_ready_closes_any_remaining_bootstrap_connection_before_controls(self):
-        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True))
-        events = []
-        self.node.sdk.close.side_effect = lambda: events.append('close')
-        self.node._start_controls.side_effect = lambda: events.append('start')
-        self.node.tick()
-        self.assertEqual(events, ['close', 'start'])
-
-    def test_drag_ready_environment_bootstraps_enable_before_starting_child(self):
-        self.node.feature = 'drag'
-        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True))
-        events = []
-        def prepare():
-            events.append('enable-and-snapshot')
-            self.node.drag_startup_enabled = True
-        self.node._prepare_snapshot.side_effect = prepare
-        self.node.sdk.close.side_effect = lambda: events.append('close')
-        self.node._start_controls.side_effect = lambda: events.append('child')
-        self.node.tick()
-        self.assertEqual(events, ['enable-and-snapshot', 'close', 'child'])
-
-    def test_drag_snapshot_handoff_does_not_enable_again_when_environment_ready(self):
-        self.node.feature = 'drag'
-        self.node.drag_startup_enabled = True
-        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True))
-        self.node.tick()
-        self.node._prepare_snapshot.assert_not_called()
-        self.node._start_controls.assert_called_once()
-
-    def test_base_loss_shuts_down_feature(self):
-        self.node.children = [Mock(poll=lambda: None)]
-        self.node.base_unready_since = time.monotonic() - 3
-        self.node.get_logger = Mock(return_value=Mock())
-        self.assertFalse(self.node.tick())
-
-    def test_lost_heartbeat_does_not_wait_for_a_second_grace_period(self):
+    def test_lost_heartbeat_closes_children(self):
         self.node.children = [Mock(poll=lambda: None)]
         self.node.latch.received = time.monotonic() - 3
-        self.node.get_logger = Mock(return_value=Mock())
         self.assertFalse(self.node.tick())
 
-    def test_cleanup_failure_still_closes_sdk_and_feature_lease(self):
-        self.node.lease = Mock()
-        sdk, lease = self.node.sdk, self.node.lease
-        self.node.close.__globals__['stop_owned_children'] = Mock(side_effect=RuntimeError('child stuck'))
-        with self.assertRaisesRegex(RuntimeError, 'child stuck'):
-            self.node.close()
-        sdk.close.assert_called_once()
-        lease.close.assert_called_once()
+    def test_tracking_loss_after_start_is_handled_by_feature_not_session_exit(self):
+        self.node.children = [Mock(poll=lambda: None)]
+        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True, tracking_ready=False))
+        self.assertTrue(self.node.tick())
 
-    def test_sdk_close_failure_still_releases_feature_lease(self):
+    def test_cleanup_failure_still_releases_feature_lease(self):
         self.node.lease = Mock()
         lease = self.node.lease
-        self.node.sdk.close.side_effect = RuntimeError('socket close failed')
-        self.node.close.__globals__['stop_owned_children'] = Mock()
-        with self.assertRaisesRegex(RuntimeError, 'socket close failed'):
+        self.node.close.__globals__['stop_owned_children'] = Mock(side_effect=RuntimeError('child stuck'))
+        with self.assertRaisesRegex(RuntimeError, 'child stuck'):
             self.node.close()
         lease.close.assert_called_once()
 

@@ -1,14 +1,14 @@
 ## 解耦后的启动方式（当前入口）
 
 公共环境与功能端分别启动。两个终端必须使用相同的 ROS_DOMAIN_ID、工作空间和 environment 参数。
-公共环境不启动滑块页面，不建立真机连接；功能端在环境就绪后启动原有控制程序。
+公共环境在真机模式下持有唯一 SDK 连接，提供只读初始快照、持续真机反馈和 Gazebo 同步；功能端通过公共 ROS 服务提交控制请求。纯仿真不建立真机连接。
 
 真机滑块／随机数控制：
 
 ```bash
-# 终端 1：公共环境，等待真实初始姿态快照
+# 终端 1：公共环境自行读取初始姿态并持续跟踪真机
 ros2 launch mycobotpro450_gazeboros2 slidar.launch.py environment:=real
-# 终端 2：提供只读快照，随后启动滑块控制后端和页面
+# 终端 2：启动滑块控制策略和页面，通过公共服务执行 SDK 调用
 ros2 launch mycobotpro450_gazeboros2 slidar_control_gazebo.launch.py environment:=real
 ```
 
@@ -17,7 +17,7 @@ ros2 launch mycobotpro450_gazeboros2 slidar_control_gazebo.launch.py environment
 ```bash
 # 终端 1：与上面相同；公共环境已运行时无需再启动
 ros2 launch mycobotpro450_gazeboros2 slidar.launch.py environment:=real
-# 终端 2：独立提供快照并启动键盘页面，不启动滑块控制器
+# 终端 2：启动键盘页面，通过公共服务执行 SDK 调用
 ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 ```
 
@@ -29,15 +29,18 @@ Randomize Target、Execute、Force Execute 和碰撞校验的行为不变。
 同一 ROS 域只允许一个功能 launch。切换功能时，先退出当前功能 launch，再启动另一功能 launch；
 公共环境可继续运行，不重新生成 Gazebo 模型。启动时会检查旧版 ros2 run 控制进程，避免重复控制。
 真机初始快照只查询电源、错误、运动状态、六轴角度和夹爪角度；不会自动上电或使能／失能。
-快照被环境消费后先释放 SDK 连接，环境完成初始姿态验证、控制器激活和 MoveIt 服务准备后才开放功能。
+公共环境完成初始姿态验证、控制器激活、统一碰撞场景安装和 MoveIt 服务准备后才开放功能；SDK 连接始终保留在公共通信节点。
 关闭功能端只关闭其自身启动的控制程序；公共环境失去就绪状态时，功能端通过原有退出流程停止。
-本次只拆分启动职责，不提供失能拖动功能；SDK 源码、模型、碰撞矩阵和运动算法没有改动。
+关闭功能后公共环境继续读取真机并同步 Gazebo。SDK 源码和碰撞几何保持不变；拖动功能见文末。
 
 实现边界：
 
-- launch/slider.launch.py：公共 Gazebo、MoveIt、RViz、初始姿态验证。
+- launch/slider.launch.py：公共 Gazebo、MoveIt、RViz、初始姿态验证及持续真机同步。
+- scripts/pro450_robot_bridge.py：唯一 SDK 连接、采样、受限 RPC、功能租约及 Gazebo 跟随。
+- scripts/pro450_collision_scene.py：统一安装现有地面对象和碰撞矩阵规则。
+- scripts/pro450_public_client.py：功能侧 ROS 代理，没有机械臂 TCP 连接。
 - scripts/pro450_environment_state.py：环境就绪心跳，无 SDK 依赖。
-- scripts/pro450_control_session.py：功能互斥、只读快照交接、等待环境、管理自身控制进程。
+- scripts/pro450_control_session.py：功能互斥、等待公共环境和真机跟踪就绪、管理自身控制进程；不读取快照、不调用使能接口。
 - scripts/pro450_session_support.py：公共启动契约，不依赖滑块或键盘控制类。
 - scripts/slider_control_gazebo.py、pro450_slider_gui.py、teleop_keyboard_gazebo.py：原有功能实现。
 
@@ -331,4 +334,6 @@ ros2 launch mycobotpro450_gazeboros2 slidar.launch.py environment:=real
 ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
 ```
 
-拖动功能 launch 不提供 environment 参数，内部固定使用真机环境。等待公共环境匹配后获取独占连接，每次功能启动通过 `set_motor_enabled(254, 1)` 自动使能六轴一次，再提供初始姿态快照；交接后不会重复使能。打开界面后按 M 切换六轴失能/使能，忽略长按重复；失能后托住机械臂手动拖动，Gazebo 根据最新实测六轴角度跟随。夹爪不下发真机控制指令，沿用初始化开度。角度读取单线程串行执行，最多请求 20 Hz，显示不排队重放历史帧；实际更新率取决于真机响应。反馈超过 0.5 秒未更新时冻结仿真最后有效姿态并显示英文提示。Q 或关闭窗口退出，保留当前电机状态，不自动使能或失能。仅支持一个功能会话拥有连接，请先退出滑块/键盘功能 launch。拖动时碰撞几何保持公共环境已有配置，不添加额外碰撞校验；Gazebo 始终跟随实际姿态。
+拖动功能 launch 不提供 environment 参数，内部固定使用真机环境。等待公共环境与实时跟踪就绪后申请独占控制租约，每次功能启动通过公共服务调用 `set_motor_enabled(254, 1)` 自动使能六轴一次；初始快照与持续跟随均由公共环境提供。打开界面后按 M 切换六轴失能/使能，忽略长按重复；失能后托住机械臂手动拖动，Gazebo 根据最新实测六轴角度跟随。夹爪与六轴统一由 M 键切换：启动时使能一次，M 失能时调用 `set_motor_enabled(254, 0)` 和 `set_pro_gripper_enabled(0)`，再次按 M 则分别传入 1，使六轴和夹爪一起锁紧。不下发夹爪角度/速度指令；公共节点在拖动会话期间每 0.5 秒尝试读取真实夹爪开度并同步 Gazebo，读取失败时保持最后有效开度。两次接口调用串行执行，无法保证硬件原子切换；若任一返回失败，界面报告状态未知，下次 M 明确请求重新使能两者。退出时保留六轴与夹爪当前使能状态。角度读取单线程串行执行，最多请求 20 Hz，显示不排队重放历史帧；实际更新率取决于真机响应。反馈超过 0.5 秒未更新时冻结仿真最后有效姿态并显示英文提示。Q 或关闭窗口退出，保留当前电机状态，不自动使能或失能。仅支持一个功能会话拥有连接，请先退出滑块/键盘功能 launch。拖动时碰撞几何保持公共环境已有配置，不添加额外碰撞校验；Gazebo 始终跟随实际姿态。
+
+公共机器人 ROS 服务为 `/pro450/robot_rpc`，接口 `mycobotpro450_gazeboros2/srv/Pro450Rpc`，只开放现有功能需要的方法。控制租约由功能代理每 0.5 秒续约；超过 3 秒未续约则结束该功能的运动，不自动使能或失能。`/pro450/environment_state` 的 `ready` 表示仿真/规划环境就绪，`tracking_ready` 单独表示真机角度反馈新鲜；运行中的短暂反馈故障仍由原有功能锁定/恢复策略处理。

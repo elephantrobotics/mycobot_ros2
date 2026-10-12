@@ -21,6 +21,10 @@ class FakePro450:
         self.speed = 0.0
         self.stamp = time.monotonic()
         self.calls = []
+        self.owner_token = 'fake-public-owner'
+
+    def sample_time(self, kind):
+        return time.monotonic(), time.time()
 
     def update(self):
         now = time.monotonic()
@@ -91,6 +95,8 @@ sys.modules['pro450_sdk_adapter'] = fake_module
 
 import rclpy
 from teleop_keyboard_gazebo import TeleopKeyboard
+from pro450_robot_bridge import RobotBridge
+from rclpy.executors import MultiThreadedExecutor
 
 
 def tick_for(node, seconds):
@@ -103,25 +109,29 @@ def tick_for(node, seconds):
 def main():
     rclpy.init(args=['--ros-args', '-p', 'mode:=real', '-p', 'real_hold_enabled:=true',
                     '-p', 'real_gripper_hold_enabled:=false'])
-    node = TeleopKeyboard()
-    spinner = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    bridge = RobotBridge()
+    executor = MultiThreadedExecutor(num_threads=6)
+    executor.add_node(bridge)
+    spinner = threading.Thread(target=executor.spin, daemon=True)
     spinner.start()
+    node = TeleopKeyboard()
+    executor.add_node(node)
     try:
-        assert type(node.mc) is FakePro450
+        assert type(bridge.sdk) is FakePro450
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             if node._fresh_feedback() is not None and node._mirror_positions is not None:
                 break
             time.sleep(.1)
         time.sleep(.5)
-        assert not node.mc.calls, 'startup issued a motion write'
+        assert not bridge.sdk.calls, 'startup issued a motion write'
         assert node.press_hold(2, 1).startswith('rejected'), 'startup was unlocked'
         node.set_hold_speed_gear(1)
         result = node.arm_real()
         assert result.startswith('armed'), result
-        assert not node.mc.calls, 'arming issued a motion write'
+        assert not bridge.sdk.calls, 'arming issued a motion write'
         original_validator = node._state_is_valid
-        collision_origin = list(node.mc.pose)
+        collision_origin = list(bridge.sdk.pose)
         node._state_is_valid = lambda *_: (False, [], 'collision (fake rejection test)')
         assert node.press_hold(2, 1).startswith('accepted')
         tick_for(node, .8)
@@ -129,12 +139,12 @@ def main():
         tick_for(node, .5)
         # The original hold transport may send a zero-travel position goal or
         # STOP. Both keep the arm at the scanned start; neither is a jog.
-        for call in node.mc.calls:
-            assert call[0] in ('stop', 'angle'), node.mc.calls
+        for call in bridge.sdk.calls:
+            assert call[0] in ('stop', 'angle'), bridge.sdk.calls
             if call[0] == 'angle':
-                assert call[1] == 3, node.mc.calls
-                assert abs(call[2] - math.degrees(collision_origin[2])) <= .01, node.mc.calls
-        assert all(abs(a - b) < 1e-6 for a, b in zip(node.mc.pose, collision_origin)), \
+                assert call[1] == 3, bridge.sdk.calls
+                assert abs(call[2] - math.degrees(collision_origin[2])) <= .01, bridge.sdk.calls
+        assert all(abs(a - b) < 1e-6 for a, b in zip(bridge.sdk.pose, collision_origin)), \
             'blocked collision corridor changed the fake robot pose'
         node._state_is_valid = original_validator
         start = node._fresh_feedback()[0]
@@ -148,13 +158,13 @@ def main():
             after = node._fresh_feedback()[0][2]
             assert direction * (after - before) > .003, (direction, before, after)
             assert node.hold_idle(), 'release did not settle'
-        goals = [call for call in node.mc.calls if call[0] == 'angle']
+        goals = [call for call in bridge.sdk.calls if call[0] == 'angle']
         assert goals and all(call[1] == 3 and math.isfinite(call[2]) and 1 <= call[3] <= 4
                              for call in goals), goals
-        assert not any(call[0] == 'jog' for call in node.mc.calls), node.mc.calls
+        assert not any(call[0] == 'jog' for call in bridge.sdk.calls), bridge.sdk.calls
         assert all(abs(node._fresh_feedback()[0][i] - start[i]) < .001
                    for i in range(7) if i != 2), 'other hardware joint changed'
-        assert ('stop', 0) in node.mc.calls, node.mc.calls
+        assert ('stop', 0) in bridge.sdk.calls, bridge.sdk.calls
         result = node.press_hold(6, 1)
         assert result.startswith('rejected'), 'uncalibrated real gripper was enabled'
         node.stop()
@@ -164,7 +174,10 @@ def main():
     finally:
         node.real_transport.close()
         node._real_thread.join(2)
+        node.mc.close()
+        executor.shutdown(timeout_sec=1.)
         node.destroy_node()
+        bridge.close(); bridge.destroy_node()
         rclpy.try_shutdown()
         spinner.join(1)
 

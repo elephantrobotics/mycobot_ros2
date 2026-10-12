@@ -6,6 +6,9 @@ find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+rosidl_generate_interfaces(${PROJECT_NAME} "srv/Pro450Rpc.srv")
+ament_export_dependencies(rosidl_default_runtime)
 
 add_library(pro450_current_start_adapter SHARED src/use_current_start_state.cpp)
 target_compile_features(pro450_current_start_adapter PUBLIC cxx_std_17)
@@ -39,6 +42,8 @@ install(PROGRAMS
   scripts/pro450_environment_state.py
   scripts/pro450_control_session.py
   scripts/pro450_drag_follow.py
+  scripts/pro450_robot_bridge.py
+  scripts/pro450_collision_scene.py
   scripts/slider_control_gazebo.py
   scripts/verify_initial_pose.py
   scripts/follow_display_gazebo.py
@@ -50,6 +55,8 @@ install(PROGRAMS
 install(FILES scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
   scripts/pro450_session_support.py
   scripts/pro450_drag_support.py
+  scripts/pro450_public_client.py
+  scripts/pro450_broker_support.py
   scripts/pro450_real_mirror.py
   scripts/pro450_sdk_adapter.py scripts/pro450_feedback.py
   scripts/pro450_gripper_profile.py scripts/pro450_gripper_speed.json
