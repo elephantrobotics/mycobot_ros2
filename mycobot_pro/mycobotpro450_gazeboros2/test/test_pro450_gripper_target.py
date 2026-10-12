@@ -12,7 +12,8 @@ from unittest.mock import Mock
 scripts = Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(scripts))
 from pro450_real_keyboard import RealPoseReader, sdk_speed_for_rad
-from pro450_gripper_profile import gripper_speed_for_duration, GripperMotionEstimate
+from pro450_gripper_profile import (gripper_speed_for_duration, gripper_speed_for_percentage,
+                                   gripper_display_rate, GripperMotionEstimate)
 
 
 def methods():
@@ -21,8 +22,8 @@ def methods():
     names = {'_run_real_motion', '_confirm_gripper_speed', '_validate_real_motion', '_mirror_loop'}
     namespace = dict(math=math, COLLISION_SAMPLE_STEP=.1, WAYPOINT_ARM_TOLERANCE_RAD=.01,
                      sdk_speed_for_rad=sdk_speed_for_rad, REAL_ARRIVAL_MARGIN_S=10,
-                     gripper_speed_for_duration=lambda *a: 2,
-                     measured_gripper_rate=lambda *a: .3,
+                     gripper_speed_for_percentage=gripper_speed_for_percentage,
+                     gripper_display_rate=gripper_display_rate, MAX_VELOCITY_RAD_S=[1.] * 7,
                      sdk_motion_accepted=lambda v: v == 1,
                      rclpy=SimpleNamespace(ok=lambda: True))
     namespace.update(time=time, threading=threading, Float64MultiArray=SimpleNamespace, publish_age=Mock())
@@ -32,6 +33,19 @@ def methods():
 
 
 class GripperTargetTests(unittest.TestCase):
+    def test_slider_percentage_covers_full_sdk_range_in_both_directions(self):
+        for scale, expected in [(0.01, 1), (.2, 20), (.5, 50), (.8, 80), (1., 100)]:
+            for start, goal in [(20, 80), (80, 20)]:
+                self.assertEqual(gripper_speed_for_percentage(start, goal, scale), expected)
+        self.assertIsNone(gripper_speed_for_percentage(50, 50, .5))
+
+    def test_display_estimate_accepts_full_range_and_is_monotonic(self):
+        for direction in ('opening', 'closing'):
+            rates = [gripper_display_rate(speed, direction) for speed in range(1, 101)]
+            self.assertTrue(all(math.isfinite(v) and v > 0 for v in rates))
+            self.assertEqual(rates, sorted(rates))
+            self.assertEqual(rates[-1], 1.)
+
     def speed_probe(self, readbacks):
         mc = Mock()
         mc.set_pro_gripper_speed.return_value = 1
@@ -126,7 +140,7 @@ class GripperTargetTests(unittest.TestCase):
         sdk.get_pro_gripper_angle.assert_not_called()
 
     def test_gripper_only_target_does_not_send_any_arm_command(self):
-        mc = Mock(); mc.get_pro_gripper_speed.return_value = 2
+        mc = Mock(); mc.get_pro_gripper_speed.return_value = 20
         current = [0.] * 6 + [.5]; target = [0.] * 6 + [.6]
         obj = SimpleNamespace(_stop_requested=False, get_node_names=lambda: [],
                               _publish_status=Mock(), _pose_reader=SimpleNamespace(cached_gripper=Mock(return_value=.5)),
@@ -141,7 +155,7 @@ class GripperTargetTests(unittest.TestCase):
         methods()['_run_real_motion'](obj, target, .2)
         mc.send_angles.assert_not_called()
         mc.set_pro_gripper_angle.assert_called_once_with(60)
-        mc.set_pro_gripper_speed.assert_called_once_with(2)
+        mc.set_pro_gripper_speed.assert_called_once_with(20)
         self.assertEqual(obj._pose_reader.cached_gripper.call_count, 1)
         self.assertTrue(all(call.kwargs == {'moving': True} for call in obj._read_real_positions.call_args_list))
 
@@ -205,7 +219,7 @@ class GripperTargetTests(unittest.TestCase):
         self.assertTrue(obj._stop_event.is_set())
 
     def test_changed_start_pose_is_revalidated_before_any_motion_write(self):
-        mc = Mock(); mc.get_pro_gripper_speed.return_value = 2
+        mc = Mock(); mc.get_pro_gripper_speed.return_value = 20
         first = [0.] * 6 + [.5]; changed = [0.] * 6 + [.53]; target = [0.] * 6 + [.6]
         stages = []
         def validate(current, goal):

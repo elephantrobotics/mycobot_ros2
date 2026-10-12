@@ -64,10 +64,10 @@ class ForceSimOnlyTests(unittest.TestCase):
         callback(node, msg)
         node._handle_target.assert_called_once_with(msg, force_collision=True)
 
-    def test_simulation_click_keeps_confirmation_and_ten_percent_speed_cap(self):
+    def test_simulation_click_keeps_confirmation_and_selected_speed(self):
         dialog = SimpleNamespace(information=Mock(), warning=Mock(return_value=1), Yes=1, Cancel=2)
         click = method('pro450_slider_gui.py', 'Pro450SliderWindow', '_force_execute',
-                       dict(QMessageBox=dialog, FORCE_EXECUTE_MAX_SPEED_PERCENT=10))
+                       dict(QMessageBox=dialog))
         node = SimpleNamespace(environment='simulation', command_busy=lambda: False,
             execute=Mock(return_value=True), snapshot=lambda: (None, 0, False, 'Ready'))
         window = SimpleNamespace(node=node, _target_positions_rad=lambda: [0]*7,
@@ -76,7 +76,7 @@ class ForceSimOnlyTests(unittest.TestCase):
         click(window)
         dialog.information.assert_not_called()
         dialog.warning.assert_called_once()
-        node.execute.assert_called_once_with([0]*7, 10, force_collision=True)
+        node.execute.assert_called_once_with([0]*7, 50, force_collision=True)
 
     def test_real_mode_force_notice_remains_clickable_without_fresh_feedback(self):
         refresh = method('pro450_slider_gui.py', 'Pro450SliderWindow', '_refresh',

@@ -36,6 +36,8 @@ install(PROGRAMS
   scripts/coords_broadcaster.py
   scripts/pro450_slider_gui.py
   scripts/pro450_pose_gate.py
+  scripts/pro450_environment_state.py
+  scripts/pro450_control_session.py
   scripts/slider_control_gazebo.py
   scripts/verify_initial_pose.py
   scripts/follow_display_gazebo.py
@@ -45,6 +47,7 @@ install(PROGRAMS
 )
 
 install(FILES scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
+  scripts/pro450_session_support.py
   scripts/pro450_real_mirror.py
   scripts/pro450_sdk_adapter.py scripts/pro450_feedback.py
   scripts/pro450_gripper_profile.py scripts/pro450_gripper_speed.json

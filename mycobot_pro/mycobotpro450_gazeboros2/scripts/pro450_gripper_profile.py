@@ -13,6 +13,43 @@ def measured_gripper_rate(speed, direction, profile=None):
     return rates[int(speed)]
 
 
+def gripper_speed_for_percentage(start, goal, speed_scale):
+    """Slider percentage selects the SDK's 1..100 range, independently of arm travel."""
+    if (not all(math.isfinite(v) for v in (start, goal, speed_scale))
+            or not 0 <= start <= 100 or not 0 <= goal <= 100
+            or not 0 < speed_scale <= 1):
+        raise ValueError('invalid gripper speed percentage')
+    if abs(goal - start) < 0.5:
+        return None
+    return max(1, min(100, int(math.floor(speed_scale * 100.0 + 0.5))))
+
+
+def gripper_display_rate(speed, direction, profile=None, nominal_max_rate=1.0):
+    """Measured low-speed interpolation; unmeasured upper range uses a nominal estimate.
+
+    The nominal endpoint is the model's velocity limit, not a measured physical
+    speed. This function is display-only and never selects an SDK command.
+    """
+    if not isinstance(speed, int) or isinstance(speed, bool) or not 1 <= speed <= 100:
+        raise ValueError('gripper SDK speed must be an integer in 1..100')
+    if profile is None:
+        profile = json.loads(Path(__file__).with_name('pro450_gripper_speed.json').read_text())
+    points = sorted((int(s), float(rate) / 100.0) for s, rate in profile[direction])
+    # Minor noise in the old short-stroke readings must not make increasing
+    # the slider decrease the simulated speed.
+    monotonic = []
+    for s, rate in points:
+        monotonic.append((s, max(rate, monotonic[-1][1] if monotonic else rate)))
+    if monotonic[-1][0] < 100:
+        monotonic.append((100, max(float(nominal_max_rate), monotonic[-1][1])))
+    if speed <= monotonic[0][0]:
+        return monotonic[0][1]
+    for (lo, a), (hi, b) in zip(monotonic, monotonic[1:]):
+        if speed <= hi:
+            return a + (b - a) * (speed - lo) / (hi - lo)
+    return monotonic[-1][1]
+
+
 class GripperMotionEstimate:
     """Independent display output; its estimates never replace sensor data.
 

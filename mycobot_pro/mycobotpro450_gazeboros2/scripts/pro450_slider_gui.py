@@ -47,7 +47,6 @@ JOINT_LIMITS_RAD = [
 ]
 RAD_DISPLAY_DECIMALS = 4
 RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
-FORCE_EXECUTE_MAX_SPEED_PERCENT = 10
 
 
 class SliderGuiNode(Node):
@@ -368,8 +367,8 @@ class Pro450SliderWindow(QMainWindow):
             self,
             "Simulation Collision Override",
             "This bypasses MoveIt collision rejection and is allowed only in "
-            "Gazebo simulation mode. Joint limits, finite feedback, STOP, and "
-            "a 10% speed cap remain active. Gazebo physical self-contact is "
+            "Gazebo simulation mode. Motion uses the speed selected in the slider window. "
+            "Joint limits, finite feedback, and STOP remain active. Gazebo physical self-contact is "
             "disabled, so intersecting robot links will not stop the motion.\n\n"
             "Execute this target anyway?",
             QMessageBox.Yes | QMessageBox.Cancel,
@@ -379,9 +378,7 @@ class Pro450SliderWindow(QMainWindow):
             return
 
         positions = self._target_positions_rad()
-        forced_speed = min(
-            self.speed_box.value(), FORCE_EXECUTE_MAX_SPEED_PERCENT
-        )
+        forced_speed = self.speed_box.value()
         if not self.node.execute(positions, forced_speed, force_collision=True):
             return
         self.execute_button.setEnabled(False)

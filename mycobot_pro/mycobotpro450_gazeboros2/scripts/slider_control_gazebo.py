@@ -30,7 +30,7 @@ from pro450_real_mirror import RealPoseBuffer
 
 from pro450_sdk_adapter import Pro450Client
 from pro450_feedback import attach_feedback, publish_feedback, publish_age
-from pro450_gripper_profile import gripper_speed_for_duration, measured_gripper_rate, GripperMotionEstimate
+from pro450_gripper_profile import gripper_speed_for_percentage, gripper_display_rate, GripperMotionEstimate
 
 
 DEFAULT_PRO450_IP = "192.168.0.232"
@@ -55,7 +55,6 @@ SPLINE_PEAK_VELOCITY_FACTOR = 1.5
 COLLISION_SAMPLE_STEP = math.radians(1.0)
 MAX_COLLISION_SAMPLES = 400
 DEFAULT_COLLISION_DEPTH_TOLERANCE_M = 0.0001
-FORCE_EXECUTE_MAX_SPEED_SCALE = 0.10
 FLOOR_OBJECT_ID = "pro450_ground_safety"
 REAL_POSE_TOLERANCE_RAD = 0.05
 WAYPOINT_ARM_TOLERANCE_RAD = math.radians(0.5)
@@ -533,8 +532,6 @@ class SliderControl(Node):
             if finite_speeds:
                 speed_scale = max(finite_speeds)
         speed_scale = max(0.01, min(1.0, speed_scale))
-        if force_collision:
-            speed_scale = min(speed_scale, FORCE_EXECUTE_MAX_SPEED_SCALE)
 
         if self.mode == 2:
             self._queue_real_motion(target, speed_scale)
@@ -1128,7 +1125,7 @@ class SliderControl(Node):
         duration = self._trajectory_duration(current, target, speed_scale)
         grip_start = int(round(current[6] * 100.0))
         grip_goal = int(round(target[6] * 100.0))
-        grip_speed = gripper_speed_for_duration(grip_start, grip_goal, duration)
+        grip_speed = gripper_speed_for_percentage(grip_start, grip_goal, speed_scale)
         mean_arm_speed = max(abs(b-a) for a,b in zip(current[:6], target[:6])) / duration
         speed = max(1, sdk_speed_for_rad(mean_arm_speed))
         if self._stop_requested:
@@ -1142,7 +1139,8 @@ class SliderControl(Node):
             if not self._confirm_gripper_speed(grip_speed):
                 self._publish_status("Cancelled before execution.")
                 return
-            rate = measured_gripper_rate(grip_speed, 'opening' if grip_goal > grip_start else 'closing')
+            rate = gripper_display_rate(grip_speed, 'opening' if grip_goal > grip_start else 'closing',
+                                        nominal_max_rate=MAX_VELOCITY_RAD_S[6])
             self._motion_sent = True
             self._gripper_model.start(current[6], grip_goal / 100.0, rate)
             self._send_gripper(grip_goal)

@@ -1,3 +1,50 @@
+## 解耦后的启动方式（当前入口）
+
+公共环境与功能端分别启动。两个终端必须使用相同的 ROS_DOMAIN_ID、工作空间和 environment 参数。
+公共环境不启动滑块页面，不建立真机连接；功能端在环境就绪后启动原有控制程序。
+
+真机滑块／随机数控制：
+
+```bash
+# 终端 1：公共环境，等待真实初始姿态快照
+ros2 launch mycobotpro450_gazeboros2 slidar.launch.py environment:=real
+# 终端 2：提供只读快照，随后启动滑块控制后端和页面
+ros2 launch mycobotpro450_gazeboros2 slidar_control_gazebo.launch.py environment:=real
+```
+
+真机键盘控制：
+
+```bash
+# 终端 1：与上面相同；公共环境已运行时无需再启动
+ros2 launch mycobotpro450_gazeboros2 slidar.launch.py environment:=real
+# 终端 2：独立提供快照并启动键盘页面，不启动滑块控制器
+ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
+```
+
+纯仿真使用同样的两个 launch，将两个 environment 参数都改为 simulation。
+`slider.launch.py` 保留为公共环境入口，`slidar.launch.py` 是同一入口的拼写别名。
+键盘依然需要先按 M 解锁，再按住原有运动键；松开夹爪按键仍使用既有读取角度后保持逻辑。
+Randomize Target、Execute、Force Execute 和碰撞校验的行为不变。
+
+同一 ROS 域只允许一个功能 launch。切换功能时，先退出当前功能 launch，再启动另一功能 launch；
+公共环境可继续运行，不重新生成 Gazebo 模型。启动时会检查旧版 ros2 run 控制进程，避免重复控制。
+真机初始快照只查询电源、错误、运动状态、六轴角度和夹爪角度；不会自动上电或使能／失能。
+快照被环境消费后先释放 SDK 连接，环境完成初始姿态验证、控制器激活和 MoveIt 服务准备后才开放功能。
+关闭功能端只关闭其自身启动的控制程序；公共环境失去就绪状态时，功能端通过原有退出流程停止。
+本次只拆分启动职责，不提供失能拖动功能；SDK 源码、模型、碰撞矩阵和运动算法没有改动。
+
+实现边界：
+
+- launch/slider.launch.py：公共 Gazebo、MoveIt、RViz、初始姿态验证。
+- scripts/pro450_environment_state.py：环境就绪心跳，无 SDK 依赖。
+- scripts/pro450_control_session.py：功能互斥、只读快照交接、等待环境、管理自身控制进程。
+- scripts/pro450_session_support.py：公共启动契约，不依赖滑块或键盘控制类。
+- scripts/slider_control_gazebo.py、pro450_slider_gui.py、teleop_keyboard_gazebo.py：原有功能实现。
+
+下面保留历史说明供查阅；以本节两 launch 的启动方式为准，不再额外启动历史 ros2 run 控制器。
+
+---
+
 ### 本地 1.操作流程
 
 #### 1.1 安装前提
@@ -273,3 +320,5 @@ ros2 run mycobotpro450_gazeboros2 teleop_keyboard_gazebo.py
 
 
 
+
+夹爪速度：滑块页面 Speed (%) 直接对应夹爪 SDK 的 1–100 速度参数，例如 20% → 20、50% → 50。夹爪速度不再由机械臂轨迹时长反推，因此机械臂与夹爪不保证同时到位。Gazebo 夹爪低速显示采用已有测量数据，未标定的高速区间采用模型速度上限插值估计；该估计不参与 SDK 速度指令计算。

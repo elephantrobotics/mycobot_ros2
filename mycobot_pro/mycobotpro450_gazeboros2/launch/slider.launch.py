@@ -1,4 +1,7 @@
 import os
+import logging
+import re
+import uuid
 
 from launch import LaunchDescription
 from launch.actions import (
@@ -10,7 +13,7 @@ from launch.actions import (
     RegisterEventHandler,
 )
 from launch.conditions import IfCondition
-from launch.event_handlers import OnProcessExit
+from launch.event_handlers import OnProcessExit, OnProcessStart
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -29,6 +32,28 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 CONTROLLER_MANAGER_TIMEOUT = "30"
 DEFAULT_REAL_SNAPSHOT_FILE = "/tmp/mycobotpro450_real_initial_positions.yaml"
+
+
+class GazeboMulticastLogFilter(logging.Filter):
+    """Hide only the repeated ENODEV discovery diagnostic; preserve other output."""
+    message = re.compile(
+        r"(?:Exception sending a multicast message:\s*"
+        r"(?:No such device|没有那个设备|没有这个设备)\s*)+"
+    )
+
+    def filter(self, record):
+        text = re.sub(r"^\[gz(?:server|client)-\d+\]\s*", "", record.getMessage())
+        return self.message.fullmatch(text.strip()) is None
+
+
+def filter_gazebo_multicast_logs(event, context):
+    name = event.process_name
+    if re.fullmatch(r"gz(?:server|client)-\d+", name):
+        for stream in ("stdout", "stderr"):
+            logger = logging.getLogger(f"{name}-{stream}")
+            if not any(isinstance(f, GazeboMulticastLogFilter) for f in logger.filters):
+                logger.addFilter(GazeboMulticastLogFilter())
+    return []
 
 
 CONTROLLERS = [
@@ -96,7 +121,7 @@ def build_simulation_stack(
     pause_gazebo,
     coordinated_start,
     control_mode,
-    startup_read_only,
+    session_id="",
 ):
     """Build one isolated Pro450 Gazebo stack for the selected environment."""
     gazebo_robot_description = {
@@ -149,7 +174,7 @@ def build_simulation_stack(
         PythonLaunchDescriptionSource(
             os.path.join(gazebo_ros_share, "launch", "gazebo.launch.py")
         ),
-        launch_arguments={"pause": pause_gazebo}.items(),
+        launch_arguments={"pause": pause_gazebo, "gui": LaunchConfiguration("gazebo_gui")}.items(),
     )
     spawn_entity = Node(
         package="gazebo_ros",
@@ -181,8 +206,8 @@ def build_simulation_stack(
                 "expected_file": ParameterValue(
                     initial_positions_file, value_type=str
                 ),
-                "tolerance_rad": LaunchConfiguration("initial_pose_tolerance_rad"),
-                "timeout_sec": LaunchConfiguration("initial_pose_timeout_sec"),
+                "tolerance_rad": ParameterValue(LaunchConfiguration("initial_pose_tolerance_rad"), value_type=float),
+                "timeout_sec": ParameterValue(LaunchConfiguration("initial_pose_timeout_sec"), value_type=float),
                 "unpause_before_verify": False,
             }
         ],
@@ -199,6 +224,7 @@ def build_simulation_stack(
         executable="rviz2",
         name="rviz2",
         output="log",
+        condition=IfCondition(LaunchConfiguration("rviz")),
         arguments=["-d", str(moveit_config.package_path / "config/moveit.rviz")],
         parameters=[
             moveit_config.robot_description,
@@ -209,25 +235,16 @@ def build_simulation_stack(
             {"use_sim_time": True},
         ],
     )
-    slider_gui = Node(
+    environment_ready = Node(
         package="mycobotpro450_gazeboros2",
-        executable="pro450_slider_gui.py",
-        name="pro450_slider_gui",
+        executable="pro450_environment_state.py",
+        name="pro450_environment_ready",
+        arguments=["--announce-ready"],
         output="screen",
         parameters=[{
-            "use_sim_time": control_mode != "real",
+            "use_sim_time": False,
             "environment": control_mode,
-        }],
-    )
-    slider_control = Node(
-        package="mycobotpro450_gazeboros2",
-        executable="slider_control_gazebo.py",
-        name="slider_control_gazebo",
-        output="screen",
-        parameters=[{
-            "use_sim_time": True,
-            "mode": control_mode,
-            "startup_read_only": startup_read_only,
+            "session_id": session_id,
         }],
     )
 
@@ -255,7 +272,7 @@ def build_simulation_stack(
                 target_action=pose_verifier,
                 on_exit=continue_after_success(
                     "Pro450 initial-pose verification",
-                    [move_group, rviz, slider_gui, slider_control],
+                    [move_group, rviz, environment_ready],
                 ),
             )
         )
@@ -273,13 +290,14 @@ def build_simulation_stack(
                 target_action=controllers,
                 on_exit=continue_after_success(
                     "grouped Pro450 controller activation",
-                    [move_group, rviz, slider_gui, slider_control],
+                    [move_group, rviz, environment_ready],
                 ),
             )
         )
         lifecycle_handlers = [expose_tools]
 
     return [
+        RegisterEventHandler(OnProcessStart(on_start=filter_gazebo_multicast_logs)),
         rsp,
         gazebo_description_publisher,
         gazebo,
@@ -290,6 +308,7 @@ def build_simulation_stack(
 
 
 def generate_launch_description():
+    session_id = uuid.uuid4().hex
     moveit_config = use_current_planning_start(MoveItConfigsBuilder(
         "firefighter", package_name="mycobotpro450_gazeboros2"
     ).to_moveit_configs())
@@ -303,11 +322,11 @@ def generate_launch_description():
 
     simulation_stack = build_simulation_stack(
         moveit_config, default_initial_positions, "false", False,
-        "simulation", False,
+        "simulation", session_id,
     )
     real_stack = build_simulation_stack(
         moveit_config, real_snapshot_file, "true", True,
-        "real", False,
+        "real", session_id,
     )
 
     pose_gate = Node(
@@ -318,7 +337,7 @@ def generate_launch_description():
         parameters=[
             {
                 "output_file": ParameterValue(real_snapshot_file, value_type=str),
-                "timeout_sec": LaunchConfiguration("real_snapshot_timeout_sec"),
+                "timeout_sec": ParameterValue(LaunchConfiguration("real_snapshot_timeout_sec"), value_type=float),
             }
         ],
         condition=IfCondition(PythonExpression(["'", environment, "' == 'real'"])),
@@ -340,6 +359,8 @@ def generate_launch_description():
                 choices=["simulation", "real"],
                 description="Pro450 environment: simulation or real-pose mirror.",
             ),
+            DeclareLaunchArgument("gazebo_gui", default_value="true"),
+            DeclareLaunchArgument("rviz", default_value="true"),
             DeclareLaunchArgument(
                 "real_snapshot_file",
                 default_value=DEFAULT_REAL_SNAPSHOT_FILE,
@@ -365,6 +386,17 @@ def generate_launch_description():
                 condition=IfCondition(
                     PythonExpression(["'", environment, "' == 'simulation'"])
                 ),
+            ),
+            Node(
+                package="mycobotpro450_gazeboros2",
+                executable="pro450_environment_state.py",
+                name="pro450_environment_state",
+                output="screen",
+                parameters=[{
+                    "use_sim_time": False,
+                    "environment": environment,
+                    "session_id": session_id,
+                }],
             ),
             pose_gate,
             start_real_stack_after_snapshot,

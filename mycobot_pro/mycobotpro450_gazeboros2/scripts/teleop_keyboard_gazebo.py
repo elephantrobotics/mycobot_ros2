@@ -504,8 +504,7 @@ class TeleopKeyboard(Node):
         self.get_logger().info(
             f"Keyboard speed gear {gear}: "
             f"arm {math.degrees(HOLD_SPEED_GEARS[gear - 1]):.1f} deg/s; "
-            f"gripper {HOLD_GRIPPER_SPEED_GEARS[gear - 1]:.2f} rad/s; "
-            f"real gripper SDK {4 * gear}")
+            f"gripper {4 * gear}")
 
     def hold_speed_status(self):
         with self._hold_lock:
@@ -1029,19 +1028,18 @@ class SimulationHoldWindow:
         self.window.setFocusPolicy(Qt.StrongFocus)
         layout = QVBoxLayout(self.window)
         layout.addWidget(QLabel(
-            "Click this window, then HOLD w/s e/d r/f t/g y/h u/j to move.\n"
-            "Release to decelerate. Hold [ or ] for the gripper.\n"
-            "- / +: slower / faster; 1-5: speed gear.\n"
-            "Space: STOP and lock. Q/Ctrl+C: brake and quit. Focus loss releases.\n" +
-            ("REAL: read-only until M arms. N stops and locks. Hardware E-stop required."
-             if real else "Simulation only — this window never connects to the real robot.")
+            "Focus this window. Hold w/s, e/d, r/f, t/g, y/h, or u/j to move joints.\n"
+            "Release to stop. Hold [ or ] to control the gripper.\n"
+            "- / +: decrease / increase speed. 1-5: select speed gear.\n"
+            "Space: stop and lock. Q / Ctrl+C: stop and exit. Losing focus stops motion.\n" +
+            ("Real Robot: M enables control. N stops and locks. Keep the hardware E-stop accessible."
+             if real else "Simulation mode: controls Gazebo only.")
         ))
         gear, speed = self.node.hold_speed_status()
         self.status = QLabel(
             f"Gear {gear}: arm {speed:.1f} deg/s; "
-            f"gripper {HOLD_GRIPPER_SPEED_GEARS[gear - 1]:.2f} rad/s; "
-            f"real gripper SDK {4 * gear}; "
-            "awaiting Gazebo feedback.")
+            f"gripper {4 * gear}; "
+            "Waiting for Gazebo feedback.")
         layout.addWidget(self.status)
         self.window.resize(570, 190)
         self.timer = QTimer(self.window)
@@ -1112,8 +1110,7 @@ class SimulationHoldWindow:
             _, speed = self.node.hold_speed_status()
             self.status.setText(
                 f"Gear {gear}: arm {speed:.1f} deg/s; "
-                f"gripper {HOLD_GRIPPER_SPEED_GEARS[gear - 1]:.2f} rad/s; "
-                f"real gripper SDK {4 * gear}.")
+                f"gripper {4 * gear}.")
             return
         if event.key() == self.Qt.Key_Space:
             self.pressed_code = None

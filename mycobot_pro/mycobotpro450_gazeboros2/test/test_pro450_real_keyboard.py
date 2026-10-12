@@ -79,6 +79,21 @@ class TransportTests(unittest.TestCase):
         self.transport.cycle()
         self.assertEqual(self.sdk.calls, [])
 
+    def test_zero_travel_scanned_goal_holds_current_pose_without_jog(self):
+        self.assertTrue(self.transport.arm())
+        origin = list(self.sdk.pose)
+        self.assertTrue(self.transport.submit(2, origin[2], math.radians(6),
+                                              origin, origin[2], position_goal=True))
+        self.transport.cycle()
+        self.assertEqual(len(self.sdk.calls), 1)
+        goal = self.sdk.calls[0]
+        self.assertEqual(goal[0:2], ('angle', 3))
+        self.assertEqual(goal[2], math.degrees(origin[2]))
+        self.assertFalse(any(call[0] == 'jog' for call in self.sdk.calls))
+        self.transport.stop(emergency=True)
+        self.transport.cycle()
+        self.assertEqual(self.sdk.calls[-1], ('stop', 0))
+
     def test_arm_hold_jogs_once_at_gear_speed(self):
         self.command()
         self.assertEqual(self.sdk.calls, [('jog', 3, 1, 8, True)])

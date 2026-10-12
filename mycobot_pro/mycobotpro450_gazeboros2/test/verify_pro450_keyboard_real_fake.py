@@ -121,12 +121,21 @@ def main():
         assert result.startswith('armed'), result
         assert not node.mc.calls, 'arming issued a motion write'
         original_validator = node._state_is_valid
+        collision_origin = list(node.mc.pose)
         node._state_is_valid = lambda *_: (False, [], 'collision (fake rejection test)')
         assert node.press_hold(2, 1).startswith('accepted')
         tick_for(node, .8)
         node.release_hold()
         tick_for(node, .5)
-        assert not node.mc.calls, 'rejected collision corridor issued motion'
+        # The original hold transport may send a zero-travel position goal or
+        # STOP. Both keep the arm at the scanned start; neither is a jog.
+        for call in node.mc.calls:
+            assert call[0] in ('stop', 'angle'), node.mc.calls
+            if call[0] == 'angle':
+                assert call[1] == 3, node.mc.calls
+                assert abs(call[2] - math.degrees(collision_origin[2])) <= .01, node.mc.calls
+        assert all(abs(a - b) < 1e-6 for a, b in zip(node.mc.pose, collision_origin)), \
+            'blocked collision corridor changed the fake robot pose'
         node._state_is_valid = original_validator
         start = node._fresh_feedback()[0]
         for direction in (1, -1):
