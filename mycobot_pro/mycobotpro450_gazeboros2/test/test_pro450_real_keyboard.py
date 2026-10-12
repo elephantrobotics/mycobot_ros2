@@ -3,9 +3,68 @@ import math
 from pathlib import Path
 import sys
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from pro450_real_keyboard import RealKeyboardTransport, sdk_speed_for_rad, SDK_RAD_PER_SPEED
+from pro450_real_keyboard import (RealKeyboardTransport, RealPoseReader, ArmReadError,
+                                 sdk_speed_for_rad, SDK_RAD_PER_SPEED)
+
+
+class ArmReadFailureTests(unittest.TestCase):
+    def execute_sequence(self, outcomes):
+        transport = RealKeyboardTransport(Mock(), lambda: None, Mock(), [(-3., 3.)] * 7)
+        transport.armed = True
+        index = [0]
+        states = []
+        def cycle():
+            outcome = outcomes[index[0]]
+            states.append((transport.armed, transport.error))
+            if outcome is not None:
+                raise outcome
+        transport.cycle = cycle
+        transport.closed = SimpleNamespace(
+            is_set=lambda: index[0] >= len(outcomes),
+            wait=lambda _: index.__setitem__(0, index[0] + 1))
+        transport.run()
+        return transport, states
+
+    def test_four_angle_failures_do_not_latch_fifth_does(self):
+        transport, states = self.execute_sequence([ArmReadError('timeout')] * 5)
+        self.assertTrue(all(armed and error is None for armed, error in states))
+        self.assertFalse(transport.armed)
+        self.assertIn('Five consecutive', transport.error)
+
+    def test_success_resets_counter_between_failure_groups(self):
+        transport, states = self.execute_sequence(
+            [ArmReadError('timeout')] * 4 + [None] + [ArmReadError('bad payload')] * 4)
+        self.assertTrue(transport.armed)
+        self.assertIsNone(transport.error)
+        self.assertEqual(transport._arm_read_failures, 4)
+
+    def test_other_faults_still_latch_on_first_exception(self):
+        transport, _ = self.execute_sequence([RuntimeError('invalid hardware moving status')])
+        self.assertFalse(transport.armed)
+        self.assertEqual(transport.error, 'invalid hardware moving status')
+
+    def test_sdk_exception_and_invalid_payload_are_angle_read_failures(self):
+        sdk = Mock()
+        reader = RealPoseReader(sdk, [(-3., 3.)] * 7)
+        sdk.get_angles.side_effect = TimeoutError('no reply')
+        with self.assertRaises(ArmReadError):
+            reader()
+        sdk.get_angles.side_effect = None
+        for payload in (-1, [0.] * 5, [float('nan')] * 6, [200.] * 6, [True] * 6):
+            sdk.get_angles.return_value = payload
+            with self.assertRaises(ArmReadError):
+                reader()
+
+    def test_valid_angles_missing_timestamp_remain_immediate_other_fault(self):
+        sdk = Mock(get_angles=Mock(return_value=[0.] * 6), sample_time=Mock(return_value=None))
+        reader = RealPoseReader(sdk, [(-3., 3.)] * 7)
+        with self.assertRaises(RuntimeError) as caught:
+            reader()
+        self.assertNotIsInstance(caught.exception, ArmReadError)
 
 
 class FakeSDK:

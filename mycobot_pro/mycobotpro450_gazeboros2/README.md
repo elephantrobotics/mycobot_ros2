@@ -322,3 +322,13 @@ ros2 run mycobotpro450_gazeboros2 teleop_keyboard_gazebo.py
 
 
 夹爪速度：滑块页面 Speed (%) 直接对应夹爪 SDK 的 1–100 速度参数，例如 20% → 20、50% → 50。夹爪速度不再由机械臂轨迹时长反推，因此机械臂与夹爪不保证同时到位。Gazebo 夹爪低速显示采用已有测量数据，未标定的高速区间采用模型速度上限插值估计；该估计不参与 SDK 速度指令计算。
+
+
+真机拖动跟随（独立功能，不启动滑块或键盘控制器）：
+
+```bash
+ros2 launch mycobotpro450_gazeboros2 slidar.launch.py environment:=real
+ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
+```
+
+拖动功能 launch 不提供 environment 参数，内部固定使用真机环境。等待公共环境匹配后获取独占连接，每次功能启动通过 `set_motor_enabled(254, 1)` 自动使能六轴一次，再提供初始姿态快照；交接后不会重复使能。打开界面后按 M 切换六轴失能/使能，忽略长按重复；失能后托住机械臂手动拖动，Gazebo 根据最新实测六轴角度跟随。夹爪不下发真机控制指令，沿用初始化开度。角度读取单线程串行执行，最多请求 20 Hz，显示不排队重放历史帧；实际更新率取决于真机响应。反馈超过 0.5 秒未更新时冻结仿真最后有效姿态并显示英文提示。Q 或关闭窗口退出，保留当前电机状态，不自动使能或失能。仅支持一个功能会话拥有连接，请先退出滑块/键盘功能 launch。拖动时碰撞几何保持公共环境已有配置，不添加额外碰撞校验；Gazebo 始终跟随实际姿态。

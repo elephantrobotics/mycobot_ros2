@@ -15,6 +15,10 @@ from pro450_hold_profile import PositionVelocityEstimator
 SDK_RAD_PER_SPEED = math.pi / 120.0  # User calibration: 100 -> 150 deg/s.
 
 
+class ArmReadError(RuntimeError):
+    """A failed six-axis angle query or invalid angle payload."""
+
+
 def valid_gripper_position(raw):
     """Check SDK read status before mapping 0..100 to the URDF coordinate."""
     if isinstance(raw, bool) or not isinstance(raw, (int, float)):
@@ -104,13 +108,13 @@ class RealPoseReader:
     def observe_arm(self, raw, when, wall_time):
         """Commit a received arm sample without waiting for a gripper query."""
         if not isinstance(raw, (list, tuple)) or len(raw) != 6:
-            raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
+            raise ArmReadError(f"Invalid Pro450 arm response: {raw!r}")
         if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in raw):
-            raise RuntimeError(f"Invalid Pro450 arm response: {raw!r}")
+            raise ArmReadError(f"Invalid Pro450 arm response: {raw!r}")
         arm = [math.radians(v) for v in raw]
         if not all(math.isfinite(v) and lo <= v <= hi
                    for v, (lo, hi) in zip(arm, self.limits[:6])):
-            raise RuntimeError(f"Pro450 arm feedback violates joint limits: {raw!r}")
+            raise ArmReadError(f"Pro450 arm feedback violates joint limits: {raw!r}")
         with self.cache.lock:
             if self.cache.arm_time is None or when > self.cache.arm_time:
                 self.cache.store_arm(arm, when)
@@ -178,7 +182,18 @@ class RealPoseReader:
         return value
 
     def __call__(self, moving=False):
-        raw = self.sdk.get_angles()
+        try:
+            raw = self.sdk.get_angles()
+        except Exception as exc:
+            raise ArmReadError(f'Pro450 arm read failed: {exc}') from exc
+        # Validate the payload before querying its timestamp: an invalid reply
+        # must count as an angle-read failure rather than a timestamp fault.
+        if (not isinstance(raw, (list, tuple)) or len(raw) != 6 or
+                any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in raw)):
+            raise ArmReadError(f'Invalid Pro450 arm response: {raw!r}')
+        if not all(math.isfinite(v) and lo <= math.radians(v) <= hi
+                   for v, (lo, hi) in zip(raw, self.limits[:6])):
+            raise ArmReadError(f'Pro450 arm feedback violates joint limits: {raw!r}')
         stamp, wall = self._sample_stamp('arm')
         self.observe_arm(raw, stamp, wall)
         if moving and self.cache.gripper is not None:
@@ -263,6 +278,7 @@ class RealKeyboardTransport:
         self.velocity = None
         self.received = 0.0
         self.error = None
+        self._arm_read_failures = 0
         self.armed = False
         self.command = None
         self.stop_pending = None
@@ -541,6 +557,16 @@ class RealKeyboardTransport:
             try:
                 self.cycle()
             except Exception as exc:
+                if isinstance(exc, ArmReadError):
+                    self._arm_read_failures += 1
+                    if self._arm_read_failures < 5:
+                        # Retry without issuing a new motion on invalid feedback.
+                        self.closed.wait(0.02)
+                        continue
+                    exc = ArmReadError(
+                        f'Five consecutive arm angle reads failed: {exc}')
+                else:
+                    self._arm_read_failures = 0
                 self._latch_fault(exc)
                 # A failed read/send may have left a finite goal active.
                 if self.motion_sent:
@@ -549,6 +575,8 @@ class RealKeyboardTransport:
                         self.motion_sent = False
                     except Exception:
                         pass  # Keep latch; operator must use hardware E-stop.
+            else:
+                self._arm_read_failures = 0
             self.closed.wait(0.02)
 
     def close(self):

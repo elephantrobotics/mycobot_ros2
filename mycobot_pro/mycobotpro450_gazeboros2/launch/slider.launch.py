@@ -35,10 +35,10 @@ DEFAULT_REAL_SNAPSHOT_FILE = "/tmp/mycobotpro450_real_initial_positions.yaml"
 
 
 class GazeboMulticastLogFilter(logging.Filter):
-    """Hide only the repeated ENODEV discovery diagnostic; preserve other output."""
+    """Hide selected repeated multicast diagnostics; preserve other output."""
     message = re.compile(
         r"(?:Exception sending a multicast message:\s*"
-        r"(?:No such device|没有那个设备|没有这个设备)\s*)+"
+        r"(?:No such device|没有那个设备|没有这个设备|Network is unreachable|网络不可达)\s*)+"
     )
 
     def filter(self, record):

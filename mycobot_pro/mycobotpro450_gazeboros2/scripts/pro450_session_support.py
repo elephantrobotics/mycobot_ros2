@@ -122,6 +122,10 @@ def control_commands(feature, environment, executable_directory, python):
         return [command('teleop_keyboard_gazebo.py', {
             'mode': environment, 'use_sim_time': 'false',
             'real_hold_enabled': 'true', 'real_gripper_hold_enabled': 'true'})]
+    if feature == 'drag':
+        if environment != 'real':
+            raise ValueError('Drag following requires the real environment')
+        return [command('pro450_drag_follow.py', {'use_sim_time': 'false'})]
     raise ValueError('Unsupported control feature')
 
 

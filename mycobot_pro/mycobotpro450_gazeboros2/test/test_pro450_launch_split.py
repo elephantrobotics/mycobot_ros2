@@ -160,6 +160,7 @@ class SessionOrderTests(unittest.TestCase):
         n = self.node
         n.failure = None; n.children = []; n.sdk = Mock(owner_token='mine')
         n.released = None; n.consumed = None; n.environment = 'real'
+        n.feature = 'slider'; n.drag_startup_enabled = False
         n.deadline = time.monotonic() + 30; n.base_unready_since = None
         n.snapshot_wall = time.time(); n.snapshot = [0.0] * 7
         n.latch = EnvironmentLatch('real')
@@ -216,6 +217,27 @@ class SessionOrderTests(unittest.TestCase):
         self.node._start_controls.side_effect = lambda: events.append('start')
         self.node.tick()
         self.assertEqual(events, ['close', 'start'])
+
+    def test_drag_ready_environment_bootstraps_enable_before_starting_child(self):
+        self.node.feature = 'drag'
+        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True))
+        events = []
+        def prepare():
+            events.append('enable-and-snapshot')
+            self.node.drag_startup_enabled = True
+        self.node._prepare_snapshot.side_effect = prepare
+        self.node.sdk.close.side_effect = lambda: events.append('close')
+        self.node._start_controls.side_effect = lambda: events.append('child')
+        self.node.tick()
+        self.assertEqual(events, ['enable-and-snapshot', 'close', 'child'])
+
+    def test_drag_snapshot_handoff_does_not_enable_again_when_environment_ready(self):
+        self.node.feature = 'drag'
+        self.node.drag_startup_enabled = True
+        self.node.latch.observe(dict(environment='real', session_id='one', verified=True, ready=True))
+        self.node.tick()
+        self.node._prepare_snapshot.assert_not_called()
+        self.node._start_controls.assert_called_once()
 
     def test_base_loss_shuts_down_feature(self):
         self.node.children = [Mock(poll=lambda: None)]
@@ -314,7 +336,7 @@ class ShutdownTests(unittest.TestCase):
             self.assertTrue(any(k.arg == 'value_type' and k.value.id == 'float' for k in timeout.keywords))
 
     def test_environment_snapshot_and_verification_timeouts_are_typed(self):
-        tree = ast.parse((ROOT / 'launch/slider.launch.py').read_text())
+        tree = ast.parse((ROOT / 'launch/slider.launch.py').read_text(encoding='utf-8'))
         values = [v for n in ast.walk(tree) if isinstance(n, ast.Dict)
                   for k, v in zip(n.keys, n.values)
                   if isinstance(k, ast.Constant) and k.value in ('timeout_sec', 'tolerance_rad')]

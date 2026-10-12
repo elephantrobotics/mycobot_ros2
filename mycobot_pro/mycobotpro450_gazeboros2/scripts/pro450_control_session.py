@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One function launch: read-only snapshot, readiness, unchanged control programs."""
+"""Independent feature sessions with snapshot handoff and exclusive SDK ownership."""
 import json
 import os
 from pathlib import Path
@@ -16,6 +16,7 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
 from pro450_sdk_adapter import Pro450Client, RobotConnectionLease
+from pro450_drag_support import set_arm_enabled
 from pro450_session_support import (EnvironmentLatch, JOINTS, control_commands,
                                    read_initial_snapshot, stop_owned_children)
 
@@ -30,8 +31,11 @@ class ControlSession(Node):
         self.declare_parameter('startup_timeout_sec', 600.0)
         self.feature = self.get_parameter('feature').value
         self.environment = self.get_parameter('environment').value
-        if self.feature not in ('slider', 'keyboard') or self.environment not in ('simulation', 'real'):
+        if self.feature not in ('slider', 'keyboard', 'drag') or self.environment not in ('simulation', 'real'):
             raise ValueError('Invalid feature or environment')
+        if self.feature == 'drag' and self.environment != 'real':
+            raise ValueError('Drag following requires the real environment')
+        self.drag_startup_enabled = False
         self.latch = EnvironmentLatch(self.environment)
         self.failure = None
         self.children = []
@@ -68,8 +72,15 @@ class ControlSession(Node):
             self.consumed = msg.data
 
     def _prepare_snapshot(self):
-        self.get_logger().info('Acquiring an initial real pose using read-only SDK queries.')
+        self.get_logger().info('Enabling the six arm motors once and acquiring the initial pose.'
+                               if self.feature == 'drag' else
+                               'Acquiring an initial real pose using read-only SDK queries.')
         self.sdk = Pro450Client('192.168.0.232', 4500, ownership_timeout=0)
+        if self.feature == 'drag' and not self.drag_startup_enabled:
+            if self.sdk.is_moving() != 0:
+                raise RuntimeError('Stop robot motion before starting drag following')
+            set_arm_enabled(self.sdk, True)
+            self.drag_startup_enabled = True
         self._refresh_snapshot()
 
     def _refresh_snapshot(self):
@@ -87,10 +98,14 @@ class ControlSession(Node):
         self.snapshot_pub.publish(msg)
 
     def _start_controls(self):
-        if {'slider_control_gazebo', 'teleop_keyboard_gazebo', 'pro450_slider_gui'} & set(self.get_node_names()):
+        if {'slider_control_gazebo', 'teleop_keyboard_gazebo', 'pro450_slider_gui', 'pro450_drag_follow'} & set(self.get_node_names()):
             raise RuntimeError('A legacy control process is still running; close it before starting this function')
         directory = Path(get_package_prefix(PACKAGE)) / 'lib' / PACKAGE
-        for command in control_commands(self.feature, self.environment, directory, sys.executable):
+        commands = control_commands(self.feature, self.environment, directory, sys.executable)
+        if self.feature == 'drag':
+            commands[0].extend(['-p', 'startup_enabled:=true', '-p',
+                                f'initial_gripper:={self.snapshot[6]}'])
+        for command in commands:
             self.children.append(subprocess.Popen(command, start_new_session=True))
         self.get_logger().info(f'{self.feature}: environment ready; control programs started.')
 
@@ -133,6 +148,8 @@ class ControlSession(Node):
             return True
         self._startup_stale_since = None
         if self.latch.ready():
+            if self.feature == 'drag' and not self.drag_startup_enabled:
+                self._prepare_snapshot()
             if self.sdk is not None:
                 self.sdk.close()
                 self.sdk = None
