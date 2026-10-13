@@ -2,6 +2,7 @@
 from contextlib import nullcontext
 from dataclasses import dataclass
 import hashlib
+import logging
 import os
 import socket
 import tempfile
@@ -16,6 +17,25 @@ except ImportError:
 
 
 ANGLES, MOVING, STOP, TOOL, ARRIVED = 0x20, 0x2B, 0x29, 0xB5, 0x5B
+
+
+class SocketSendErrorLogFilter(logging.Filter):
+    """Rate-limit repeated broken-pipe logs without changing SDK exceptions."""
+    def __init__(self, interval=5.0, clock=time.monotonic):
+        super().__init__()
+        self.interval, self.clock = interval, clock
+        self.last_reported = float('-inf')
+        self.lock = threading.Lock()
+
+    def filter(self, record):
+        if not record.getMessage().startswith('Socket send error: [Errno 32] Broken pipe'):
+            return True
+        now = self.clock()
+        with self.lock:
+            if now - self.last_reported < self.interval:
+                return False
+            self.last_reported = now
+            return True
 
 
 @dataclass(frozen=True)
@@ -137,6 +157,8 @@ class Pro450Client(_VendorClient):
         self._lease = RobotConnectionLease(ip, netport, ownership_timeout)
         try:
             super().__init__(ip, netport, debug)
+            self._socket_log_filter = SocketSendErrorLogFilter()
+            self.log.addFilter(self._socket_log_filter)
             if not all(hasattr(self, name) for name in ('lock_out', 'lock', 'event', 'write_command')):
                 raise RuntimeError('Unsupported Pro450 SDK response interface')
             with self.lock:
@@ -158,6 +180,7 @@ class Pro450Client(_VendorClient):
         self._next_angles = 0.0
         self._angle_period = 1.0 / max(1.0, min(20.0, feedback_hz))
         self._lease = None
+        self._socket_log_filter = None
         self.owner_token = uuid.uuid4().hex
         self.invalid_frames = 0
         self.feedback_error = ''
@@ -330,6 +353,10 @@ class Pro450Client(_VendorClient):
         thread = getattr(self, 'read_threading', None)
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=1.0)
+        log_filter = getattr(self, '_socket_log_filter', None)
+        if log_filter is not None:
+            self.log.removeFilter(log_filter)
+            self._socket_log_filter = None
         if self._lease is not None:
             self._lease.close()
             self._lease = None

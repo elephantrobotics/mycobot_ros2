@@ -7,10 +7,7 @@ import threading
 import time
 
 import rclpy
-from builtin_interfaces.msg import Duration, Time
 from rclpy.node import Node
-from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from pro450_drag_support import DragState, set_drag_enabled
 from pro450_public_client import PublicPro450Client as Pro450Client
@@ -27,8 +24,6 @@ class DragFollow(Node):
         self.sdk = None
         self.worker = None
         self.stop_event = threading.Event()
-        self.rendered_sequence = 0
-        self.gripper_published = False
         try:
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
@@ -66,13 +61,6 @@ class DragFollow(Node):
                 # The UI reports stale feedback; retry queries without terminal spam.
                 self.stop_event.wait(.05)
 
-    @staticmethod
-    def trajectory(joints, positions):
-        msg = JointTrajectory()
-        msg.joint_names = list(joints)
-        msg.points = [JointTrajectoryPoint(positions=list(positions),
-            velocities=[0.0] * len(joints), time_from_start=Duration(nanosec=40000000))]
-        return msg
 
     def render(self):
         enabled, pending, message, sample = self.state.snapshot()

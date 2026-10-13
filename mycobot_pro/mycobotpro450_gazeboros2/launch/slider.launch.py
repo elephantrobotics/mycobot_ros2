@@ -1,3 +1,4 @@
+"""Shared Pro450 environment: Gazebo, MoveIt and real-pose tracking."""
 import os
 import logging
 import re

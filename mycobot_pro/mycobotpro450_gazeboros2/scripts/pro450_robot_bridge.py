@@ -20,7 +20,6 @@ from mycobotpro450_gazeboros2.srv import Pro450Rpc
 from pro450_sdk_adapter import Pro450Client
 from pro450_session_support import JOINTS, LIMITS_DEG, read_initial_snapshot
 from pro450_broker_support import FeatureLease
-from pro450_gripper_profile import GripperMotionEstimate, gripper_display_rate
 from pro450_real_mirror import RealPoseBuffer
 
 
@@ -36,9 +35,7 @@ class RobotBridge(Node):
         self.packet = {'sequence': 0, 'value': None, 'error': 'No arm feedback'}
         self.arm_active = self.gripper_active = False
         self.arm_goal = None
-        self.gripper_speed = 1
         self.mirror = RealPoseBuffer()
-        self.gripper_model = GripperMotionEstimate()
         self.next_gripper = 0.
         self.worker = None
         self.frame = None
@@ -50,12 +47,10 @@ class RobotBridge(Node):
             self.initial_pose = read_initial_snapshot(self.sdk)
             self.gripper = self.initial_pose[6]
             self.stamps = {kind: self.sdk.sample_time(kind) for kind in ('arm', 'gripper')}
-            self.gripper_model.observe(self.gripper, self.stamps['gripper'][0])
             self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
             self.gripper_pub = self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
             self.real_pub = self.create_publisher(JointState, '/pro450/real_joint_states', 1)
             self.age_pub = self.create_publisher(Float64MultiArray, '/pro450/real_feedback_age', 1)
-            self.estimate_pub = self.create_publisher(Float64MultiArray, '/pro450/gripper_estimate', 1)
             qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
             self.snapshot_pub = self.create_publisher(JointState, '/pro450/real_state_snapshot', qos)
             self.create_subscription(String, '/pro450/environment_state', self.environment_state, qos)
@@ -85,7 +80,6 @@ class RobotBridge(Node):
             if stamp is not None:
                 self.gripper = value / 100.
                 self.stamps['gripper'] = stamp
-                self.gripper_model.observe(self.gripper, stamp[0])
 
     def sample_loop(self):
         while not self.stop_event.is_set():
@@ -125,7 +119,7 @@ class RobotBridge(Node):
             # Publish the arm packet before a possibly slow idle gripper query.
             if time.monotonic() >= self.next_gripper:
                 with self.hardware_lock:
-                    if (self.lease.token is None or self.lease.feature == 'drag') and not self.arm_active and not self.stop_event.is_set():
+                    if not self.stop_event.is_set():
                         try:
                             self.update_gripper(self.sdk.get_pro_gripper_angle())
                         except Exception:
@@ -146,7 +140,6 @@ class RobotBridge(Node):
             self.sdk.set_pro_gripper_angle(int(round(opening)))
             self.gripper_active = False
             self.update_gripper(opening)
-        self.gripper_model.hold()
         self.lease.clear(token)
 
     def rpc(self, req, res):
@@ -189,13 +182,7 @@ class RobotBridge(Node):
                         result = getattr(self.sdk, method)(*args, **kwargs)
                         if method == 'get_pro_gripper_angle':
                             self.update_gripper(result)
-                        elif method == 'set_pro_gripper_speed' and result == 1:
-                            self.gripper_speed = int(args[0])
                         elif method == 'set_pro_gripper_angle' and result == 1:
-                            goal = float(args[0]) / 100.
-                            rate = gripper_display_rate(self.gripper_speed,
-                                'opening' if goal > self.gripper else 'closing')
-                            self.gripper_model.start(self.gripper, goal, rate)
                             self.gripper_active = True
                         elif method in ('send_angles', 'send_angle', 'jog_angle'):
                             self.arm_active = True
@@ -244,12 +231,8 @@ class RobotBridge(Node):
             if rendered is None:
                 return
             shown, velocity = rendered
-        if self.lease.feature == 'slider' or self.lease.token is None:
-            grip = self.gripper_model.render()
-            if grip is not None:
-                shown[6], velocity[6] = grip[:2]
-                estimate = Float64MultiArray(); estimate.data = list(grip)
-                self.estimate_pub.publish(estimate)
+        # Gripper rendering uses only the latest successfully measured opening.
+        shown[6], velocity[6] = self.gripper, 0.0
         self.arm_pub.publish(self.trajectory(JOINTS[:6], shown[:6], velocity[:6]))
         self.gripper_pub.publish(self.trajectory(JOINTS[6:], shown[6:], velocity[6:]))
 

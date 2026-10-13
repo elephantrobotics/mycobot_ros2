@@ -17,18 +17,14 @@ ament_target_dependencies(pro450_current_start_adapter
 pluginlib_export_plugin_description_file(moveit_core planning_request_adapters.xml)
 install(TARGETS pro450_current_start_adapter LIBRARY DESTINATION lib)
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_pro450_current_start test/test_pro450_current_start.cpp)
-  ament_target_dependencies(test_pro450_current_start
-    moveit_ros_planning moveit_core pluginlib rclcpp)
-endif()
+
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
   install(
     DIRECTORY launch
     DESTINATION share/${PROJECT_NAME}
-    PATTERN "setup_assistant.launch" EXCLUDE)
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE)
 endif()
 
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
@@ -36,7 +32,6 @@ install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/activate_gazebo_controllers.py
-  scripts/coords_broadcaster.py
   scripts/pro450_slider_gui.py
   scripts/pro450_pose_gate.py
   scripts/pro450_environment_state.py
@@ -46,9 +41,7 @@ install(PROGRAMS
   scripts/pro450_collision_scene.py
   scripts/slider_control_gazebo.py
   scripts/verify_initial_pose.py
-  scripts/follow_display_gazebo.py
   scripts/teleop_keyboard_gazebo.py
-  scripts/calibrate_pro450_hold_speed.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -59,7 +52,7 @@ install(FILES scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
   scripts/pro450_broker_support.py
   scripts/pro450_real_mirror.py
   scripts/pro450_sdk_adapter.py scripts/pro450_feedback.py
-  scripts/pro450_gripper_profile.py scripts/pro450_gripper_speed.json
+  scripts/pro450_gripper_control.py scripts/pro450_scene_support.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

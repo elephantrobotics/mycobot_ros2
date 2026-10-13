@@ -26,6 +26,7 @@ class ControlSession(Node):
         self.declare_parameter('feature', 'slider')
         self.declare_parameter('environment', 'simulation')
         self.declare_parameter('startup_timeout_sec', 600.0)
+        self.declare_parameter('show_force_execute', False)
         self.feature = self.get_parameter('feature').value
         self.environment = self.get_parameter('environment').value
         if self.feature not in ('slider', 'keyboard', 'drag') or self.environment not in ('simulation', 'real'):
@@ -58,7 +59,8 @@ class ControlSession(Node):
         if {'slider_control_gazebo', 'teleop_keyboard_gazebo', 'pro450_slider_gui', 'pro450_drag_follow'} & set(self.get_node_names()):
             raise RuntimeError('A control process is already running; close it before starting this function')
         directory = Path(get_package_prefix(PACKAGE)) / 'lib' / PACKAGE
-        for command in control_commands(self.feature, self.environment, directory, sys.executable):
+        for command in control_commands(self.feature, self.environment, directory, sys.executable,
+                                        show_force_execute=self.get_parameter('show_force_execute').value):
             self.children.append(subprocess.Popen(command, start_new_session=True))
         self.get_logger().info(f'{self.feature}: public environment ready; control programs started.')
 

@@ -103,7 +103,7 @@ def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10
     return result['value']
 
 
-def control_commands(feature, environment, executable_directory, python):
+def control_commands(feature, environment, executable_directory, python, show_force_execute=False):
     """Explicit process allowlist: no Gazebo, MoveIt or additional SDK owner."""
     from pathlib import Path
     root = Path(executable_directory)
@@ -114,9 +114,10 @@ def control_commands(feature, environment, executable_directory, python):
         return args
     if feature == 'slider':
         return [command('slider_control_gazebo.py', {
-            'mode': environment, 'use_sim_time': 'true', 'startup_read_only': 'false'}),
+            'mode': environment, 'use_sim_time': 'true'}),
             command('pro450_slider_gui.py', {
                 'environment': environment,
+                'show_force_execute': 'true' if show_force_execute else 'false',
                 'use_sim_time': 'false' if environment == 'real' else 'true'})]
     if feature == 'keyboard':
         return [command('teleop_keyboard_gazebo.py', {

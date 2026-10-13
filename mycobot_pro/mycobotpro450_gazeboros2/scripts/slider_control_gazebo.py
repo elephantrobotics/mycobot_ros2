@@ -10,28 +10,19 @@ import threading
 import time
 
 import rclpy
-from builtin_interfaces.msg import Duration, Time
-from geometry_msgs.msg import Pose
-from moveit_msgs.msg import (
-    AllowedCollisionEntry,
-    CollisionObject,
-    PlanningScene,
-    PlanningSceneComponents,
-)
-from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
+from builtin_interfaces.msg import Duration
+from moveit_msgs.srv import GetStateValidity
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Empty, String, Float64MultiArray, Bool
-from shape_msgs.msg import SolidPrimitive
+from std_msgs.msg import Empty, String, Bool
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from pro450_real_keyboard import RealPoseReader, sdk_speed_for_rad
-from pro450_real_mirror import RealPoseBuffer
 
 from pro450_public_client import PublicPro450Client as Pro450Client
-from pro450_feedback import attach_feedback, publish_feedback, publish_age
-from pro450_gripper_profile import gripper_speed_for_percentage, gripper_display_rate, GripperMotionEstimate
+from pro450_feedback import attach_feedback
+from pro450_gripper_control import gripper_speed_for_percentage
+from pro450_scene_support import CollisionSceneSupport
 
 
 DEFAULT_PRO450_IP = "192.168.0.232"
@@ -56,7 +47,6 @@ SPLINE_PEAK_VELOCITY_FACTOR = 1.5
 COLLISION_SAMPLE_STEP = math.radians(1.0)
 MAX_COLLISION_SAMPLES = 400
 DEFAULT_COLLISION_DEPTH_TOLERANCE_M = 0.0001
-FLOOR_OBJECT_ID = "pro450_ground_safety"
 REAL_POSE_TOLERANCE_RAD = 0.05
 WAYPOINT_ARM_TOLERANCE_RAD = math.radians(0.5)
 WAYPOINT_GRIPPER_TOLERANCE = 0.02
@@ -85,35 +75,28 @@ def gripper_write_accepted(result):
 
 
 class SliderControl(Node):
+    _wait_for_future = CollisionSceneSupport._wait_for_future
+
     def __init__(self):
         super().__init__("slider_control_gazebo")
 
         self.declare_parameter("mode", "simulation")
         self.declare_parameter("pro450_ip", DEFAULT_PRO450_IP)
         self.declare_parameter("pro450_port", DEFAULT_PRO450_PORT)
-        self.declare_parameter("startup_read_only", True)
         self.declare_parameter("feedback_hz", 10.0)
         self.declare_parameter("startup_stable_samples", 5)
         self.declare_parameter("startup_sample_interval_sec", 0.2)
         self.declare_parameter("startup_stable_tolerance_deg", 0.2)
         # Keep the MoveIt ground surface coincident with Gazebo's z=0 plane.
         # A positive value is an optional safety margin, not model geometry.
-        self.declare_parameter("floor_clearance_m", 0.0)
         self.declare_parameter(
             "collision_depth_tolerance_m",
             DEFAULT_COLLISION_DEPTH_TOLERANCE_M,
         )
-        self.declare_parameter("floor_size_m", 20.0)
-        self.declare_parameter("floor_thickness_m", 0.10)
-        self.declare_parameter("floor_frame", "world")
         mode_name = str(self.get_parameter("mode").value).strip().lower()
         if mode_name not in ("simulation", "real"):
             raise ValueError("mode must be either 'simulation' or 'real'.")
         self.mode = 2 if mode_name == "real" else 1
-        self._public_scene_managed = True
-        self.startup_read_only = bool(
-            self.get_parameter("startup_read_only").value
-        )
         self.startup_stable_samples = max(
             2, int(self.get_parameter("startup_stable_samples").value)
         )
@@ -127,37 +110,17 @@ class SliderControl(Node):
         )
         self.pro450_ip = self.get_parameter("pro450_ip").value
         self.pro450_port = int(self.get_parameter("pro450_port").value)
-        self.floor_clearance_m = max(
-            0.0, float(self.get_parameter("floor_clearance_m").value)
-        )
         self.collision_depth_tolerance_m = max(
             0.0,
             float(self.get_parameter("collision_depth_tolerance_m").value),
         )
-        self.floor_size_m = max(1.0, float(self.get_parameter("floor_size_m").value))
-        self.floor_thickness_m = max(
-            0.01, float(self.get_parameter("floor_thickness_m").value)
-        )
-        self.floor_frame = str(self.get_parameter("floor_frame").value)
-
         self.pub_arm = self.create_publisher(
             JointTrajectory, "/arm_controller/joint_trajectory", 10
         )
         self.pub_gripper = self.create_publisher(
             JointTrajectory, "/pro_gripper_controller/joint_trajectory", 10
         )
-        status_topic = "/pro450/startup_status" if self.mode == 2 and self.startup_read_only else "/pro450/slider_status"
-        self.status_pub = self.create_publisher(String, status_topic, 10)
-        self._handoff_timer = None
-        self._handoff_ack = self.create_publisher(String, "/pro450/snapshot_released", 10)
-        self.create_subscription(String, "/pro450/snapshot_consumed", self._snapshot_consumed_cb, 10)
-        snapshot_qos = QoSProfile(
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1,
-            reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
-        )
-        self.real_snapshot_pub = None
+        self.status_pub = self.create_publisher(String, "/pro450/slider_status", 10)
 
         self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
         self.create_subscription(
@@ -171,13 +134,6 @@ class SliderControl(Node):
         self.validity_client = self.create_client(
             GetStateValidity, "/check_state_validity"
         )
-        self.get_scene_client = self.create_client(
-            GetPlanningScene, "/get_planning_scene"
-        )
-        self.apply_scene_client = self.create_client(
-            ApplyPlanningScene, "/apply_planning_scene"
-        )
-
         self._state_lock = threading.RLock()
         self._current_positions = None
         self._feedback_time = 0.0
@@ -187,27 +143,17 @@ class SliderControl(Node):
         self._stop_event = threading.Event()
         # The read-only startup snapshot must not advertise idle while the
         # active controller is validating/executing a command.
-        self.busy_pub = None
-        if not (self.mode == 2 and self.startup_read_only):
-            self.busy_pub = self.create_publisher(Bool, "/pro450/slider_busy", 10)
-            self.create_timer(0.1, self._publish_command_busy)
-
+        self.busy_pub = self.create_publisher(Bool, "/pro450/slider_busy", 10)
+        self.create_timer(0.1, self._publish_command_busy)
         self.mc = None
-        self._motion_sent = False
         self._real_thread = None
-        self._mirror_thread = None
-        self._mirror_stop = threading.Event()
-        self._real_mirror = None
+        self._motion_sent = False
         self._pose_reader = None
         self._arm_moving = False
-        self._sample_velocity = [0.0] * 7
-        self._sample_publish_lock = threading.Lock()
-        self._gripper_model = GripperMotionEstimate()
         self._last_read_error = 0.0
-        self._real_motion_enabled = self.mode == 2 and not self.startup_read_only
+        self._real_motion_enabled = self.mode == 2
         self.command_queue = queue.Queue(maxsize=1)
         if self.mode == 2:
-            self._setup_real_mirror()
             self._initialize_pro450()
             self._pose_reader = RealPoseReader(
                 self.mc, JOINT_LIMITS_RAD, report=self.get_logger().debug)
@@ -216,18 +162,10 @@ class SliderControl(Node):
             if stamp is not None:
                 self._pose_reader.observe_arm(
                     [math.degrees(v) for v in self._startup_pose[:6]], *stamp)
-            self._on_real_sample(self._startup_pose)
-            if self._real_motion_enabled:
-                attach_feedback(self, self._pose_reader)
-                self._real_thread = threading.Thread(
-                    target=self._real_robot_worker, daemon=True)
-                self._real_thread.start()
-                self._publish_status("Ready: Real Robot + Gazebo motion mode.")
-            else:
-                self.create_timer(1.0, self._refresh_read_only_snapshot)
-                self._publish_status(
-                    "Ready: real robot startup is READ ONLY; stable pose snapshot published."
-                )
+            attach_feedback(self, self._pose_reader)
+            self._real_thread = threading.Thread(target=self._real_robot_worker, daemon=True)
+            self._real_thread.start()
+            self._publish_status("Ready: Real Robot + Gazebo motion mode.")
         else:
             self._publish_status("Ready: Gazebo simulation mode.")
 
@@ -246,46 +184,8 @@ class SliderControl(Node):
                 msg.data = self._command_active
                 self.busy_pub.publish(msg)
 
-    def _setup_real_mirror(self):
-        self._real_mirror = RealPoseBuffer()
-        self.real_joint_pub = self.real_age_pub = self.gripper_estimate_pub = None
 
-    def _on_real_sample(self, pose):
-        with self._pose_reader.cache.lock:
-            value = self._pose_reader.gripper
-            measured = self._pose_reader.gripper_time
-            valid = self._pose_reader.gripper_valid
-        if valid and measured is not None:
-            self._gripper_model.observe(value, measured)
-        publish_feedback(self, pose, self._pose_reader, COMMAND_JOINTS)
 
-    def _mirror_loop(self):
-        next_tick = time.monotonic()
-        while rclpy.ok() and not self._mirror_stop.is_set():
-            next_tick += 0.02
-            if int(next_tick * 50) % 25 == 0:
-                publish_age(self, self._pose_reader)
-            try:
-                rendered = self._real_mirror.render()
-                gripper = self._gripper_model.render()
-                msg = Float64MultiArray()
-                msg.data = list(gripper) if gripper is not None else [0.0, 0.0, 0.0]
-                self.gripper_estimate_pub.publish(msg)
-                if rendered is not None and gripper is not None:
-                    pose, velocity = rendered
-                    # Gripper readings have their own timestamps. Never return
-                    # to the arm buffer's old opening or interpolated slope.
-                    pose[6], velocity[6] = gripper[:2]
-                    self._publish_trajectory(pose, 0.04, velocity)
-                elif gripper is not None:
-                    self._publish_gripper_trajectory(gripper[0], 0.04, gripper[1])
-            except Exception:
-                self.get_logger().debug("Could not render the measured pose.")
-            delay = next_tick - time.monotonic()
-            if delay > 0.0:
-                self._mirror_stop.wait(delay)
-            else:
-                next_tick = time.monotonic()
 
     def _read_startup_gripper(self, timeout=10.0):
         """Acquire a real initial opening, with a deadline even for a blocked SDK read."""
@@ -383,7 +283,6 @@ class SliderControl(Node):
             self._startup_pose = [math.radians(value) for value in averaged_angles] + [
                 gripper_value / 100.0
             ]
-            self._publish_real_snapshot(averaged_angles, gripper_value)
             self.get_logger().info(
                 "Pro450 connected in read-only startup phase. Stable angles: "
                 f"{averaged_angles}; gripper={gripper_value:.1f}."
@@ -394,64 +293,8 @@ class SliderControl(Node):
             self.mc = None
             raise RuntimeError(f"Unable to initialize Pro450: {exc}") from exc
 
-    def _publish_real_snapshot(self, angles_deg, gripper_value):
-        if getattr(self.mc, 'public_feedback', False) is True:
-            return  # Initial pose and continuous truth are owned by the public environment.
-        snapshot = JointState()
-        snapshot.header.stamp = self.get_clock().now().to_msg()
-        stamps = [self.mc.sample_time(kind) for kind in ('arm', 'gripper')]
-        if all(stamp is not None for stamp in stamps):
-            wall = min(stamp[1] for stamp in stamps)
-            seconds = int(wall)
-            snapshot.header.stamp = Time(sec=seconds, nanosec=int((wall - seconds) * 1e9))
-        token = getattr(self.mc, "owner_token", "")
-        snapshot.header.frame_id = ("pro450:handoff:" if self.startup_read_only else "pro450:retain:") + token
-        snapshot.name = list(COMMAND_JOINTS)
-        snapshot.position = [math.radians(value) for value in angles_deg] + [
-            float(gripper_value) / 100.0
-        ]
-        self.real_snapshot_pub.publish(snapshot)
 
-    def _snapshot_consumed_cb(self, msg):
-        if self.mode != 2 or not self.startup_read_only or self.mc is None:
-            return
-        if msg.data != getattr(self.mc, "owner_token", ""):
-            return
-        self.mc.close()
-        ack = String()
-        ack.data = msg.data
-        self._handoff_ack.publish(ack)
-        if self._handoff_timer is None:
-            self.get_logger().info("Startup snapshot consumed; robot connection released.")
-            self._handoff_timer = self.create_timer(1.0, lambda: rclpy.try_shutdown())
 
-    def _refresh_read_only_snapshot(self):
-        """Refresh the latched pose without issuing any hardware write command."""
-        if self.mc is None or self._real_motion_enabled or self._handoff_timer is not None:
-            return
-        try:
-            moving = self.mc.is_moving()
-            if moving != 0:
-                self.get_logger().warning(
-                    "Real pose snapshot not refreshed because the Pro450 is moving."
-                )
-                return
-            angles = self._validate_real_angles(self.mc.get_angles())
-            gripper_value = self.mc.get_pro_gripper_angle()
-            if isinstance(gripper_value, bool) or not isinstance(
-                gripper_value, (int, float)
-            ):
-                raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
-            gripper_value = float(gripper_value)
-            if gripper_value < 0:
-                raise RuntimeError(
-                    f"force-gripper read failed: SDK returned {gripper_value}; "
-                    "no valid startup snapshot will be published")
-            if not math.isfinite(gripper_value) or not 0.0 <= gripper_value <= 100.0:
-                raise RuntimeError(f"invalid force-gripper angle: {gripper_value!r}")
-            self._publish_real_snapshot(angles, gripper_value)
-        except Exception as exc:
-            self.get_logger().error(f"Read-only Pro450 snapshot refresh failed: {exc}")
 
     @staticmethod
     def _validate_real_angles(angles):
@@ -609,9 +452,6 @@ class SliderControl(Node):
             self._publish_command_busy()
 
     def _path_is_valid(self, current, target):
-        floor_ready, floor_reason = self._ensure_floor_collision_scene()
-        if not floor_ready:
-            return False, floor_reason
 
         if not self.validity_client.wait_for_service(timeout_sec=2.0):
             return False, "MoveIt /check_state_validity service is unavailable."
@@ -729,118 +569,8 @@ class SliderControl(Node):
             details.append(f"depth {depth * 1000.0:.3f} mm")
         return f"{summary} ({', '.join(details)})." if details else f"{summary}."
 
-    def _wait_for_future(self, future, timeout_sec, operation):
-        deadline = time.monotonic() + timeout_sec
-        while not future.done() and time.monotonic() < deadline:
-            if self._stop_requested:
-                return None, "STOP requested."
-            time.sleep(0.01)
-        if not future.done():
-            return None, f"{operation} timed out."
-        try:
-            response = future.result()
-        except Exception as exc:
-            return None, f"{operation} failed: {exc}"
-        if response is None:
-            return None, f"{operation} failed."
-        return response, ""
 
-    @staticmethod
-    def _ensure_acm_name(acm, name):
-        """Add a symmetric row/column to an AllowedCollisionMatrix."""
-        if name in acm.entry_names:
-            return
-        old_size = len(acm.entry_names)
-        while len(acm.entry_values) < old_size:
-            acm.entry_values.append(AllowedCollisionEntry())
-        for row in acm.entry_values[:old_size]:
-            if len(row.enabled) < old_size:
-                row.enabled.extend([False] * (old_size - len(row.enabled)))
-            elif len(row.enabled) > old_size:
-                del row.enabled[old_size:]
-            row.enabled.append(False)
-        new_row = AllowedCollisionEntry()
-        new_row.enabled = [False] * (old_size + 1)
-        acm.entry_names.append(name)
-        acm.entry_values.append(new_row)
 
-    def _ensure_floor_collision_scene(self):
-        if getattr(self, '_public_scene_managed', False):
-            return True, ""  # Public environment readiness includes scene installation.
-        if not self.get_scene_client.wait_for_service(timeout_sec=3.0):
-            return False, "MoveIt /get_planning_scene service is unavailable."
-        if not self.apply_scene_client.wait_for_service(timeout_sec=3.0):
-            return False, "MoveIt /apply_planning_scene service is unavailable."
-
-        get_request = GetPlanningScene.Request()
-        get_request.components.components = (
-            PlanningSceneComponents.ALLOWED_COLLISION_MATRIX
-        )
-        get_future = self.get_scene_client.call_async(get_request)
-        get_response, reason = self._wait_for_future(
-            get_future, 3.0, "Reading MoveIt allowed-collision matrix"
-        )
-        if get_response is None:
-            return False, reason
-
-        scene = PlanningScene()
-        scene.is_diff = True
-        scene.allowed_collision_matrix = get_response.scene.allowed_collision_matrix
-        acm = scene.allowed_collision_matrix
-        # Historical 'Never' exclusions hid gripper-to-wrist contacts. Keep
-        # mechanical attachment pairs; enable the movable fingers vs wrist.
-        fingers = {f"gripper_{side}{i}" for side in ('left', 'right') for i in (1, 2, 3)}
-        for i, left in enumerate(acm.entry_names):
-            for j, right in enumerate(acm.entry_names):
-                if ((left in fingers and right in ('link5', 'link6')) or
-                        (right in fingers and left in ('link5', 'link6'))):
-                    acm.entry_values[i].enabled[j] = False
-        self._ensure_acm_name(acm, "base")
-        self._ensure_acm_name(acm, FLOOR_OBJECT_ID)
-
-        base_index = acm.entry_names.index("base")
-        floor_index = acm.entry_names.index(FLOOR_OBJECT_ID)
-        acm.entry_values[base_index].enabled[floor_index] = True
-        acm.entry_values[floor_index].enabled[base_index] = True
-        acm.entry_values[floor_index].enabled[floor_index] = True
-
-        floor = CollisionObject()
-        floor.header.frame_id = self.floor_frame
-        floor.id = FLOOR_OBJECT_ID
-        primitive = SolidPrimitive()
-        primitive.type = SolidPrimitive.BOX
-        primitive.dimensions = [
-            self.floor_size_m,
-            self.floor_size_m,
-            self.floor_thickness_m,
-        ]
-        pose = Pose()
-        pose.orientation.w = 1.0
-        # The default collision surface matches Gazebo z=0.  A configured
-        # positive clearance deliberately turns it into a safety margin.
-        pose.position.z = self.floor_clearance_m - self.floor_thickness_m / 2.0
-        floor.primitives = [primitive]
-        floor.primitive_poses = [pose]
-        floor.operation = CollisionObject.ADD
-        scene.world.collision_objects = [floor]
-
-        apply_request = ApplyPlanningScene.Request()
-        apply_request.scene = scene
-        apply_future = self.apply_scene_client.call_async(apply_request)
-        apply_response, reason = self._wait_for_future(
-            apply_future, 3.0, "Applying MoveIt ground collision object"
-        )
-        if apply_response is None:
-            return False, reason
-        if not apply_response.success:
-            return False, "MoveIt rejected the ground collision object."
-
-        self.get_logger().info(
-            f"Installed MoveIt ground safety object in '{self.floor_frame}' "
-            f"with {self.floor_clearance_m * 1000.0:.0f} mm clearance; "
-            "only link 'base' may contact it."
-        )
-        return True, "ready"
 
     @staticmethod
     def _trajectory_duration(current, target, speed_scale):
@@ -906,7 +636,6 @@ class SliderControl(Node):
 
     def _read_real_positions(self, moving=None):
         pose = self._pose_reader(moving=self._arm_moving if moving is None else moving)
-        self._on_real_sample(pose)
         return pose
 
     def _gazebo_matches(self, positions):
@@ -932,7 +661,6 @@ class SliderControl(Node):
 
     def _stop_real_motion(self):
         """SDK stop on the owner thread, then show the measured pose."""
-        self._gripper_model.hold()
         if self.mc is not None and self._motion_sent:
             self.mc.stop()
             # Arm STOP does not stop the independent gripper motor.
@@ -947,8 +675,6 @@ class SliderControl(Node):
         except Exception as exc:
             self.get_logger().error(f"Could not mirror the stopped pose: {exc}")
 
-    def _read_real_arm(self):
-        return self._read_real_positions()[:6]
 
     def _send_gripper(self, opening):
         result = self.mc.set_pro_gripper_angle(opening)
@@ -998,9 +724,7 @@ class SliderControl(Node):
                 arm_done = all(
                     abs(value - goal) <= WAYPOINT_ARM_TOLERANCE_RAD
                     for value, goal in zip(arm, goal_arm))
-                estimate = self._gripper_model.sample()
-                gripper_done = estimate is None or estimate[2]
-                if arm_done and gripper_done and (not arm_moves or self.mc.is_moving() == 0):
+                if arm_done and (not arm_moves or self.mc.is_moving() == 0):
                     try:
                         self._pose_reader.read_fresh_gripper()
                         measured = self._read_real_positions(moving=False)
@@ -1140,10 +864,7 @@ class SliderControl(Node):
             if not self._confirm_gripper_speed(grip_speed):
                 self._publish_status("Cancelled before execution.")
                 return
-            rate = gripper_display_rate(grip_speed, 'opening' if grip_goal > grip_start else 'closing',
-                                        nominal_max_rate=MAX_VELOCITY_RAD_S[6])
             self._motion_sent = True
-            self._gripper_model.start(current[6], grip_goal / 100.0, rate)
             self._send_gripper(grip_goal)
         if self._stop_requested:
             if self._motion_sent:
@@ -1256,9 +977,6 @@ def main(args=None):
                 node._stop_requested = True
                 node._stop_event.set()
                 node._real_thread.join(timeout=2.0)
-            if node._mirror_thread is not None:
-                node._mirror_stop.set()
-                node._mirror_thread.join(timeout=0.5)
             if node.mc is not None and node._motion_sent:
                 try:
                     # Stop motion but keep servo torque enabled; releasing all

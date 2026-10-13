@@ -6,12 +6,10 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from std_msgs.msg import Bool
 from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene
-from slider_control_gazebo import SliderControl
+from pro450_scene_support import CollisionSceneSupport
 
 
-class CollisionScene(Node):
-    _ensure_acm_name = staticmethod(SliderControl._ensure_acm_name)
-    _wait_for_future = SliderControl._wait_for_future
+class CollisionScene(Node, CollisionSceneSupport):
 
     def __init__(self):
         super().__init__('pro450_collision_scene')
@@ -35,7 +33,7 @@ class CollisionScene(Node):
 
     def install_scene(self):
         try:
-            self.ready, reason = SliderControl._ensure_floor_collision_scene(self)
+            self.ready, reason = self._ensure_floor_collision_scene()
             if not self.ready:
                 self.get_logger().warning(reason)
         finally:

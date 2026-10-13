@@ -1,4 +1,4 @@
-"""Real drag following; start alongside slidar.launch.py environment:=real."""
+"""Real drag following; start alongside slider.launch.py environment:=real."""
 from launch import LaunchDescription
 from launch.actions import EmitEvent, RegisterEventHandler
 from launch.event_handlers import OnProcessExit

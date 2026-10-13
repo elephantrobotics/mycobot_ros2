@@ -38,7 +38,7 @@ class PublicPro450Client:
         self.thread.start()
         try:
             if not self.client.wait_for_service(timeout_sec=5.):
-                raise RuntimeError('Public robot service unavailable; start slidar.launch.py environment:=real')
+                raise RuntimeError('Public robot service unavailable; start slider.launch.py environment:=real')
             self._rpc('claim', [feature])
             self._claimed = True
             self.node.create_timer(.5, self._heartbeat)

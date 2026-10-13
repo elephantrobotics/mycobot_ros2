@@ -13,7 +13,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Empty, String, Float64MultiArray, Bool
+from std_msgs.msg import Empty, String, Bool
 
 from python_qt_binding.QtCore import Qt, QTimer
 from python_qt_binding.QtWidgets import (
@@ -58,6 +58,8 @@ class SliderGuiNode(Node):
     def __init__(self):
         super().__init__("pro450_slider_gui")
         self.declare_parameter("environment", "simulation")
+        self.declare_parameter("show_force_execute", False)
+        self.show_force_execute = self.get_parameter("show_force_execute").value
         self.environment = str(self.get_parameter("environment").value).strip().lower()
         if self.environment not in ("simulation", "real"):
             raise ValueError("environment must be simulation or real")
@@ -81,12 +83,6 @@ class SliderGuiNode(Node):
         self._actual = None
         self._actual_time = 0.0
         self._feedback_valid = False
-        self._gripper_sample_time = 0.0
-        self._gripper_estimate = None
-        self._gripper_estimate_time = 0.0
-        if self.environment == "real":
-            self.create_subscription(Float64MultiArray, "/pro450/real_feedback_age", self._age_cb, 1)
-            self.create_subscription(Float64MultiArray, "/pro450/gripper_estimate", self._estimate_cb, 1)
         self._status = (
             "Waiting for real robot feedback..."
             if self.environment == "real"
@@ -112,10 +108,6 @@ class SliderGuiNode(Node):
             self._actual_time = time.monotonic() - age
             self._feedback_valid = feedback_valid
 
-    def _age_cb(self, msg):
-        if len(msg.data) >= 2 and math.isfinite(msg.data[1]) and msg.data[1] >= 0:
-            with self._lock:
-                self._gripper_sample_time = time.monotonic() - msg.data[1]
 
     def _status_cb(self, msg):
         with self._lock:
@@ -137,25 +129,13 @@ class SliderGuiNode(Node):
         with self._lock:
             return self._command_pending or self._command_busy
 
-    def _estimate_cb(self, msg):
-        if len(msg.data) != 3 or not all(math.isfinite(v) for v in msg.data):
-            return
-        with self._lock:
-            self._gripper_estimate = tuple(msg.data) if msg.data[2] in (1.0, 2.0) else None
-            self._gripper_estimate_time = time.monotonic()
 
-    def gripper_estimate(self):
-        with self._lock:
-            return self._gripper_estimate if time.monotonic() - self._gripper_estimate_time < 0.5 else None
 
     def snapshot(self):
         with self._lock:
             actual = list(self._actual) if self._actual is not None else None
             return actual, self._actual_time, self._feedback_valid, self._status
 
-    def gripper_age(self):
-        with self._lock:
-            return time.monotonic() - self._gripper_sample_time
 
     def execute(self, positions_rad, speed_percent, force_collision=False):
         if force_collision and self.environment != "simulation":
@@ -284,6 +264,7 @@ class Pro450SliderWindow(QMainWindow):
         )
         self.force_execute_button.clicked.connect(self._force_execute)
         controls.addWidget(self.force_execute_button)
+        self.force_execute_button.setVisible(self.node.show_force_execute)
 
         self.stop_button = QPushButton("STOP")
         self.stop_button.setStyleSheet("font-weight: bold; color: white; background: #b00020;")
@@ -318,11 +299,6 @@ class Pro450SliderWindow(QMainWindow):
                     if not math.isfinite(value)
                     else f"{value:.{JOINT_DISPLAY_DECIMALS[index]}f}"
                 )
-            if self.node.environment == "real":
-                estimate = self.node.gripper_estimate()
-                if estimate is not None:
-                    self.actual_labels[-1].setText(f"{estimate[0]:.{GRIPPER_DISPLAY_DECIMALS}f}")
-
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True
             for index, (box, slider, value) in enumerate(zip(self.target_boxes, self.sliders, actual)):

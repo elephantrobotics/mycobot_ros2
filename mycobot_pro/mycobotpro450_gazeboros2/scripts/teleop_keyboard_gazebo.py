@@ -3,23 +3,19 @@
 
 import math
 import os
-import select
 import signal
 import sys
-import termios
 import threading
 import time
-import tty
 
 import rclpy
-from builtin_interfaces.msg import Duration, Time
-from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
+from builtin_interfaces.msg import Duration
+from moveit_msgs.srv import GetStateValidity
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
-from pro450_feedback import attach_feedback, publish_feedback, publish_age
+from pro450_feedback import attach_feedback
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from pro450_hold_profile import (
     PositionVelocityEstimator, collision_stop_angle, hold_setpoint, trapezoid_samples,
@@ -27,7 +23,6 @@ from pro450_hold_profile import (
 from pro450_real_keyboard import (
     RealKeyboardTransport, RealPoseReader, SDK_RAD_PER_SPEED, valid_gripper_position,
 )
-from pro450_real_mirror import RealPoseBuffer
 
 # Borrow the existing Pro450 slider's collision implementation, not its node
 # constructor. This keeps the same floor, contact tolerance and path sampling.
@@ -37,23 +32,8 @@ from slider_control_gazebo import (
     JOINT_LIMITS_RAD, SliderControl,
 )
 
-NORMAL_STEP = math.radians(1.0)
-FAST_STEP = math.radians(5.0)
-GRIPPER_STEP = 0.05
-SPEED_SCALE = 0.10
-MAX_VELOCITY = 1.0 * SPEED_SCALE
-MAX_ACCELERATION = 0.2
-# The real-robot step path still uses its separately tested integer speed.
-# Do not infer a continuous-hold speed from the single 100 ~= 150 deg/s sample.
-REAL_SPEED = 4
-# Kept for the retired step path. A real gripper hold uses the same gear
-# integers as the arm: 4, 8, 12, 16, 20.
-REAL_GRIPPER_SPEED = 30
 MIN_DURATION = 0.6
-MAX_DURATION = 30.0
 MAX_FEEDBACK_AGE = 1.0
-SETTLE_TOLERANCE = math.radians(1.0)
-MIRROR_TOLERANCE = math.radians(3.0)
 HOLD_VALIDATION_ADVANCE = 0.55
 # First check is short so motion starts quickly; later checks extend it.
 HOLD_FIRST_VALIDATION_ADVANCE = 0.15
@@ -89,8 +69,6 @@ class TeleopKeyboard(Node):
     _collision_is_decreasing = SliderControl._collision_is_decreasing
     _format_collision_reason = staticmethod(SliderControl._format_collision_reason)
     _wait_for_future = SliderControl._wait_for_future
-    _ensure_acm_name = staticmethod(SliderControl._ensure_acm_name)
-    _ensure_floor_collision_scene = SliderControl._ensure_floor_collision_scene
 
     def __init__(self):
         super().__init__("teleop_keyboard_gazebo")
@@ -102,11 +80,6 @@ class TeleopKeyboard(Node):
             self.get_parameter("real_gripper_hold_enabled").value)
         self.real_transport = None
         self._real_thread = None
-        self._real_mirror = None
-        self._mirror_thread = None
-        self._mirror_stop = threading.Event()
-        self._sample_velocity = [0.0] * 7
-        self.real_joint_pub = None
         self._mirror_positions = None
         self._mirror_time = 0.0
         self.mode = str(self.get_parameter("mode").value).strip().lower()
@@ -120,16 +93,7 @@ class TeleopKeyboard(Node):
         self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
         self.validity_client = self.create_client(
             GetStateValidity, "/check_state_validity")
-        self.get_scene_client = self.create_client(
-            GetPlanningScene, "/get_planning_scene")
-        self.apply_scene_client = self.create_client(
-            ApplyPlanningScene, "/apply_planning_scene")
-        self._public_scene_managed = True
-        self.floor_clearance_m = 0.0
         self.collision_depth_tolerance_m = DEFAULT_COLLISION_DEPTH_TOLERANCE_M
-        self.floor_size_m = 20.0
-        self.floor_thickness_m = 0.10
-        self.floor_frame = "world"
         self._state_lock = threading.Lock()
         self._robot_lock = threading.Lock()
         self._positions = None
@@ -137,8 +101,6 @@ class TeleopKeyboard(Node):
         self._feedback_time = 0.0
         self._sim_velocity_estimator = PositionVelocityEstimator()
         self._sim_velocity_warning_emitted = False
-        self._active = False
-        self._worker = None
         self._armed = False
         self._stop_requested = False
         self.mc = None
@@ -166,7 +128,6 @@ class TeleopKeyboard(Node):
                 history=HistoryPolicy.KEEP_LAST, depth=1,
                 reliability=ReliabilityPolicy.RELIABLE,
                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
-            self.snapshot_pub = None
             self._connect_read_only()
             self._real_pose_reader = RealPoseReader(
                 self.mc, JOINT_LIMITS_RAD, report=self.get_logger().debug)
@@ -177,13 +138,9 @@ class TeleopKeyboard(Node):
                     self._real_pose_reader.observe_arm(
                         [math.degrees(v) for v in self._startup_pose[:6]], *stamp)
             self.real_transport = RealKeyboardTransport(
-                self.mc, self._real_pose_reader, self._mirror_real_pose, JOINT_LIMITS_RAD,
+                self.mc, self._real_pose_reader, lambda pose: None, JOINT_LIMITS_RAD,
                 report_error=self.get_logger().error)
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
-            self._real_mirror = RealPoseBuffer()
-            self._sample_publish_lock = threading.Lock()
-            self.real_joint_pub = self.real_age_pub = None
-            self._on_real_sample(self._startup_pose)
             attach_feedback(self, self._real_pose_reader)
             self._real_thread.start()
             self.get_logger().info("Real robot READ ONLY. Wait for Gazebo sync before arming.")
@@ -236,16 +193,6 @@ class TeleopKeyboard(Node):
                 return None
             return list(self._positions), list(self._velocities)
 
-    def _mirror_real_pose(self, pose):
-        # Only a stationary measured pose may open a newly started launch gate.
-        feedback = self.real_transport.feedback() if self.real_transport else None
-        if feedback is None:
-            return  # Never mirror a stale/unvalidated combined pose.
-        if (feedback is not None and not self.real_transport.moving and
-                all(abs(v) <= 0.01 for v in feedback[1])):
-            self._publish_snapshot(pose)
-        # Gazebo receives the measured pose through the delayed render thread.
-        self._on_real_sample(pose)
 
     def arm_real(self):
         if self.mode != "real" or not self.real_hold_enabled:
@@ -279,31 +226,6 @@ class TeleopKeyboard(Node):
             raise RuntimeError(f"Pro450 feedback violates joint limits: {pose!r}")
         return pose
 
-    def _publish_snapshot(self, pose):
-        if getattr(self.mc, 'public_feedback', False) is True:
-            return
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "pro450:retain:" + getattr(self.mc, "owner_token", "")
-        reader = getattr(self, "_real_pose_reader", None)
-        if reader is not None:
-            if not reader.fresh():
-                return
-            # JointState has one stamp: use the oldest constituent sample,
-            # not a new stamp that would disguise the cached gripper's age.
-            age = max(0.0, time.monotonic() - min(reader.arm_time, reader.gripper_time))
-            stamp_ns = max(0, int((time.time() - age) * 1e9))
-            msg.header.stamp.sec = stamp_ns // 1000000000
-            msg.header.stamp.nanosec = stamp_ns % 1000000000
-        elif hasattr(self.mc, 'sample_time'):
-            stamps = [self.mc.sample_time(kind) for kind in ('arm', 'gripper')]
-            if all(stamp is not None for stamp in stamps):
-                wall = min(stamp[1] for stamp in stamps)
-                seconds = int(wall)
-                msg.header.stamp = Time(sec=seconds, nanosec=int((wall - seconds) * 1e9))
-        msg.name = list(COMMAND_JOINTS)
-        msg.position = list(pose)
-        self.snapshot_pub.publish(msg)
 
     def _connect_read_only(self):
         from pro450_public_client import PublicPro450Client as Pro450Client
@@ -326,28 +248,8 @@ class TeleopKeyboard(Node):
                > math.radians(0.2) for j in range(7)):
             raise RuntimeError("Pro450 startup pose was not stable")
         self._startup_pose = samples[-1]
-        self._publish_snapshot(samples[-1])
 
-    def _refresh_snapshot(self):
-        with self._state_lock:
-            if self._active:
-                return
-        try:
-            with self._robot_lock:
-                if self.mc.is_moving() != 0:
-                    return
-                pose = self._read_real_pose()
-            self._publish_snapshot(pose)
-        except Exception as exc:
-            self._armed = False
-            self.get_logger().error(f"Real feedback failed; keyboard locked: {exc}")
 
-    @staticmethod
-    def _duration(current, target):
-        d = max(abs(b - a) for a, b in zip(current, target))
-        # Zero-endpoint-velocity cubic: peak velocity 1.5d/T, acceleration 6d/T².
-        return max(MIN_DURATION, 1.5 * d / MAX_VELOCITY,
-                   math.sqrt(6.0 * d / MAX_ACCELERATION))
 
     def _publish_trajectory(self, target, duration, gripper_only=False, velocities=None):
         sec = int(duration)
@@ -372,106 +274,9 @@ class TeleopKeyboard(Node):
         gripper.points = [point]
         self.pub_gripper.publish(gripper)
 
-    def _on_real_sample(self, pose):
-        publish_feedback(self, pose, self._real_pose_reader, COMMAND_JOINTS)
 
-    def _mirror_loop(self):
-        next_tick = time.monotonic()
-        while rclpy.ok() and not self._mirror_stop.is_set():
-            next_tick += 0.02
-            if int(next_tick * 50) % 25 == 0:
-                publish_age(self, self._real_pose_reader)
-            try:
-                rendered = self._real_mirror.render()
-                if rendered is not None:
-                    pose, velocity = rendered
-                    self._publish_trajectory(pose, 0.04, velocities=velocity)
-            except Exception:
-                self.get_logger().debug("Could not render the measured pose.")
-            delay = next_tick - time.monotonic()
-            if delay > 0.0:
-                self._mirror_stop.wait(delay)
-            else:
-                next_tick = time.monotonic()
 
-    def request_step(self, index, delta):
-        if self.mode == "real":
-            self.get_logger().warning("Real terminal step path is disabled; use the hold window.")
-            return
-        if "slider_control_gazebo" in self.get_node_names():
-            self.get_logger().warning(
-                "Slider command bridge is also running; stop it before keyboard control.")
-            return
-        if self.mode == "real" and not self._armed:
-            self.get_logger().warning("Real motion locked; press m to arm explicitly.")
-            return
-        feedback = self._fresh_feedback()
-        if feedback is None:
-            self.get_logger().warning("Missing/stale finite Gazebo feedback; rejected.")
-            return
-        current, velocity = feedback
-        if any(abs(x) > 0.05 for x in velocity):
-            self.get_logger().warning("Robot still moving; wait until settled.")
-            return
-        with self._state_lock:
-            if self._active:
-                self.get_logger().warning("Previous command is still active.")
-                return
-            self._active = True
-            self._stop_requested = False
-        target = list(current)
-        low, high = JOINT_LIMITS_RAD[index]
-        target[index] = max(low, min(high, target[index] + delta))
-        if abs(target[index] - current[index]) < 1e-8:
-            with self._state_lock:
-                self._active = False
-            self.get_logger().info("Already at joint limit.")
-            return
-        self._worker = threading.Thread(
-            target=self._execute_step,
-            args=(current, target, index == 6), daemon=True)
-        self._worker.start()
 
-    def _execute_step(self, current, target, gripper_only):
-        if self.mode == "real":
-            self.get_logger().error("Legacy real step transport is disabled.")
-            with self._state_lock:
-                self._active = False
-            return
-        try:
-            self.get_logger().info("Validating keyboard path against MoveIt collisions...")
-            valid, reason = self._path_is_valid(current, target)
-            if not valid:
-                self.get_logger().warning(f"Rejected: {reason}")
-                return
-            fresh = self._fresh_feedback()
-            if (self._stop_requested or fresh is None or
-                    max(abs(a - b) for a, b in zip(fresh[0], current)) > math.radians(1)):
-                self.get_logger().warning("Pose changed during validation; retry.")
-                return
-            duration = self._duration(current, target)
-            if duration > MAX_DURATION:
-                self.get_logger().warning("Trajectory duration exceeds safe limit.")
-                return
-            if self._stop_requested:
-                return
-            self._publish_trajectory(target, duration, gripper_only)
-            end = time.monotonic() + duration
-            while time.monotonic() < end and not self._stop_requested:
-                time.sleep(0.05)
-            feedback = self._fresh_feedback()
-            if (not self._stop_requested and feedback is not None and
-                    max(abs(a - b) for a, b in zip(feedback[0], target)) <= SETTLE_TOLERANCE):
-                self.get_logger().info("Keyboard step completed.")
-            elif not self._stop_requested:
-                self._armed = False
-                self.get_logger().error("Target not reached; real controls locked.")
-        except Exception as exc:
-            self._armed = False
-            self.get_logger().error(f"Keyboard command failed; controls locked: {exc}")
-        finally:
-            with self._state_lock:
-                self._active = False
 
     def stop(self):
         self._stop_requested = True
@@ -715,11 +520,7 @@ class TeleopKeyboard(Node):
             return not valid
 
         try:
-            # Same ground object the short corridor installs. A scan that runs
-            # before the ground exists would treat the whole stroke as clear.
-            ready, reason = self._ensure_floor_collision_scene()
-            if not ready:
-                raise RuntimeError(reason)
+            # Public environment readiness guarantees the shared ground scene.
             target = collision_stop_angle(start, goal, margin, grid, fine, blocked)
         except Exception as exc:
             if self.mode == "real":
@@ -923,17 +724,6 @@ class TeleopKeyboard(Node):
             return
         if abs(endpoint - positions[axis]) > 0.00001 or abs(next_velocity) > 0.002:
             self._publish_hold_waypoint(positions, axis, endpoint, duration)
-
-
-class RawTerminal:
-    def __enter__(self):
-        self.fd = sys.stdin.fileno()
-        self.previous = termios.tcgetattr(self.fd)
-        tty.setcbreak(self.fd)
-        return self
-
-    def __exit__(self, *_):
-        termios.tcsetattr(self.fd, termios.TCSANOW, self.previous)
 
 
 JOINT_KEYS = {"w": (0, 1), "s": (0, -1), "e": (1, 1), "d": (1, -1),
@@ -1187,73 +977,31 @@ class SimulationHoldWindow:
             self.window.close()
 
 
-def keyboard_loop(node):
-    print("Pro450: w/s e/d r/f t/g y/h u/j = +/-1 deg; uppercase = +/-5 deg")
-    print("[ / ] = gripper +/-0.05 rad; Space = STOP; 2 = feedback; q = quit")
-    print("Real only: m = arm, n = lock. No reset or collision override.")
-    with RawTerminal():
-        while rclpy.ok():
-            if not select.select([sys.stdin], [], [], 0.05)[0]:
-                continue
-            key = sys.stdin.read(1)
-            if key == "q":
-                node._armed = False
-                rclpy.shutdown()
-                break
-            if key == " ":
-                node.stop()
-            elif key == "m" and node.mode == "real":
-                if node._fresh_feedback() is None:
-                    node.get_logger().warning("Cannot arm without Gazebo feedback.")
-                else:
-                    node._armed = True
-                    node.get_logger().warning("REAL MOTION ARMED. n = lock; Space = STOP.")
-            elif key == "n":
-                node._armed = False
-                node.get_logger().info("Real motion locked.")
-            elif key == "2":
-                node.get_logger().info(f"Gazebo feedback (rad): {node._fresh_feedback()}")
-            elif key in ("[", "]"):
-                node.request_step(6, GRIPPER_STEP if key == "[" else -GRIPPER_STEP)
-            elif key.lower() in JOINT_KEYS:
-                index, direction = JOINT_KEYS[key.lower()]
-                node.request_step(index, direction *
-                                  (FAST_STEP if key.isupper() else NORMAL_STEP))
-
-
 def main(args=None):
     from rclpy.signals import SignalHandlerOptions
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     node = None
-    keyboard = None
     ros_thread = None
     previous_sigint = None
     previous_sigterm = None
     exit_code = 0
     try:
         node = TeleopKeyboard()
-        if node.mode in ("simulation", "real"):
-            from python_qt_binding.QtWidgets import QApplication
-            app = QApplication.instance() or QApplication(["pro450_sim_hold"])
-            ros_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
-            ros_thread.start()
-            window = SimulationHoldWindow(node)
-            previous_sigint = signal.getsignal(signal.SIGINT)
-            signal.signal(
-                signal.SIGINT,
-                lambda _signum, _frame: window.request_exit("Ctrl+C"),
-            )
-            previous_sigterm = signal.getsignal(signal.SIGTERM)
-            signal.signal(signal.SIGTERM,
-                          lambda _signum, _frame: window.request_exit("SIGTERM"))
-            window.show()
-            app.exec_()
-        else:
-            if not sys.stdin.isatty():
-                raise RuntimeError("Real keyboard control requires an interactive terminal")
-            keyboard = threading.Thread(target=keyboard_loop, args=(node,), daemon=True)
-            keyboard.start()
-            rclpy.spin(node)
+        from python_qt_binding.QtWidgets import QApplication
+        app = QApplication.instance() or QApplication(["pro450_sim_hold"])
+        ros_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+        ros_thread.start()
+        window = SimulationHoldWindow(node)
+        previous_sigint = signal.getsignal(signal.SIGINT)
+        signal.signal(
+            signal.SIGINT,
+            lambda _signum, _frame: window.request_exit("Ctrl+C"),
+        )
+        previous_sigterm = signal.getsignal(signal.SIGTERM)
+        signal.signal(signal.SIGTERM,
+                      lambda _signum, _frame: window.request_exit("SIGTERM"))
+        window.show()
+        app.exec_()
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     except Exception as exc:
@@ -1266,28 +1014,10 @@ def main(args=None):
             if node.real_transport is not None:
                 node.real_transport.close()
                 node._real_thread.join(timeout=2.0)
-            if node._mirror_thread is not None:
-                node._mirror_stop.set()
-                node._mirror_thread.join(timeout=0.5)
             node._armed = False
             node._stop_requested = True
             if node.mode == "simulation" and not node.hold_idle():
                 node.stop()
-            with node._state_lock:
-                motion_active = node._active
-            if motion_active and node.mode == "real":
-                try:
-                    if node._robot_lock.acquire(timeout=2.0):
-                        try:
-                            node.mc.stop()
-                        finally:
-                            node._robot_lock.release()
-                    else:
-                        node.get_logger().error("Could not acquire real robot lock for STOP")
-                except Exception as exc:
-                    node.get_logger().error(f"Real STOP on exit failed: {exc}")
-            if node._worker is not None:
-                node._worker.join(timeout=2.0)
             if node._hold_validation_worker is not None:
                 node._hold_validation_worker.join(timeout=2.0)
             # Never release servo torque; the loaded real robot could fall.
@@ -1297,8 +1027,6 @@ def main(args=None):
         rclpy.try_shutdown()
         if ros_thread is not None:
             ros_thread.join(timeout=1.0)
-        if keyboard is not None:
-            keyboard.join(timeout=1.0)
         if previous_sigint is not None:
             signal.signal(signal.SIGINT, previous_sigint)
         if previous_sigterm is not None:
