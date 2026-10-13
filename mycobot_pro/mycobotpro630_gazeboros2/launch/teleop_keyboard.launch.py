@@ -1,67 +1,23 @@
-import os
+"""Independent keyboard function; no Gazebo, MoveIt or slider process is spawned."""
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument, EmitEvent, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
-from moveit_configs_utils import MoveItConfigsBuilder
-from moveit_configs_utils.launches import generate_spawn_controllers_launch
+from launch_ros.parameter_descriptions import ParameterValue
+
 
 def generate_launch_description():
-    moveit_config = MoveItConfigsBuilder("firefighter", package_name="mycobotpro630_gazeboros2").to_moveit_configs()
-
-    rsp = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        output="screen",
-        parameters=[moveit_config.robot_description, {'use_sim_time': True}],
-    )
-
-    gazebo_ros_share = get_package_share_directory('gazebo_ros')
-    gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(gazebo_ros_share, 'launch', 'gazebo.launch.py')),
-    )
-
-    spawn_entity = Node(
-        package='gazebo_ros',
-        executable='spawn_entity.py',
-        arguments=['-topic', 'robot_description', '-entity', 'mycobotpro630'],
-        output='screen'
-    )
-
-    spawn_controllers = generate_spawn_controllers_launch(moveit_config)
-
-    move_group = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
-        output="screen",
-        parameters=[
-            moveit_config.to_dict(),
-            {"use_sim_time": True},
-        ],
-    )
-
-    rviz = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", str(moveit_config.package_path / "config/moveit.rviz")],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-            moveit_config.robot_description_kinematics,
-            moveit_config.planning_pipelines,
-            moveit_config.joint_limits,
-            {"use_sim_time": True},
-        ],
-    )
-
+    session = Node(
+        package='mycobotpro630_gazeboros2', executable='pro630_control_session.py',
+        name='pro630_keyboard_session', output='screen', parameters=[{
+            'feature': 'keyboard', 'environment': LaunchConfiguration('environment'),
+            'startup_timeout_sec': ParameterValue(LaunchConfiguration('startup_timeout_sec'), value_type=float),
+            'use_sim_time': False}])
     return LaunchDescription([
-        rsp,
-        gazebo,
-        spawn_entity,
-        move_group,
-        rviz,
-        TimerAction(period=3.0, actions=[spawn_controllers])
-    ])
+        DeclareLaunchArgument('environment', default_value='simulation', choices=['simulation', 'real']),
+        DeclareLaunchArgument('startup_timeout_sec', default_value='600.0'),
+        RegisterEventHandler(OnProcessExit(target_action=session,
+            on_exit=[EmitEvent(event=Shutdown(reason='Keyboard function session ended'))])),
+        session])

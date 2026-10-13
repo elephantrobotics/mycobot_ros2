@@ -1,0 +1,265 @@
+"""Pro630 feature contract backed by the installed ElephantRobot text SDK.
+
+One serialized TCP connection, receive timestamps and model-coordinate
+conversion. The SDK is unmodified. Pro450 packets/speed calibration are not
+used. A transport timeout closes the unframed stream to reject late replies.
+"""
+import hashlib
+import math
+import os
+import socket
+import select
+import tempfile
+import threading
+import time
+import uuid
+from pro630_model import (ARM_SDK_SPEED_MAX, DEFAULT_PRO630_IP,
+                         DEFAULT_PRO630_PORT, GRIPPER_ID,
+                         HARDWARE_OFFSETS_DEG, LIMITS_DEG)
+try:
+    from pymycobot import ElephantRobot as _VendorClient
+except ImportError:
+    _VendorClient = object
+
+
+class RobotConnectionLease:
+    """Host-local ownership released by the OS when the descriptor closes."""
+    def __init__(self, ip, port, timeout=15.):
+        key = hashlib.sha256(f'{ip}:{port}'.encode()).hexdigest()[:20]
+        self.handle = open(os.path.join(tempfile.gettempdir(), f'pro630-{key}.lock'), 'a+b')
+        self.handle.seek(0, os.SEEK_END)
+        if not self.handle.tell():
+            self.handle.write(b'0'); self.handle.flush()
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                if os.name == 'nt':
+                    import msvcrt
+                    self.handle.seek(0)
+                    msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    self.handle.close(); self.handle = None
+                    raise RuntimeError(f'Pro630 connection already owned for {ip}:{port}')
+                time.sleep(.05)
+
+    def close(self):
+        if self.handle is not None:
+            self.handle.close(); self.handle = None
+
+
+class Pro630Client(_VendorClient):
+    """Only this module maps feature operations to Pro630 vendor methods."""
+    def __init__(self, ip=DEFAULT_PRO630_IP, netport=DEFAULT_PRO630_PORT,
+                 debug=False, feedback_hz=20., ownership_timeout=15.):
+        if _VendorClient is object:
+            raise RuntimeError('pymycobot and numpy are required for real Pro630 mode')
+        self._api_lock = threading.RLock()
+        self._closed = threading.Event()
+        self._stamps = {}
+        self._last_reply = ''
+        self._lease = None
+        self._period = 1. / max(1., min(20., feedback_hz))
+        self._next_angles = 0.
+        self.owner_token = uuid.uuid4().hex
+        self._lease = RobotConnectionLease(ip, netport, ownership_timeout)
+        try:
+            super().__init__(ip, netport, debug)
+            self.tcp_client.settimeout(2.)
+            self.tcp_client.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            if not super().start_client():
+                raise RuntimeError(f'Cannot connect to Pro630 at {ip}:{netport}')
+        except Exception:
+            self.close()
+            raise
+
+    def send_command(self, command):
+        with self._api_lock:
+            if self._closed.is_set():
+                raise RuntimeError('Pro630 connection closed; restart the public environment')
+            try:
+                self.tcp_client.sendall((command.rstrip('\n') + '\n').encode())
+                method = command.split('(', 1)[0]
+                data = bytearray()
+                while len(data) < 65536:
+                    chunk = self.tcp_client.recv(4096)
+                    if not chunk:
+                        raise ConnectionError('Pro630 peer disconnected')
+                    data.extend(chunk)
+                    received = (time.monotonic(), time.time())
+                    if hasattr(socket, 'TCP_QUICKACK'):
+                        try:
+                            self.tcp_client.setsockopt(socket.IPPROTO_TCP, socket.TCP_QUICKACK, 1)
+                        except OSError:
+                            pass  # Optional Linux latency hint; correctness does not depend on it.
+                    text = data.decode()
+                    if ':' in text:
+                        reply = text.split(':', 1)[1].strip()
+                        if method == 'get_robot_state' and len(reply) < 64 and '\n' not in text:
+                            continue
+                        if reply in ('-', '+'):
+                            continue
+                        if (method in ('force_GetGripperAngle', 'force_GetSpeed')
+                                and '\n' not in text and select.select([self.tcp_client], [], [], .05)[0]):
+                            continue
+                        if reply and (not reply.startswith('[') or ']' in reply):
+                            break
+                else:
+                    raise RuntimeError('Pro630 response exceeds 64 KiB')
+                if ':' not in text:
+                    raise RuntimeError(f'Malformed Pro630 response: {text!r}')
+                reply = text.split(':', 1)[1].strip()
+                if not reply or '\n' in reply or '\r' in reply:
+                    raise RuntimeError(f'Invalid Pro630 response: {reply!r}')
+                if any(word in reply.lower() for word in ('error', 'failed', 'exception')):
+                    raise RuntimeError(f'Pro630 command failed: {reply}')
+                self._last_reply = reply
+                self._received = received
+                return reply
+            except (OSError, UnicodeError, RuntimeError) as exc:
+                self.close()
+                raise RuntimeError(f'Pro630 transport failed: {exc}') from exc
+
+    def sample_time(self, kind):
+        return self._stamps.get(kind)
+
+    def _flag(self, command):
+        reply = self.send_command(command)
+        if reply not in ('0', '1'):
+            raise RuntimeError(f'Invalid Pro630 status for {command}: {reply!r}')
+        return int(reply)
+
+    def is_power_on(self):
+        return self._flag('is_power_on()')
+
+    def is_moving(self):
+        return self._flag('check_running()')
+
+    def get_error_information(self):
+        state = super().get_robot_state().strip()
+        if len(state) != 64 or set(state) - {'0', '1'}:
+            raise RuntimeError(f'Invalid Pro630 robot state: {state!r}')
+        bad = [i for i in (*range(2, 8), *range(24, 30)) if state[i] != '1']
+        if state[1] != '1':
+            bad.append(1)
+        if state[30] == '1':
+            bad.append(30)
+        return 0 if not bad else 'robot state faults at bits ' + ','.join(map(str, bad))
+
+    def get_angles(self):
+        with self._api_lock:
+            delay = self._next_angles - time.monotonic()
+            if delay > 0 and self._closed.wait(delay):
+                raise RuntimeError('Pro630 connection closed')
+            self._next_angles = time.monotonic() + self._period
+            reply = self.send_command('get_angles()')
+            # Vendor string_to_coords returns a plausible six-angle sentinel
+            # on parse failure. Strict parsing prevents it becoming feedback.
+            raw = [float(v.strip()) for v in reply.strip('[]').split(',')]
+            if len(raw) != 6 or not all(math.isfinite(v) for v in raw):
+                raise RuntimeError(f'Invalid Pro630 angle response: {reply!r}')
+            values = [v + offset for v, offset in zip(raw, HARDWARE_OFFSETS_DEG)]
+            if any(not lo <= v <= hi for v, (lo, hi) in zip(values, LIMITS_DEG)):
+                raise RuntimeError('Pro630 arm feedback violates model joint limits')
+            self._stamps['arm'] = self._received
+            return values
+
+    @staticmethod
+    def _speed(value):
+        if type(value) not in (int, float) or not math.isfinite(value) or not 1 <= value <= ARM_SDK_SPEED_MAX:
+            raise ValueError('Pro630 arm SDK speed must be in 1..1000')
+        return int(value)
+
+    def send_angles(self, angles, speed, _async=False):
+        with self._api_lock:
+            if not isinstance(angles, (list, tuple)) or len(angles) != 6:
+                raise ValueError('Six model-frame angles are required')
+            if any(type(v) not in (int, float) or not math.isfinite(v) or not lo <= v <= hi
+                   for v, (lo, hi) in zip(angles, LIMITS_DEG)):
+                raise ValueError('Pro630 command violates model joint limits')
+            raw = [v - offset for v, offset in zip(angles, HARDWARE_OFFSETS_DEG)]
+            # Vendor write_angles returns None. Arrival is checked from
+            # measured feedback rather than inventing a motion acknowledgment.
+            return super().write_angles(raw, self._speed(speed))
+
+    def send_angle(self, joint, angle, speed, _async=False):
+        if type(joint) is not int or not 1 <= joint <= 6:
+            raise ValueError('Arm joint must be in 1..6')
+        with self._api_lock:
+            values = self.get_angles(); values[joint - 1] = angle
+            return self.send_angles(values, speed, _async=_async)
+
+    def jog_angle(self, joint, direction, speed, _async=False):
+        if type(joint) is not int or not 1 <= joint <= 6 or direction not in (0, 1):
+            raise ValueError('Invalid Pro630 jog joint or direction')
+        return super().jog_angle(f'J{joint}', 1 if direction else -1, self._speed(speed))
+
+    def stop(self, deceleration=0, _async=False):
+        return super().task_stop()  # No deceleration selector in Pro630 SDK.
+
+    @staticmethod
+    def _gripper_id(gripper_id):
+        if type(gripper_id) is not int or gripper_id != GRIPPER_ID:
+            raise ValueError('This model controls only force gripper ID 14')
+        return gripper_id
+
+    def get_pro_gripper_angle(self, gripper_id=GRIPPER_ID):
+        with self._api_lock:
+            value = super().force_get_angle(self._gripper_id(gripper_id))
+            if 0 <= value <= 100:
+                self._stamps['gripper'] = self._received
+            return value
+
+    def set_pro_gripper_angle(self, angle, gripper_id=GRIPPER_ID):
+        if type(angle) not in (int, float) or not math.isfinite(angle) or not 0 <= angle <= 100:
+            raise ValueError('Gripper opening must be in 0..100')
+        return super().force_set_angle(self._gripper_id(gripper_id), int(round(angle)))
+
+    def get_pro_gripper_speed(self, gripper_id=GRIPPER_ID):
+        return super().force_get_speed(self._gripper_id(gripper_id))
+
+    def set_pro_gripper_speed(self, speed, gripper_id=GRIPPER_ID):
+        if type(speed) is not int or not 1 <= speed <= 100:
+            raise ValueError('Pro630 gripper SDK speed must be in 1..100')
+        return super().force_set_speed(self._gripper_id(gripper_id), speed)
+
+    def set_pro_gripper_enabled(self, enabled):
+        if type(enabled) is not int or enabled not in (0, 1):
+            raise ValueError('Gripper enable must be 0 or 1')
+        return super().force_set_enabled(GRIPPER_ID, enabled)
+
+    def set_motor_enabled(self, motors, enabled):
+        """Use the documented Pro630 free-move mode for manual teaching.
+
+        state_off may engage brakes, so release requests enter free-move
+        without powering off. No undocumented servo-release or brake IO.
+        """
+        if motors != 254 or type(enabled) is not int or enabled not in (0, 1):
+            raise ValueError('Drag mode may switch only all six arm joints')
+        with self._api_lock:
+            if self.is_power_on() != 1:
+                raise RuntimeError('Pro630 must already be powered for drag following')
+            if enabled:
+                super()._state_on()
+                if self._flag('state_check()') != 1:
+                    raise RuntimeError('Pro630 arm enable was not confirmed')
+            super().set_free_move_mode(not bool(enabled))
+            if self._last_reply.lower() not in ('1', '0', 'ok', 'true'):
+                raise RuntimeError(f'Pro630 free-move command unconfirmed: {self._last_reply!r}')
+            return 1
+
+    def close(self):
+        self._closed.set()
+        sock = getattr(self, 'tcp_client', None)
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            sock.close(); self.is_client_started = False
+        if self._lease is not None:
+            self._lease.close(); self._lease = None
