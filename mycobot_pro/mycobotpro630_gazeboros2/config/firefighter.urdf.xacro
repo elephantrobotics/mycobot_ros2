@@ -1,6 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <!-- MoveIt uses collision_exact by default. Gazebo overrides this with
+         collision_gazebo because ODE is unstable with dynamic non-convex,
+         high-triangle collision meshes. -->
+    <xacro:arg name="collision_mesh_dir" default="collision_exact" />
 
     <!-- Import firefighter urdf file -->
     <xacro:include filename="$(find mycobotpro630_gazeboros2)/config/mycobot_pro_630_force_gripper.urdf" />
@@ -11,4 +15,18 @@
 
     <xacro:firefighter_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
 
+    <gazebo>
+        <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+            <parameters>$(find mycobotpro630_gazeboros2)/config/ros2_controllers.yaml</parameters>
+            <!-- The Gazebo entity is spawned from the namespaced description
+                 publisher because it uses collision_gazebo and, in real-pose
+                 mirror mode, the read-only hardware snapshot.  Do not let the
+                 plugin fall back to the MoveIt robot_state_publisher, whose
+                 ros2_control initial values are the default zero pose. -->
+            <robot_param>robot_description</robot_param>
+            <robot_param_node>/gazebo_spawn/robot_description_publisher</robot_param_node>
+        </plugin>
+    </gazebo>
 </robot>
+
+

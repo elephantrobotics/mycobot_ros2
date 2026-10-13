@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Wait for a stable real-Pro630 snapshot and persist it for Gazebo startup."""
+
+import math
+import os
+import tempfile
+import time
+
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import JointState
+from std_msgs.msg import String
+
+
+from pro630_model import ARM_JOINTS, GRIPPER_JOINT, COMMAND_JOINTS, JOINT_LIMITS_RAD
+
+
+class Pro630PoseGate(Node):
+    def __init__(self):
+        super().__init__("pro630_pose_gate")
+        self.declare_parameter(
+            "output_file", "/tmp/mycobotpro630_real_initial_positions.yaml"
+        )
+        self.declare_parameter("timeout_sec", 600.0)
+        self.declare_parameter("max_snapshot_age_sec", 2.5)
+        self.output_file = str(self.get_parameter("output_file").value)
+        self.max_snapshot_age_sec = max(
+            0.1, float(self.get_parameter("max_snapshot_age_sec").value)
+        )
+        self.deadline = time.monotonic() + max(
+            1.0, float(self.get_parameter("timeout_sec").value)
+        )
+        self.success = False
+        self.failure_reason = ""
+        self._handoff_token = None
+        self._handoff_pub = self.create_publisher(String, "/pro630/snapshot_consumed", 10)
+        self.create_subscription(String, "/pro630/snapshot_released", self._released_cb, 10)
+
+        snapshot_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(
+            JointState,
+            "/pro630/real_state_snapshot",
+            self._snapshot_cb,
+            snapshot_qos,
+        )
+        self.create_timer(0.2, self._timeout_cb)
+        self.get_logger().info(
+            "Waiting for a stable, read-only Pro630 pose snapshot; "
+            "Gazebo startup is gated."
+        )
+
+    def _snapshot_cb(self, msg):
+        if self.success or self.failure_reason:
+            return
+        if getattr(self, '_handoff_token', None):
+            return
+        stamp_sec = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) / 1e9
+        now_sec = self.get_clock().now().nanoseconds / 1e9
+        if stamp_sec <= 0.0 or abs(now_sec - stamp_sec) > self.max_snapshot_age_sec:
+            self.get_logger().warning("Ignoring stale Pro630 pose snapshot.")
+            return
+        values = dict(zip(msg.name, msg.position))
+        if not all(name in values for name in COMMAND_JOINTS):
+            self.get_logger().warning("Ignoring incomplete Pro630 pose snapshot.")
+            return
+
+        positions = [float(values[name]) for name in COMMAND_JOINTS]
+        if positions[-1] < 0:
+            self.failure_reason = (
+                "Pro630 gripper read failed: negative gripper snapshot; "
+                "Gazebo startup is forbidden")
+            self.get_logger().error(self.failure_reason)
+            return
+        if not all(math.isfinite(value) for value in positions):
+            self.get_logger().warning("Ignoring non-finite Pro630 pose snapshot.")
+            return
+        for name, value, limits in zip(COMMAND_JOINTS, positions, JOINT_LIMITS_RAD):
+            if not limits[0] <= value <= limits[1]:
+                self.get_logger().warning(
+                    f"Ignoring snapshot: {name}={value:.6f} rad is outside limits."
+                )
+                return
+
+        try:
+            self._write_yaml_atomically(positions)
+        except OSError as exc:
+            self.failure_reason = f"Unable to persist real pose snapshot: {exc}"
+            self.get_logger().error(self.failure_reason)
+            return
+
+        frame_id = getattr(msg.header, 'frame_id', '')
+        if frame_id.startswith('pro630:handoff:'):
+            self._handoff_token = frame_id.split(':', 2)[2]
+            self._request_release()
+            self.get_logger().info("Snapshot saved; waiting for the read-only robot connection to release.")
+            return
+        self.success = True
+        self.get_logger().info(
+            f"Stable Pro630 pose snapshot saved to {self.output_file}; "
+            "Gazebo startup may continue."
+        )
+
+    def _request_release(self):
+        msg = String()
+        msg.data = self._handoff_token
+        self._handoff_pub.publish(msg)
+
+    def _released_cb(self, msg):
+        if self._handoff_token and msg.data == self._handoff_token:
+            self.success = True
+            self.get_logger().info("Read-only connection released; Gazebo startup may continue.")
+
+    def _write_yaml_atomically(self, positions):
+        output_dir = os.path.dirname(self.output_file) or "."
+        os.makedirs(output_dir, exist_ok=True)
+        lines = ["initial_positions:"]
+        for name, value in zip(COMMAND_JOINTS, positions):
+            lines.append(f"  {name}: {value:.12f}")
+        payload = "\n".join(lines) + "\n"
+
+        fd, temporary_path = tempfile.mkstemp(
+            prefix=".pro630_initial_", suffix=".yaml", dir=output_dir, text=True
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_path, self.output_file)
+        except Exception:
+            try:
+                os.unlink(temporary_path)
+            except OSError:
+                pass
+            raise
+
+    def _timeout_cb(self):
+        if self.success or self.failure_reason:
+            return
+        if self._handoff_token:
+            self._request_release()
+        if time.monotonic() >= self.deadline:
+            self.failure_reason = "Timed out waiting for a stable Pro630 pose snapshot."
+            self.get_logger().error(self.failure_reason)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Pro630PoseGate()
+    try:
+        while rclpy.ok() and not node.success and not node.failure_reason:
+            rclpy.spin_once(node, timeout_sec=0.2)
+        return_code = 0 if node.success else 1
+    except KeyboardInterrupt:
+        return_code = 130
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
+    raise SystemExit(return_code)
+
+
+if __name__ == "__main__":
+    main()
