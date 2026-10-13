@@ -16,7 +16,11 @@ moveit_simple_controller_manager:
       - joint4_to_joint3
       - joint5_to_joint4
       - joint6_to_joint5
+    action_ns: follow_joint_trajectory
+    default: true
   pro_gripper_controller:
     type: FollowJointTrajectory
     joints:
       - gripper_controller
+    action_ns: follow_joint_trajectory
+    default: true
