@@ -2,35 +2,57 @@
 
 ## 安装依赖
 
-使用该工程前，需要安装最新的pymycobot python api库
+使用该工程前，需要安装最新的 pymycobot Python API 库：
 
 ```bash
 pip install pymycobot --user
 ```
 
+创建工作空间并拉取代码：
+
+```bash
+mkdir -p ~/colcon_ws/src
+cd ~/colcon_ws/src
+git clone --branch Pro450gazebo https://github.com/elephantrobotics/mycobot_ros2.git
+```
+
+编译并加载 ROS 2 环境：
+
+```bash
+cd ~/colcon_ws
+source /opt/ros/humble/setup.bash
+colcon build --packages-select mycobot_description mycobotpro450_gazeboros2
+# 或全量编译
+# colcon build
+source install/setup.bash
+```
+
 ## 公共环境
 
 ```bash
-# 纯仿真环境：
+# 纯仿真环境
 ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=simulation
-# 真机环境：
+
+# 真机环境
 ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real
 ```
 
-真机环境下，公共环境启动时会读取一次真机姿态快照映射到Gazebo环境中，使用前需确认机械臂固件版本、末端固件版本、夹爪固件版本为最新，确保机械臂和夹爪通信正常。
-纯仿真环境下，默认从零位开始。
+- 启动成功后，会拉起 Gazebo 仿真环境，并实时跟踪真机机械臂姿态，期间可切换控制器来控制机械臂。
+- 真机环境：启动时会读取一次真机姿态快照，并映射到 Gazebo 环境中。使用前需确认机械臂、末端、夹爪的固件版本为最新，并确保机械臂和夹爪通信正常。
+- 纯仿真环境：默认从零位开始。
 
 ## 滑块与随机目标
 
 公共环境就绪后，另开终端：
 
 ```bash
-ros2 launch mycobotpro450_gazeboros2 slidar_control_gazebo.launch.py environment:=real
+ros2 launch mycobotpro450_gazeboros2 slider_control_gazebo.launch.py environment:=real
 # 纯仿真时使用 environment:=simulation
 ```
 
-environment参数需要与公共环境一致，检测路径碰撞会显示 `Rejected: collision detected` 拒接执行。
-Force Execute 测试按钮默认隐藏。仅在启动滑块功能时显式设置 `show_force_execute:=true` 才显示，功能为即使检测到碰撞也执行，仅在纯仿真环境下开放。
+- 启动成功后，会拉起用于滑块和随机数操作的 Qt 界面。
+- `environment` 参数需要与公共环境一致。检测到路径碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
+- Force Execute 测试按钮默认隐藏，仅在启动滑块功能时显式设置 `show_force_execute:=true` 才显示。其功能为即使检测到碰撞也执行，且仅在纯仿真环境下开放。
 
 ## 键盘控制
 
@@ -41,9 +63,21 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 # 纯仿真时使用 environment:=simulation
 ```
 
-真机模式 `M` 解锁控制，`N` 或 `Space` 停止并锁定；`Q` 关闭窗口退出。
-聚焦窗口，按住 `w/s、e/d、r/f、t/g、y/h、u/j` 控制六轴，按住 `[ / ]` 控制夹爪。
-松键停止，失焦停止；`1–5` 切换速度档位，`- / +` 调整档位。界面持续显示当前设定速度。
+- 启动成功后，会拉起用于键盘控制的 Qt 界面。
+
+真机模式下：
+
+- `M`：解锁控制
+- `N` 或 `Space`：停止并锁定
+- `Q`：关闭窗口退出
+
+聚焦窗口后：
+
+- 按住 `w` / `s`、`e` / `d`、`r` / `f`、`t` / `g`、`y` / `h`、`u` / `j` 控制六轴
+- 按住 `[` / `]` 控制夹爪
+- 松键停止，失焦停止
+- `1`–`5` 切换速度档位，`-` / `+` 调整档位
+- 界面持续显示当前设定速度
 
 ## 拖动跟随
 
@@ -53,5 +87,8 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
 ```
 
-仅支持真机，`M` 控制六轴和夹爪使能/失能，六轴失能后托住机械臂手动拖动；夹爪失能后可手动掰动，Gazebo公共环境中的机械臂跟随真机运动，再次按下 `M` 锁紧六轴和夹爪，`Q` 关闭窗口退出。
+仅支持真机。
 
+- 启动成功后，会拉起用于拖动跟随的 Qt 界面。
+- `M`：控制六轴和夹爪使能 / 失能。六轴失能后，托住机械臂手动拖动；夹爪失能后可手动掰动。Gazebo 公共环境中的机械臂跟随真机运动。再次按下 `M`，锁紧六轴和夹爪。
+- `Q`：关闭窗口退出。

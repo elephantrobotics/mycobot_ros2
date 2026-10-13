@@ -4,7 +4,8 @@
   <name>mycobotpro450_gazeboros2</name>
   <version>0.3.0</version>
   <description>
-     An automatically generated package with all the configuration and launch files for using the firefighter with the MoveIt Motion Planning Framework
+     MyCobot Pro450 Gazebo environment, measured real-robot pose tracking,
+     MoveIt collision checking, slider control, keyboard control and drag following.
   </description>
   <maintainer email="627892495@qq.com">jiawei.long</maintainer>
 
@@ -32,6 +33,11 @@
   <exec_depend>joint_state_publisher</exec_depend>
   <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>python_qt_binding</exec_depend>
+  <exec_depend>python3-pyqt5</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>shape_msgs</exec_depend>
@@ -44,22 +50,20 @@
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>xacro</exec_depend>
-  <!-- The next 2 packages are required for the gazebo simulation.
-       We don't include them by default to prevent installing gazebo and all its dependencies. -->
-  <!-- <exec_depend>joint_trajectory_controller</exec_depend> -->
-  <!-- <exec_depend>gazebo_ros_control</exec_depend> -->
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>gazebo_ros2_control</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>controller_manager_msgs</exec_depend>
   <exec_depend>moveit_configs_utils</exec_depend>
   <exec_depend>moveit_ros_visualization</exec_depend>
-  <exec_depend>moveit_ros_warehouse</exec_depend>
   <exec_depend>moveit_setup_assistant</exec_depend>
-  <exec_depend>mycobotpro450_gazebo</exec_depend>
+  <exec_depend>mycobot_description</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>rviz_common</exec_depend>
   <exec_depend>rviz_default_plugins</exec_depend>
-  <exec_depend>warehouse_ros_mongo</exec_depend>
 
 
   <export>

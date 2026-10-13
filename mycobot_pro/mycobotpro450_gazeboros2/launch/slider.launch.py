@@ -37,14 +37,31 @@ DEFAULT_REAL_SNAPSHOT_FILE = "/tmp/mycobotpro450_real_initial_positions.yaml"
 
 class GazeboMulticastLogFilter(logging.Filter):
     """Hide selected repeated multicast diagnostics; preserve other output."""
+    # Discovery writes the prefix and strerror separately. Concurrent writers
+    # can interleave them or leave a prefix/error on its own line.
     message = re.compile(
-        r"(?:Exception sending a multicast message:\s*"
-        r"(?:No such device|没有那个设备|没有这个设备|Network is unreachable|网络不可达)\s*)+"
+        r"Exception sending a multicast message:[ \t]*"
+        r"|No such device|Network is unreachable"
+        r"|\u6ca1\u6709\u90a3\u4e2a\u8bbe\u5907"
+        r"|\u6ca1\u6709\u8fd9\u4e2a\u8bbe\u5907"
+        r"|\u7f51\u7edc\u4e0d\u53ef\u8fbe"
     )
 
     def filter(self, record):
-        text = re.sub(r"^\[gz(?:server|client)-\d+\]\s*", "", record.getMessage())
-        return self.message.fullmatch(text.strip()) is None
+        text = record.getMessage()
+        if self.message.search(text) is None:
+            return True
+        text = self.message.sub("", text)
+        lines = []
+        for line in text.splitlines():
+            content = re.sub(r"^\[gz(?:server|client)-\d+\]\s*", "", line)
+            if content.strip():
+                lines.append(line)
+        if not lines:
+            return False
+        record.msg = "\n".join(lines)
+        record.args = ()
+        return True
 
 
 def filter_gazebo_multicast_logs(event, context):
@@ -220,22 +237,6 @@ def build_simulation_stack(
         output="screen",
         parameters=[moveit_config.to_dict(), {"use_sim_time": True}],
     )
-    rviz = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        condition=IfCondition(LaunchConfiguration("rviz")),
-        arguments=["-d", str(moveit_config.package_path / "config/moveit.rviz")],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-            moveit_config.robot_description_kinematics,
-            moveit_config.planning_pipelines,
-            moveit_config.joint_limits,
-            {"use_sim_time": True},
-        ],
-    )
     environment_ready = Node(
         package="mycobotpro450_gazeboros2",
         executable="pro450_environment_state.py",
@@ -273,7 +274,7 @@ def build_simulation_stack(
                 target_action=pose_verifier,
                 on_exit=continue_after_success(
                     "Pro450 initial-pose verification",
-                    [move_group, rviz, environment_ready],
+                    [move_group, environment_ready],
                 ),
             )
         )
@@ -291,7 +292,7 @@ def build_simulation_stack(
                 target_action=controllers,
                 on_exit=continue_after_success(
                     "grouped Pro450 controller activation",
-                    [move_group, rviz, environment_ready],
+                    [move_group, environment_ready],
                 ),
             )
         )
@@ -368,7 +369,6 @@ def generate_launch_description():
                 description="Pro450 environment: simulation or real-pose mirror.",
             ),
             DeclareLaunchArgument("gazebo_gui", default_value="true"),
-            DeclareLaunchArgument("rviz", default_value="true"),
             DeclareLaunchArgument(
                 "real_snapshot_file",
                 default_value=DEFAULT_REAL_SNAPSHOT_FILE,
