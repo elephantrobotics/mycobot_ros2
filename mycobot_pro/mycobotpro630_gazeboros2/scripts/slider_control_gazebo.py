@@ -23,31 +23,26 @@ from pro630_public_client import PublicPro630Client as Pro630Client
 from pro630_feedback import attach_feedback
 from pro630_gripper_control import gripper_speed_for_percentage
 from pro630_scene_support import CollisionSceneSupport
+from pro630_collision_check import (
+    CollisionCheck, COLLISION_SAMPLE_STEP, MAX_COLLISION_SAMPLES,
+    DEFAULT_COLLISION_DEPTH_TOLERANCE_M, SHOW_COLLISION_PATH_PERCENT,
+    SHOW_COLLISION_DEPTH, SHOW_COLLISION_BODIES,
+)
 
 
-DEFAULT_PRO630_IP = "192.168.1.191"
-DEFAULT_PRO630_PORT = 5001
+from pro630_model import DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT, MAX_VELOCITY_RAD_S
 
-from pro630_model import ARM_JOINTS, GRIPPER_JOINT, COMMAND_JOINTS, JOINT_LIMITS_RAD
-from pro630_model import MAX_VELOCITY_RAD_S
+from pro630_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
+COMMAND_JOINTS = joints(True)
 MIN_TRAJECTORY_DURATION = 0.5
 MAX_TRAJECTORY_DURATION = 600.0
 SPLINE_PEAK_VELOCITY_FACTOR = 1.5
-COLLISION_SAMPLE_STEP = math.radians(1.0)
-MAX_COLLISION_SAMPLES = 400
-DEFAULT_COLLISION_DEPTH_TOLERANCE_M = 0.0001
 REAL_POSE_TOLERANCE_RAD = 0.05
 WAYPOINT_ARM_TOLERANCE_RAD = math.radians(0.5)
 WAYPOINT_GRIPPER_TOLERANCE = 0.02
 # Distance from the MoveIt-checked joint-space line that stops the real arm.
 LINE_DEVIATION_LIMIT_RAD = math.radians(1.0)
 REAL_ARRIVAL_MARGIN_S = 10.0
-# Collision validation still computes the first collision point and penetration
-# depth. These flags only control how much diagnostic detail is exposed in the
-# operator-facing status text, so the previous wording can be restored easily.
-SHOW_COLLISION_PATH_PERCENT = False
-SHOW_COLLISION_DEPTH = False
-SHOW_COLLISION_BODIES = False
 
 
 def sdk_motion_accepted(result):
@@ -60,11 +55,12 @@ def gripper_write_accepted(result):
     return type(result) is int and result == 1
 
 
-class SliderControl(Node):
+class SliderControl(CollisionCheck, Node):
     _wait_for_future = CollisionSceneSupport._wait_for_future
 
     def __init__(self):
         super().__init__("slider_control_gazebo")
+        configure_node(self)
 
         self.declare_parameter("mode", "simulation")
         self.declare_parameter("pro630_ip", DEFAULT_PRO630_IP)
@@ -105,7 +101,7 @@ class SliderControl(Node):
         )
         self.pub_gripper = self.create_publisher(
             JointTrajectory, "/pro_gripper_controller/joint_trajectory", 10
-        )
+        ) if self.with_gripper else None
         self.status_pub = self.create_publisher(String, "/pro630/slider_status", 10)
 
         self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
@@ -142,8 +138,9 @@ class SliderControl(Node):
         if self.mode == 2:
             self._initialize_pro630()
             self._pose_reader = RealPoseReader(
-                self.mc, JOINT_LIMITS_RAD, report=self.get_logger().debug)
-            self._pose_reader.seed_gripper(self._startup_pose[6])
+                self.mc, self.joint_limits, report=self.get_logger().debug, with_gripper=self.with_gripper)
+            if self.with_gripper:
+                self._pose_reader.seed_gripper(self._startup_pose[6])
             stamp = self.mc.sample_time('arm')
             if stamp is not None:
                 self._pose_reader.observe_arm(
@@ -169,8 +166,6 @@ class SliderControl(Node):
             with self._state_lock:
                 msg.data = self._command_active
                 self.busy_pub.publish(msg)
-
-
 
 
     def _read_startup_gripper(self, timeout=10.0):
@@ -227,7 +222,7 @@ class SliderControl(Node):
                 f"Connecting to Pro630 @ {self.pro630_ip}:{self.pro630_port}"
             )
             self.mc = Pro630Client(self.pro630_ip, self.pro630_port,
-                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider")
+                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider", with_gripper=self.with_gripper)
             power_state = self.mc.is_power_on()
             if power_state != 1:
                 raise RuntimeError(
@@ -260,26 +255,22 @@ class SliderControl(Node):
                         "startup sampling"
                     )
 
-            gripper_value = self._read_startup_gripper(timeout=10.0)
+            gripper_value = self._read_startup_gripper(timeout=10.0) if self.with_gripper else None
 
             averaged_angles = [
                 sum(sample[index] for sample in samples) / len(samples)
                 for index in range(len(ARM_JOINTS))
             ]
-            self._startup_pose = [math.radians(value) for value in averaged_angles] + [
-                gripper_value / 100.0
-            ]
+            self._startup_pose = [math.radians(value) for value in averaged_angles] + ([gripper_value / 100.0] if self.with_gripper else [])
             self.get_logger().info(
                 "Pro630 connected in read-only startup phase. Stable angles: "
-                f"{averaged_angles}; gripper={gripper_value:.1f}."
+                f"{averaged_angles}." + (f" Gripper={gripper_value:.1f}." if self.with_gripper else "")
             )
         except Exception as exc:
             if self.mc is not None:
                 self.mc.close()
             self.mc = None
             raise RuntimeError(f"Unable to initialize Pro630: {exc}") from exc
-
-
 
 
     @staticmethod
@@ -304,13 +295,13 @@ class SliderControl(Node):
 
     def _feedback_cb(self, msg):
         values = dict(zip(msg.name, msg.position))
-        if not all(name in values for name in COMMAND_JOINTS):
+        if not all(name in values for name in self.command_joints):
             return
-        positions = [float(values[name]) for name in COMMAND_JOINTS]
+        positions = [float(values[name]) for name in self.command_joints]
         velocities = dict(zip(msg.name, msg.velocity)) if len(msg.velocity) == len(msg.name) else {}
         feedback_valid = all(math.isfinite(value) for value in positions) and all(
             name in velocities and math.isfinite(float(velocities[name]))
-            for name in COMMAND_JOINTS
+            for name in self.command_joints
         )
         with self._state_lock:
             self._current_positions = positions
@@ -335,16 +326,17 @@ class SliderControl(Node):
             self._publish_status("Rejected: keyboard controller is running.")
             return
         values = dict(zip(msg.name, msg.position))
-        if not all(name in values for name in COMMAND_JOINTS):
-            self._publish_status("Rejected: target message is missing one or more joints.")
+        if (len(msg.name) != len(self.command_joints) or len(msg.position) != len(self.command_joints)
+                or set(msg.name) != set(self.command_joints)):
+            self._publish_status("Rejected: target joints do not match the installation profile.")
             return
 
-        target = [float(values[name]) for name in COMMAND_JOINTS]
+        target = [float(values[name]) for name in self.command_joints]
         if not all(math.isfinite(value) for value in target):
             self._publish_status("Rejected: target contains NaN or infinity.")
             return
 
-        for name, value, limits in zip(COMMAND_JOINTS, target, JOINT_LIMITS_RAD):
+        for name, value, limits in zip(self.command_joints, target, self.joint_limits):
             if not limits[0] <= value <= limits[1]:
                 self._publish_status(
                     f"Rejected: {name}={value:.4f} rad is outside its limits."
@@ -352,7 +344,8 @@ class SliderControl(Node):
                 return
 
         # Validate and execute the same discrete opening sent to the SDK.
-        target[-1] = round(target[-1] * 100) / 100.0
+        if self.with_gripper:
+            target[-1] = round(target[-1] * 100) / 100.0
 
         speed_scale = 0.2
         if msg.velocity:
@@ -374,6 +367,8 @@ class SliderControl(Node):
                 if self._current_positions is not None
                 else None
             )
+            feedback_age = time.monotonic() - self._feedback_time
+            feedback_valid = self._feedback_valid
             self._command_active = True
             self._stop_requested = False
             self._stop_event.clear()
@@ -444,126 +439,6 @@ class SliderControl(Node):
                 self._command_active = False
             self._publish_command_busy()
 
-    def _path_is_valid(self, current, target):
-
-        if not self.validity_client.wait_for_service(timeout_sec=2.0):
-            return False, "MoveIt /check_state_validity service is unavailable."
-
-        max_delta = max(abs(b - a) for a, b in zip(current, target))
-        sample_count = max(
-            2, min(MAX_COLLISION_SAMPLES, math.ceil(max_delta / COLLISION_SAMPLE_STEP))
-        )
-
-        current_valid, previous_contacts, reason = self._state_is_valid(current)
-        if reason:
-            return False, reason
-        escaping_collision = not current_valid
-        initial_contacts = dict(previous_contacts)
-
-        for index in range(1, sample_count + 1):
-            if self._stop_requested:
-                return False, "STOP requested."
-            ratio = index / sample_count
-            sample = [a + (b - a) * ratio for a, b in zip(current, target)]
-
-            valid, contacts, reason = self._state_is_valid(sample)
-            if reason:
-                return False, reason
-            if valid:
-                escaping_collision = False
-                previous_contacts = {}
-                continue
-
-            if escaping_collision and self._collision_is_decreasing(
-                initial_contacts,
-                previous_contacts,
-                contacts,
-            ):
-                previous_contacts = contacts
-                continue
-
-            return False, self._format_collision_reason(ratio, contacts)
-
-        if escaping_collision:
-            return False, (
-                "target remains in collision; move farther along a path that "
-                "fully exits the existing contact."
-            )
-
-        return True, "valid"
-
-    def _state_is_valid(self, positions):
-        """Return validity and maximum penetration depth for every body pair."""
-
-        request = GetStateValidity.Request()
-        request.robot_state.is_diff = True
-        request.robot_state.joint_state.name = list(COMMAND_JOINTS)
-        request.robot_state.joint_state.position = positions
-        # Empty group checks the entire robot, including the separate gripper.
-        request.group_name = ""
-
-        future = self.validity_client.call_async(request)
-        deadline = time.monotonic() + 2.0
-        while not future.done() and time.monotonic() < deadline:
-            if self._stop_requested:
-                return False, {}, "STOP requested."
-            time.sleep(0.01)
-        if not future.done():
-            return False, {}, "MoveIt state-validity check timed out."
-        response = future.result()
-        if response is None:
-            return False, {}, "MoveIt state-validity check failed."
-        if response.valid:
-            return True, {}, ""
-
-        contacts = {}
-        for contact in response.contacts:
-            if contact.depth <= self.collision_depth_tolerance_m:
-                continue
-            pair = tuple(sorted((contact.contact_body_1, contact.contact_body_2)))
-            contacts[pair] = max(contacts.get(pair, 0.0), contact.depth)
-
-        # FCL can report tiny contacts at coincident triangle surfaces. Ignore
-        # only the configured numerical tolerance. An invalid response without
-        # contacts can be a constraint failure and must remain a hard failure.
-        if response.contacts and not contacts:
-            return True, {}, ""
-        if not contacts:
-            return False, {}, "MoveIt reported an invalid state without contacts."
-        return False, contacts, ""
-
-    def _collision_is_decreasing(self, initial, previous, current):
-        if not set(current).issubset(initial):
-            return False
-        tolerance = self.collision_depth_tolerance_m
-        for pair, depth in current.items():
-            if depth > initial[pair] + tolerance:
-                return False
-            if depth > previous.get(pair, 0.0) + tolerance:
-                return False
-        return True
-
-    @staticmethod
-    def _format_collision_reason(ratio, contacts):
-        if not contacts:
-            if SHOW_COLLISION_PATH_PERCENT:
-                return f"invalid state at {ratio * 100:.0f}% of path."
-            return "invalid state."
-
-        pair, depth = max(contacts.items(), key=lambda item: item[1])
-        summary = "collision detected"
-        if SHOW_COLLISION_PATH_PERCENT:
-            summary += f" at {ratio * 100:.0f}% of path"
-
-        details = []
-        if SHOW_COLLISION_BODIES:
-            details.append(f"{pair[0]} vs {pair[1]}")
-        if SHOW_COLLISION_DEPTH:
-            details.append(f"depth {depth * 1000.0:.3f} mm")
-        return f"{summary} ({', '.join(details)})." if details else f"{summary}."
-
-
-
 
     @staticmethod
     def _trajectory_duration(current, target, speed_scale):
@@ -596,9 +471,12 @@ class SliderControl(Node):
         arm.points = [arm_point]
         self.pub_arm.publish(arm)
 
-        self._publish_gripper_trajectory(target[6], duration, None if velocities is None else velocities[6])
+        if self.with_gripper:
+            self._publish_gripper_trajectory(target[6], duration, None if velocities is None else velocities[6])
 
     def _publish_gripper_trajectory(self, position, duration, velocity=None):
+        if not self.with_gripper:
+            return
         seconds = int(duration)
         nanoseconds = int((duration - seconds) * 1_000_000_000)
         gripper = JointTrajectory()
@@ -656,12 +534,13 @@ class SliderControl(Node):
         """SDK stop on the owner thread, then show the measured pose."""
         if self.mc is not None and self._motion_sent:
             self.mc.stop()
-            # Arm STOP does not stop the independent gripper motor.
-            try:
-                opening = self._pose_reader.read_fresh_gripper()
-                self._send_gripper(int(round(opening * 100.0)))
-            except Exception as exc:
-                self.get_logger().error(f"Could not hold gripper at measured opening: {exc}")
+            if self.with_gripper:
+                # Arm STOP does not stop the independent gripper motor.
+                try:
+                    opening = self._pose_reader.read_fresh_gripper()
+                    self._send_gripper(int(round(opening * 100.0)))
+                except Exception as exc:
+                    self.get_logger().error(f"Could not hold gripper at measured opening: {exc}")
         self._motion_sent = False
         try:
             self._read_real_positions()
@@ -670,6 +549,8 @@ class SliderControl(Node):
 
 
     def _send_gripper(self, opening):
+        if not self.with_gripper:
+            raise RuntimeError("Gripper is not installed")
         result = self.mc.set_pro_gripper_angle(opening)
         if not gripper_write_accepted(result):
             raise RuntimeError(f"gripper returned {result!r}")
@@ -684,7 +565,7 @@ class SliderControl(Node):
         delta = [goal - start for start, goal in zip(start_arm, goal_arm)]
         length_sq = sum(value * value for value in delta)
         arm_moves = length_sq > WAYPOINT_ARM_TOLERANCE_RAD ** 2
-        grip_goal = target[6]
+        grip_goal = target[6] if self.with_gripper else None
         deadline = time.monotonic() + timeout
         bad_reads = 0
         self._arm_moving = True
@@ -718,6 +599,8 @@ class SliderControl(Node):
                     abs(value - goal) <= WAYPOINT_ARM_TOLERANCE_RAD
                     for value, goal in zip(arm, goal_arm))
                 if arm_done and (not arm_moves or self.mc.is_moving() == 0):
+                    if not self.with_gripper:
+                        return True
                     try:
                         self._pose_reader.read_fresh_gripper()
                         measured = self._read_real_positions(moving=False)
@@ -780,6 +663,8 @@ class SliderControl(Node):
 
     def _confirm_gripper_speed(self, speed):
         """Retry transient speed reads before sending any movement command."""
+        if not self.with_gripper:
+            raise RuntimeError("Gripper is not installed")
         if self._stop_requested:
             return False
         write_result = self.mc.set_pro_gripper_speed(speed)
@@ -816,7 +701,8 @@ class SliderControl(Node):
         if "teleop_keyboard_gazebo" in self.get_node_names():
             self._publish_status("Rejected: keyboard controller is running.")
             return
-        self._pose_reader.cached_gripper()
+        if self.with_gripper:
+            self._pose_reader.cached_gripper()
         current = self._read_real_positions(moving=True)
         if not self._gazebo_matches(current):
             if self._stop_requested:
@@ -841,9 +727,11 @@ class SliderControl(Node):
             self._publish_status("Cancelled before execution.")
             return
         duration = self._trajectory_duration(current, target, speed_scale)
-        grip_start = int(round(current[6] * 100.0))
-        grip_goal = int(round(target[6] * 100.0))
-        grip_speed = gripper_speed_for_percentage(grip_start, grip_goal, speed_scale)
+        grip_speed = None
+        if self.with_gripper:
+            grip_start = int(round(current[6] * 100.0))
+            grip_goal = int(round(target[6] * 100.0))
+            grip_speed = gripper_speed_for_percentage(grip_start, grip_goal, speed_scale)
         mean_arm_speed = max(abs(b-a) for a,b in zip(current[:6], target[:6])) / duration
         speed = max(1, sdk_speed_for_rad(mean_arm_speed))
         if self._stop_requested:

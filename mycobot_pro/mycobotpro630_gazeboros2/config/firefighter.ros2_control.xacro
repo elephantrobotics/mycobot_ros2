@@ -50,6 +50,7 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
+            <xacro:if value="$(arg with_gripper)">
             <joint name="gripper_controller">
                 <command_interface name="position"/>
                 <state_interface name="position">
@@ -105,6 +106,7 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
+            </xacro:if>
         </ros2_control>
     </xacro:macro>
 </robot>

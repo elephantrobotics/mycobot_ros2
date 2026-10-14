@@ -32,6 +32,8 @@ install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
 install(FILES ARCHITECTURE.md DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
+  scripts/pro630_gui_backend.py
+  scripts/pro630_control_gui.py
   scripts/activate_gazebo_controllers.py
   scripts/pro630_slider_gui.py
   scripts/pro630_pose_gate.py
@@ -46,13 +48,14 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES scripts/pro630_model.py scripts/pro630_hold_profile.py scripts/pro630_real_keyboard.py
+install(FILES scripts/pro630_configuration.py scripts/pro630_model.py scripts/pro630_hold_profile.py scripts/pro630_real_keyboard.py
   scripts/pro630_session_support.py
   scripts/pro630_drag_support.py
   scripts/pro630_public_client.py
   scripts/pro630_broker_support.py
   scripts/pro630_real_mirror.py
   scripts/pro630_sdk_adapter.py scripts/pro630_feedback.py
+  scripts/pro630_collision_check.py
   scripts/pro630_gripper_control.py scripts/pro630_scene_support.py
   DESTINATION lib/${PROJECT_NAME})
 
