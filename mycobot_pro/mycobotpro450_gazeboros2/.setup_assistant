@@ -1,7 +1,7 @@
 moveit_setup_assistant_config:
   urdf:
     package: mycobotpro450_gazeboros2
-    relative_path: config/mycobot_pro_450_force_gripper.urdf
+    relative_path: config/firefighter.urdf.xacro
   srdf:
     relative_path: config/firefighter.srdf
   package_settings:

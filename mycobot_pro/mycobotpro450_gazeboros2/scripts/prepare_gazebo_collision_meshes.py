@@ -15,6 +15,7 @@ used by the legacy hull generator.  Their Gazebo meshes are rebuilt as tight
 """
 
 import argparse
+from pro450_configuration import geometry_xml
 import math
 from pathlib import Path
 import struct
@@ -172,12 +173,13 @@ def oriented_box_from_stl(path, padding_m=0.0005):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("urdf", type=Path)
+    parser.add_argument("--without-gripper", action="store_true")
     parser.add_argument("source_dir", type=Path)
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("exact_dir", type=Path)
     args = parser.parse_args()
 
-    root = ET.parse(args.urdf).getroot()
+    root = geometry_xml(args.urdf, not args.without_gripper)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     for link in root.findall("link"):

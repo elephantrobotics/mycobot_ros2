@@ -6,9 +6,8 @@ import subprocess
 import threading
 import time
 
-JOINTS = [f"joint{i}" for i in range(1, 7)] + ["gripper_controller"]
-LIMITS_DEG = [(-162, 162), (-125, 125), (-154, 154), (-162, 162),
-              (-162, 162), (-165, 165)]
+from pro450_configuration import ARM_JOINTS, LIMITS_DEG, joints, require_flag
+JOINTS = joints(True)
 
 
 class EnvironmentLatch:
@@ -22,6 +21,9 @@ class EnvironmentLatch:
     def observe(self, state):
         if state.get('environment') != self.environment:
             raise RuntimeError('Control and environment modes do not match')
+        require_flag(state.get('with_gripper'))
+        if self.state is not None and state['with_gripper'] != self.state['with_gripper']:
+            raise RuntimeError('Installation profile changed; restart the control launch')
         session = state.get('session_id')
         if not isinstance(session, str) or not session:
             raise ValueError('Missing environment session ID')
@@ -37,7 +39,7 @@ class EnvironmentLatch:
         return self.fresh() and self.state.get('ready') is True
 
 
-def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep):
+def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep, with_gripper=True):
     """Only query hardware. Keep the existing five-sample startup criteria."""
     if sdk.is_power_on() != 1:
         raise RuntimeError('Pro450 is not powered; automatic power-on is forbidden')
@@ -61,7 +63,7 @@ def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep):
     if any(max(p[i] for p in samples) - min(p[i] for p in samples) > 0.2
            for i in range(6)):
         raise RuntimeError('Pro450 initial pose is not stable')
-    gripper = read_initial_gripper(sdk, clock, sleep)
+    gripper = read_initial_gripper(sdk, clock, sleep) if with_gripper else None
     # Confirm the arm stayed still during a possibly slow gripper read.
     if sdk.is_moving() != 0:
         raise RuntimeError('Pro450 moved during the initial snapshot')
@@ -71,7 +73,7 @@ def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep):
                 or not math.isfinite(v) or not lo <= v <= hi or abs(v - old) > 0.2
                 for v, old, (lo, hi) in zip(final, samples[-1], LIMITS_DEG))):
         raise RuntimeError('Pro450 pose changed during the initial snapshot')
-    return [math.radians(v) for v in final] + [gripper / 100.0]
+    return [math.radians(v) for v in final] + ([gripper / 100.0] if with_gripper else [])
 
 
 def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10.0):
@@ -103,11 +105,12 @@ def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10
     return result['value']
 
 
-def control_commands(feature, environment, executable_directory, python, show_force_execute=False):
+def control_commands(feature, environment, executable_directory, python, show_force_execute=False, with_gripper=True):
     """Explicit process allowlist: no Gazebo, MoveIt or additional SDK owner."""
     from pathlib import Path
     root = Path(executable_directory)
     def command(script, parameters):
+        parameters = dict(parameters, with_gripper='true' if require_flag(with_gripper) else 'false')
         args = [python, '-B', str(root / script), '--ros-args']
         for name, value in parameters.items():
             args.extend(['-p', f'{name}:={value}'])

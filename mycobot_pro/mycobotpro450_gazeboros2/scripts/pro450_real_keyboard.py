@@ -43,7 +43,8 @@ def sdk_speed_for_rad(velocity, urdf_limit=1.0):
 class RosPoseCache:
     """ROS-side joint cache. Only successful SDK reads are stored."""
 
-    def __init__(self):
+    def __init__(self, with_gripper=True):
+        self.with_gripper = with_gripper
         self.lock = threading.RLock()
         self.arm = None
         self.arm_time = None
@@ -51,7 +52,7 @@ class RosPoseCache:
         self.gripper_time = None
 
     def ready(self):
-        return self.arm is not None and self.gripper is not None
+        return self.arm is not None and (not self.with_gripper or self.gripper is not None)
 
     def store_arm(self, arm, when):
         with self.lock:
@@ -66,7 +67,7 @@ class RosPoseCache:
 
     def pose(self):
         with self.lock:
-            return list(self.arm) + [self.gripper]
+            return list(self.arm) + ([self.gripper] if self.with_gripper else [])
 
 
 class RealPoseReader:
@@ -81,10 +82,11 @@ class RealPoseReader:
     """
     supports_motion_cache = True
 
-    def __init__(self, sdk, limits, clock=time.monotonic, report=None):
+    def __init__(self, sdk, limits, clock=time.monotonic, report=None, with_gripper=True):
+        self.with_gripper = with_gripper
         self.sdk, self.limits, self.clock = sdk, limits, clock
         self.report = report or (lambda _: None)
-        self.cache = RosPoseCache()
+        self.cache = RosPoseCache(with_gripper)
         self.gripper_valid = False
         self.gripper_rejected_minus_one = False
         self.gripper_from_cache = False
@@ -141,6 +143,8 @@ class RealPoseReader:
         now = self.clock()
         if self.cache.arm_time is None or now - self.cache.arm_time > 0.5:
             return False
+        if not self.with_gripper:
+            return True
         if self.gripper_from_cache:
             try:
                 self.cached_gripper()
@@ -156,10 +160,14 @@ class RealPoseReader:
         return now - self.cache.gripper_time <= self.gripper_max_age
 
     def force_gripper_read(self):
+        if not self.with_gripper:
+            raise RuntimeError("Gripper is not installed")
         self.next_gripper = self.clock()
 
     def cached_gripper(self):
         """Last successful measured opening; no SDK call or age refresh."""
+        if not self.with_gripper:
+            raise RuntimeError("Gripper is not installed")
         with self.cache.lock:
             value = self.cache.gripper
             if (value is None or self.cache.gripper_time is None or
@@ -169,6 +177,8 @@ class RealPoseReader:
 
     def read_fresh_gripper(self):
         """One successful hardware read; never satisfy a preflight with cache."""
+        if not self.with_gripper:
+            raise RuntimeError("Gripper is not installed")
         raw = self.sdk.get_pro_gripper_angle(gripper_id=14)
         value = valid_gripper_position(raw)
         stamp, _ = self._sample_stamp('gripper')
@@ -196,6 +206,8 @@ class RealPoseReader:
             raise ArmReadError(f'Pro450 arm feedback violates joint limits: {raw!r}')
         stamp, wall = self._sample_stamp('arm')
         self.observe_arm(raw, stamp, wall)
+        if not self.with_gripper:
+            return self._combined()
         if moving and self.cache.gripper is not None:
             self.cached_gripper()
             self.gripper_from_cache = True
@@ -254,6 +266,8 @@ class RealPoseReader:
         return self._combined()
 
     def seed_gripper(self, value):
+        if not self.with_gripper:
+            raise RuntimeError("Gripper is not installed")
         self.cache.store_gripper(float(value), self._sample_stamp('gripper')[0])
         self.gripper_valid = True
         self.gripper_rejected_minus_one = False
@@ -270,6 +284,7 @@ class RealKeyboardTransport:
 
     def __init__(self, sdk, read_pose, publish_pose, limits, clock=time.monotonic,
                  report_error=None):
+        self.with_gripper = getattr(read_pose, 'with_gripper', True)
         self.sdk, self.read_pose, self.publish_pose = sdk, read_pose, publish_pose
         self.limits, self.clock = limits, clock
         self.report_error = report_error or (lambda _: None)
@@ -325,6 +340,8 @@ class RealKeyboardTransport:
     def submit(self, axis, endpoint, velocity, origin, validated_limit,
                position_goal=False):
         with self.lock:
+            if axis >= len(self.limits):
+                return False
             if not self.armed or self.error or self.stop_pending is not None:
                 return False
             self.command = (self.generation, axis, endpoint, abs(velocity),
@@ -379,7 +396,7 @@ class RealKeyboardTransport:
         if getattr(self.read_pose, 'supports_motion_cache', False):
             arm_moving = bool(self.motion_sent or self.moving) and self.motion_axis != 6 and not self.error
             pending_start = self.command is not None and not self.motion_sent
-            if pending_start:
+            if pending_start and self.with_gripper:
                 self.read_pose.cached_gripper()
             return self.read_pose(moving=arm_moving or pending_start)
         return self.read_pose()
@@ -410,7 +427,7 @@ class RealKeyboardTransport:
         moving = self.sdk.is_moving()
         if moving not in (0, 1):
             raise RuntimeError("invalid hardware moving status")
-        if len(pose) != 7 or not all(math.isfinite(p) and lo <= p <= hi
+        if len(pose) != len(self.limits) or not all(math.isfinite(p) and lo <= p <= hi
                                     for p, (lo, hi) in zip(pose, self.limits)):
             raise RuntimeError("invalid hardware feedback")
         velocities = self.estimator.update(sample_time, pose)
@@ -421,7 +438,8 @@ class RealKeyboardTransport:
                 self.pose, self.velocity, self.received = pose, velocities, sample_time
                 self.moving = bool(moving)
                 if self.error:
-                    read_id = getattr(self.read_pose, 'success_count', sample_time)
+                    read_id = (getattr(self.read_pose, 'success_count', sample_time)
+                               if self.with_gripper else sample_time)
                     if read_id != self._last_recovery_read:
                         self._last_recovery_read = read_id
                         stable = (not moving and not self.motion_sent and
@@ -499,7 +517,7 @@ class RealKeyboardTransport:
         else:
             # SDK direction: 1 increases, 0 decreases. One jog runs until stop.
             signature = ('jog', axis + 1, 1 if direction > 0 else 0, speed)
-        if signature != self.last_signature and hasattr(self.read_pose, 'cached_gripper'):
+        if self.with_gripper and signature != self.last_signature and hasattr(self.read_pose, 'cached_gripper'):
             try:
                 self.read_pose.cached_gripper()
             except Exception as exc:

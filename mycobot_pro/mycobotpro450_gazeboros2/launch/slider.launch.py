@@ -3,10 +3,14 @@ import os
 import logging
 import re
 import uuid
+import sys
+import tempfile
+import yaml
 
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    OpaqueFunction,
     EmitEvent,
     GroupAction,
     IncludeLaunchDescription,
@@ -14,7 +18,7 @@ from launch.actions import (
     RegisterEventHandler,
 )
 from launch.conditions import IfCondition
-from launch.event_handlers import OnProcessExit, OnProcessStart
+from launch.event_handlers import OnProcessExit, OnProcessStart, OnShutdown
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -27,7 +31,9 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_share_directory, get_package_prefix
+sys.path.insert(0, os.path.join(get_package_prefix("mycobotpro450_gazeboros2"), "lib", "mycobotpro450_gazeboros2"))
+from pro450_configuration import controllers as profile_controllers, controller_config, project_moveit
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
@@ -92,9 +98,9 @@ def use_current_planning_start(moveit_config):
     return moveit_config
 
 
-def controller_spawner(*, inactive=False):
+def controller_spawner(*, inactive=False, with_gripper=True):
     arguments = [
-        *CONTROLLERS,
+        *profile_controllers(with_gripper),
         "--controller-manager",
         "/controller_manager",
         "--controller-manager-timeout",
@@ -140,6 +146,8 @@ def build_simulation_stack(
     coordinated_start,
     control_mode,
     session_id="",
+    with_gripper=True,
+    controller_file="",
 ):
     """Build one isolated Pro450 Gazebo stack for the selected environment."""
     gazebo_robot_description = {
@@ -158,6 +166,8 @@ def build_simulation_stack(
                     " initial_positions_file:=",
                     initial_positions_file,
                     " collision_mesh_dir:=collision_gazebo",
+                    " with_gripper:=", "true" if with_gripper else "false",
+                    " controller_config_file:=", controller_file,
                 ]
             ),
             value_type=str,
@@ -206,13 +216,13 @@ def build_simulation_stack(
         output="screen",
     )
 
-    controllers = controller_spawner(inactive=coordinated_start)
+    controllers = controller_spawner(inactive=coordinated_start, with_gripper=with_gripper)
     controller_activator = Node(
         package="mycobotpro450_gazeboros2",
         executable="activate_gazebo_controllers.py",
         name="pro450_controller_activation_coordinator",
         output="screen",
-        parameters=[{"controllers": CONTROLLERS}],
+        parameters=[{"controllers": profile_controllers(with_gripper)}],
     )
     pose_verifier = Node(
         package="mycobotpro450_gazeboros2",
@@ -227,6 +237,7 @@ def build_simulation_stack(
                 "tolerance_rad": ParameterValue(LaunchConfiguration("initial_pose_tolerance_rad"), value_type=float),
                 "timeout_sec": ParameterValue(LaunchConfiguration("initial_pose_timeout_sec"), value_type=float),
                 "unpause_before_verify": False,
+                "with_gripper": with_gripper,
             }
         ],
     )
@@ -246,6 +257,7 @@ def build_simulation_stack(
         parameters=[{
             "use_sim_time": False,
             "environment": control_mode,
+            "with_gripper": with_gripper,
             "session_id": session_id,
         }],
     )
@@ -311,11 +323,24 @@ def build_simulation_stack(
     ]
 
 
-def generate_launch_description():
+def _build_environment(context):
+    with_gripper = LaunchConfiguration("with_gripper").perform(context) == "true"
+    temporary = tempfile.TemporaryDirectory(prefix="pro450_environment_")
+    directory = temporary.name
+    controller_file = os.path.join(directory, "controllers.yaml")
+    source = os.path.join(get_package_share_directory("mycobotpro450_gazeboros2"), "config", "ros2_controllers.yaml")
+    with open(source) as stream:
+        config = controller_config(yaml.safe_load(stream), with_gripper)
+    with open(controller_file, "w") as stream:
+        yaml.safe_dump(config, stream)
+    def cleanup(event, context):
+        temporary.cleanup()
+        return []
     session_id = uuid.uuid4().hex
     moveit_config = use_current_planning_start(MoveItConfigsBuilder(
         "firefighter", package_name="mycobotpro450_gazeboros2"
-    ).to_moveit_configs())
+    ).robot_description(mappings={"with_gripper": "true" if with_gripper else "false"}).to_moveit_configs())
+    project_moveit(moveit_config, with_gripper)
     environment = LaunchConfiguration("environment")
     real_snapshot_file = LaunchConfiguration("real_snapshot_file")
     default_initial_positions = os.path.join(
@@ -326,11 +351,11 @@ def generate_launch_description():
 
     simulation_stack = build_simulation_stack(
         moveit_config, default_initial_positions, "false", False,
-        "simulation", session_id,
+        "simulation", session_id, with_gripper, controller_file,
     )
     real_stack = build_simulation_stack(
         moveit_config, real_snapshot_file, "true", True,
-        "real", session_id,
+        "real", session_id, with_gripper, controller_file,
     )
 
     pose_gate = Node(
@@ -341,6 +366,7 @@ def generate_launch_description():
         parameters=[
             {
                 "output_file": ParameterValue(real_snapshot_file, value_type=str),
+                "with_gripper": with_gripper,
                 "timeout_sec": ParameterValue(LaunchConfiguration("real_snapshot_timeout_sec"), value_type=float),
             }
         ],
@@ -348,7 +374,7 @@ def generate_launch_description():
     )
     robot_bridge = Node(
         package='mycobotpro450_gazeboros2', executable='pro450_robot_bridge.py',
-        output='screen', parameters=[{'use_sim_time': False}],
+        output='screen', parameters=[{'use_sim_time': False, 'with_gripper': with_gripper}],
         condition=IfCondition(PythonExpression(["'", environment, "' == 'real'"])),
     )
     start_real_stack_after_snapshot = RegisterEventHandler(
@@ -360,8 +386,8 @@ def generate_launch_description():
         )
     )
 
-    return LaunchDescription(
-        [
+    return [
+            RegisterEventHandler(OnShutdown(on_shutdown=cleanup)),
             DeclareLaunchArgument(
                 "environment",
                 default_value="simulation",
@@ -404,6 +430,7 @@ def generate_launch_description():
                     "use_sim_time": False,
                     "environment": environment,
                     "session_id": session_id,
+                    "with_gripper": with_gripper,
                 }],
             ),
             pose_gate,
@@ -412,4 +439,10 @@ def generate_launch_description():
             robot_bridge,
             start_real_stack_after_snapshot,
         ]
-    )
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument("with_gripper", default_value="true", choices=["true", "false"]),
+        OpaqueFunction(function=_build_environment),
+    ])

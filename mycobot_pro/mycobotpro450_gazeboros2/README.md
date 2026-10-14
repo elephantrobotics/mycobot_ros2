@@ -29,12 +29,24 @@ source install/setup.bash
 
 ## 公共环境
 
-```bash
-# 纯仿真环境
-ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=simulation
+如果机械臂选择末端装有myGripper F100 力控夹爪，则调用以下指令拉起公共环境：
 
-# 真机环境
-ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real
+```bash
+# 纯仿真环境 带夹爪
+ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=simulation with_gripper:=true
+
+# 真机环境 带夹爪
+ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gripper:=true
+```
+
+如果机械臂选择末端没有myGripper F100 力控夹爪，则调用以下指令拉起公共环境：
+
+```bash
+# 纯仿真环境 带夹爪
+ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=simulation with_gripper:=false
+
+# 真机环境 带夹爪
+ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gripper:=false
 ```
 
 - 启动成功后，会拉起 Gazebo 仿真环境，并实时跟踪真机机械臂姿态，期间可切换控制器来控制机械臂。
@@ -50,7 +62,7 @@ ros2 launch mycobotpro450_gazeboros2 slider_control_gazebo.launch.py environment
 # 纯仿真时使用 environment:=simulation
 ```
 
-- 启动成功后，会拉起用于滑块和随机数操作的 Qt 界面。
+- 启动成功后，会拉起用于滑块和随机数操作的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
 - `environment` 参数需要与公共环境一致。检测到路径碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
 - Force Execute 测试按钮默认隐藏，仅在启动滑块功能时显式设置 `show_force_execute:=true` 才显示。其功能为即使检测到碰撞也执行，且仅在纯仿真环境下开放。
 
@@ -63,7 +75,7 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 # 纯仿真时使用 environment:=simulation
 ```
 
-- 启动成功后，会拉起用于键盘控制的 Qt 界面。
+- 启动成功后，会拉起用于键盘控制的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
 
 真机模式下：
 
@@ -74,7 +86,7 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 聚焦窗口后：
 
 - 按住 `w` / `s`、`e` / `d`、`r` / `f`、`t` / `g`、`y` / `h`、`u` / `j` 控制六轴
-- 按住 `[` / `]` 控制夹爪
+- 按住 `[` / `]` 控制夹爪，无夹爪时没有该功能
 - 松键停止，失焦停止
 - `1`–`5` 切换速度档位，`-` / `+` 调整档位
 - 界面持续显示当前设定速度
@@ -89,6 +101,6 @@ ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
 
 仅支持真机。
 
-- 启动成功后，会拉起用于拖动跟随的 Qt 界面。
+- 启动成功后，会拉起用于拖动跟随的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
 - `M`：控制六轴和夹爪使能 / 失能。六轴失能后，托住机械臂手动拖动；夹爪失能后可手动掰动。Gazebo 公共环境中的机械臂跟随真机运动。再次按下 `M`，锁紧六轴和夹爪。
 - `Q`：关闭窗口退出。

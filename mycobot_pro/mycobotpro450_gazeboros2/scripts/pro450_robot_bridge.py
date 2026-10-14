@@ -18,14 +18,16 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from mycobotpro450_gazeboros2.srv import Pro450Rpc
 
 from pro450_sdk_adapter import Pro450Client
-from pro450_session_support import JOINTS, LIMITS_DEG, read_initial_snapshot
+from pro450_session_support import LIMITS_DEG, read_initial_snapshot
 from pro450_broker_support import FeatureLease
 from pro450_real_mirror import RealPoseBuffer
+from pro450_configuration import configure_node
 
 
 class RobotBridge(Node):
     def __init__(self):
         super().__init__('pro450_robot_bridge')
+        configure_node(self)
         self.sdk = None
         self.hardware_lock = threading.RLock()
         self.cache_condition = threading.Condition()
@@ -35,7 +37,7 @@ class RobotBridge(Node):
         self.packet = {'sequence': 0, 'value': None, 'error': 'No arm feedback'}
         self.arm_active = self.gripper_active = False
         self.arm_goal = None
-        self.mirror = RealPoseBuffer()
+        self.mirror = RealPoseBuffer(pose_size=len(self.command_joints))
         self.next_gripper = 0.
         self.worker = None
         self.frame = None
@@ -44,11 +46,12 @@ class RobotBridge(Node):
         try:
             self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20., ownership_timeout=0)
             # Startup is strictly read-only; feature launches are not needed for the snapshot.
-            self.initial_pose = read_initial_snapshot(self.sdk)
-            self.gripper = self.initial_pose[6]
-            self.stamps = {kind: self.sdk.sample_time(kind) for kind in ('arm', 'gripper')}
+            self.initial_pose = read_initial_snapshot(self.sdk, with_gripper=self.with_gripper)
+            self.gripper = self.initial_pose[6] if self.with_gripper else None
+            self.stamps = {kind: self.sdk.sample_time(kind) for kind in (('arm', 'gripper') if self.with_gripper else ('arm',))}
             self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
-            self.gripper_pub = self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
+            self.gripper_pub = (self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
+                                if self.with_gripper else None)
             self.real_pub = self.create_publisher(JointState, '/pro450/real_joint_states', 1)
             self.age_pub = self.create_publisher(Float64MultiArray, '/pro450/real_feedback_age', 1)
             qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -102,9 +105,9 @@ class RobotBridge(Node):
                                      for v, (lo, hi) in zip(value, LIMITS_DEG)))
                     if valid and stamp is not None:
                         self.stamps['arm'] = stamp
-                        pose = [math.radians(v) for v in value] + [self.gripper]
+                        pose = [math.radians(v) for v in value] + ([self.gripper] if self.with_gripper else [])
                         previous = self.frame
-                        velocity = [0.] * 7 if previous is None else [
+                        velocity = [0.] * len(self.command_joints) if previous is None else [
                             (current - old) / max(.001, stamp[0] - previous[0])
                             for current, old in zip(pose, previous[2])]
                         self.frame = (stamp[0], stamp[1], pose, velocity)
@@ -117,7 +120,7 @@ class RobotBridge(Node):
                 self.packet = {'sequence': self.packet['sequence'] + 1, 'value': value, 'error': error}
                 self.cache_condition.notify_all()
             # Publish the arm packet before a possibly slow idle gripper query.
-            if time.monotonic() >= self.next_gripper:
+            if self.with_gripper and time.monotonic() >= self.next_gripper:
                 with self.hardware_lock:
                     if not self.stop_event.is_set():
                         try:
@@ -133,7 +136,7 @@ class RobotBridge(Node):
         if self.arm_active:
             self.sdk.stop(deceleration=0, _async=True)
             self.arm_active = False
-        if self.gripper_active:
+        if self.with_gripper and self.gripper_active:
             opening = self.sdk.get_pro_gripper_angle()
             if not isinstance(opening, (int, float)) or isinstance(opening, bool) or not 0 <= opening <= 100:
                 raise RuntimeError('Cannot hold gripper: fresh opening unavailable')
@@ -148,7 +151,11 @@ class RobotBridge(Node):
             if not isinstance(args, list) or not isinstance(kwargs, dict):
                 raise ValueError('Invalid request payload')
             method = req.method
-            if method == 'heartbeat':
+            if not self.with_gripper and 'gripper' in method:
+                raise RuntimeError('Gripper operations are unavailable in the arm-only environment')
+            if method == 'get_capabilities':
+                result = {'with_gripper': self.with_gripper, 'joints': self.command_joints}
+            elif method == 'heartbeat':
                 self.lease.touch(req.token)
                 result = True
             elif method == 'claim':
@@ -212,7 +219,7 @@ class RobotBridge(Node):
         now = time.monotonic()
         arm_stamp, grip_stamp = self.stamps.get('arm'), self.stamps.get('gripper')
         ages = Float64MultiArray()
-        ages.data = [now - arm_stamp[0] if arm_stamp else -1., now - grip_stamp[0] if grip_stamp else -1.]
+        ages.data = [now - arm_stamp[0] if arm_stamp else -1., (now - grip_stamp[0] if grip_stamp else -1.) if self.with_gripper else float('inf')]
         self.age_pub.publish(ages)
         frame = self.frame
         if frame is None or now - frame[0] > .5:
@@ -221,30 +228,32 @@ class RobotBridge(Node):
         msg = JointState()
         sec = int(wall)
         msg.header.stamp = Time(sec=sec, nanosec=int((wall-sec)*1e9))
-        msg.name, msg.position = list(JOINTS), list(pose[:6]) + [self.gripper]
+        msg.name, msg.position = list(self.command_joints), list(pose[:6]) + ([self.gripper] if self.with_gripper else [])
         msg.velocity = list(measured_velocity)
         self.real_pub.publish(msg)
         if self.lease.feature == 'drag':
-            shown, velocity = list(pose[:6]) + [self.gripper], [0.] * 7
+            shown, velocity = list(pose[:6]) + ([self.gripper] if self.with_gripper else []), [0.] * len(self.command_joints)
         else:
             rendered = self.mirror.render()
             if rendered is None:
                 return
             shown, velocity = rendered
         # Gripper rendering uses only the latest successfully measured opening.
-        shown[6], velocity[6] = self.gripper, 0.0
-        self.arm_pub.publish(self.trajectory(JOINTS[:6], shown[:6], velocity[:6]))
-        self.gripper_pub.publish(self.trajectory(JOINTS[6:], shown[6:], velocity[6:]))
+        if self.with_gripper:
+            shown[6], velocity[6] = self.gripper, 0.0
+        self.arm_pub.publish(self.trajectory(self.command_joints[:6], shown[:6], velocity[:6]))
+        if self.with_gripper:
+            self.gripper_pub.publish(self.trajectory(self.command_joints[6:], shown[6:], velocity[6:]))
 
     def publish_snapshot(self):
         if self.frame is None or time.monotonic() - self.frame[0] > .5:
             return
         # This is an initial-pose source, not an SDK ownership handoff.
         msg = JointState()
-        wall = min(self.frame[1], self.stamps['gripper'][1])
+        wall = min(self.frame[1], self.stamps['gripper'][1]) if self.with_gripper else self.frame[1]
         sec = int(wall); msg.header.stamp = Time(sec=sec, nanosec=int((wall-sec)*1e9))
         msg.header.frame_id = 'pro450:retain:' + self.sdk.owner_token
-        msg.name, msg.position = list(JOINTS), list(self.frame[2][:6]) + [self.gripper]
+        msg.name, msg.position = list(self.command_joints), list(self.frame[2][:6]) + ([self.gripper] if self.with_gripper else [])
         self.snapshot_pub.publish(msg)
 
     def close(self):

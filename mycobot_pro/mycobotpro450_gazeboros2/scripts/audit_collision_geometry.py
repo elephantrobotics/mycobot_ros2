@@ -3,6 +3,7 @@
 """Audit how well URDF collision primitives cover visual COLLADA meshes."""
 
 import argparse
+from pro450_configuration import geometry_xml
 import math
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -127,11 +128,12 @@ def format_bounds(points):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("urdf", type=Path)
+    parser.add_argument("--without-gripper", action="store_true")
     parser.add_argument("description_root", type=Path)
     parser.add_argument("--tolerance-mm", type=float, default=2.0)
     args = parser.parse_args()
 
-    root = ET.parse(args.urdf).getroot()
+    root = geometry_xml(args.urdf, not args.without_gripper)
     tolerance = args.tolerance_mm / 1000.0
     print("Link                     verts  inside  <=tol  max_out(mm)  visual bounds in link frame")
     print("-" * 112)

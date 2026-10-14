@@ -3,6 +3,7 @@
 """Validate generated Pro450 collision hulls against every visual vertex."""
 
 import argparse
+from pro450_configuration import geometry_xml
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -30,10 +31,11 @@ def bounds(points):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("urdf", type=Path)
+    parser.add_argument("--without-gripper", action="store_true")
     parser.add_argument("description_root", type=Path)
     args = parser.parse_args()
 
-    root = ET.parse(args.urdf).getroot()
+    root = geometry_xml(args.urdf, not args.without_gripper)
     failures = []
     print("Link                     faces  max outside(mm)  visual size(mm)        hull size(mm)")
     print("-" * 102)

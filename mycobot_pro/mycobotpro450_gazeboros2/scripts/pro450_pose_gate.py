@@ -6,6 +6,8 @@ import os
 import tempfile
 import time
 
+from pro450_configuration import configure_node
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
@@ -13,23 +15,12 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
 
-ARM_JOINTS = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
-GRIPPER_JOINT = "gripper_controller"
-COMMAND_JOINTS = ARM_JOINTS + [GRIPPER_JOINT]
-JOINT_LIMITS_RAD = [
-    (math.radians(-162), math.radians(162)),
-    (math.radians(-125), math.radians(125)),
-    (math.radians(-154), math.radians(154)),
-    (math.radians(-162), math.radians(162)),
-    (math.radians(-162), math.radians(162)),
-    (math.radians(-165), math.radians(165)),
-    (0.0, 1.0),
-]
 
 
 class Pro450PoseGate(Node):
     def __init__(self):
         super().__init__("pro450_pose_gate")
+        configure_node(self)
         self.declare_parameter(
             "output_file", "/tmp/mycobotpro450_real_initial_positions.yaml"
         )
@@ -77,12 +68,12 @@ class Pro450PoseGate(Node):
             self.get_logger().warning("Ignoring stale Pro450 pose snapshot.")
             return
         values = dict(zip(msg.name, msg.position))
-        if not all(name in values for name in COMMAND_JOINTS):
+        if not all(name in values for name in self.command_joints):
             self.get_logger().warning("Ignoring incomplete Pro450 pose snapshot.")
             return
 
-        positions = [float(values[name]) for name in COMMAND_JOINTS]
-        if positions[-1] < 0:
+        positions = [float(values[name]) for name in self.command_joints]
+        if self.with_gripper and positions[-1] < 0:
             self.failure_reason = (
                 "Pro450 gripper read failed: negative gripper snapshot; "
                 "Gazebo startup is forbidden")
@@ -91,7 +82,7 @@ class Pro450PoseGate(Node):
         if not all(math.isfinite(value) for value in positions):
             self.get_logger().warning("Ignoring non-finite Pro450 pose snapshot.")
             return
-        for name, value, limits in zip(COMMAND_JOINTS, positions, JOINT_LIMITS_RAD):
+        for name, value, limits in zip(self.command_joints, positions, self.joint_limits):
             if not limits[0] <= value <= limits[1]:
                 self.get_logger().warning(
                     f"Ignoring snapshot: {name}={value:.6f} rad is outside limits."
@@ -131,7 +122,7 @@ class Pro450PoseGate(Node):
         output_dir = os.path.dirname(self.output_file) or "."
         os.makedirs(output_dir, exist_ok=True)
         lines = ["initial_positions:"]
-        for name, value in zip(COMMAND_JOINTS, positions):
+        for name, value in zip(self.command_joints, positions):
             lines.append(f"  {name}: {value:.12f}")
         payload = "\n".join(lines) + "\n"
 

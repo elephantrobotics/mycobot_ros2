@@ -33,18 +33,8 @@ from python_qt_binding.QtWidgets import (
 )
 
 
-ARM_JOINTS = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
-GRIPPER_JOINT = "gripper_controller"
-COMMAND_JOINTS = ARM_JOINTS + [GRIPPER_JOINT]
-JOINT_LIMITS_RAD = [
-    (math.radians(-162.0), math.radians(162.0)),
-    (math.radians(-125.0), math.radians(125.0)),
-    (math.radians(-154.0), math.radians(154.0)),
-    (math.radians(-162.0), math.radians(162.0)),
-    (math.radians(-162.0), math.radians(162.0)),
-    (math.radians(-165.0), math.radians(165.0)),
-    (0.0, 1.0),
-]
+from pro450_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
+COMMAND_JOINTS = joints(True)
 RAD_DISPLAY_DECIMALS = 4
 RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
 GRIPPER_DISPLAY_DECIMALS = 2
@@ -57,6 +47,7 @@ class SliderGuiNode(Node):
 
     def __init__(self):
         super().__init__("pro450_slider_gui")
+        configure_node(self)
         self.declare_parameter("environment", "simulation")
         self.declare_parameter("show_force_execute", False)
         self.show_force_execute = self.get_parameter("show_force_execute").value
@@ -91,13 +82,13 @@ class SliderGuiNode(Node):
 
     def _joint_cb(self, msg):
         values = dict(zip(msg.name, msg.position))
-        if not all(name in values for name in COMMAND_JOINTS):
+        if not all(name in values for name in self.command_joints):
             return
-        positions = [float(values[name]) for name in COMMAND_JOINTS]
+        positions = [float(values[name]) for name in self.command_joints]
         velocities = dict(zip(msg.name, msg.velocity)) if len(msg.velocity) == len(msg.name) else {}
         feedback_valid = all(math.isfinite(value) for value in positions) and all(
             name in velocities and math.isfinite(float(velocities[name]))
-            for name in COMMAND_JOINTS
+            for name in self.command_joints
         )
         with self._lock:
             age = 0.0
@@ -147,13 +138,13 @@ class SliderGuiNode(Node):
             self._command_pending = True
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = list(COMMAND_JOINTS)
+        msg.name = list(self.command_joints)
         msg.position = list(positions_rad)
         # The dedicated target topic uses velocity as a per-joint speed limit.
         # All URDF velocity limits are currently 1 rad/s, so this also carries
         # the requested 1..100 percent speed scale without a custom message.
         speed_rad_s = max(0.01, min(1.0, speed_percent / 100.0))
-        msg.velocity = [speed_rad_s] * len(COMMAND_JOINTS)
+        msg.velocity = [speed_rad_s] * len(self.command_joints)
         publisher = self.force_target_pub if force_collision else self.target_pub
         try:
             publisher.publish(msg)
@@ -193,7 +184,7 @@ class Pro450SliderWindow(QMainWindow):
         grid.addWidget(QLabel("Actual (rad)"), 0, 3)
 
         labels = ["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5", "Joint 6", "Gripper"]
-        for row, (label, limits) in enumerate(zip(labels, JOINT_LIMITS_RAD), start=1):
+        for row, (label, limits) in enumerate(zip(labels, self.node.joint_limits), start=1):
             minimum, maximum = limits
             decimals = JOINT_DISPLAY_DECIMALS[row - 1]
             scale = JOINT_SLIDER_SCALES[row - 1]
@@ -374,10 +365,11 @@ class Pro450SliderWindow(QMainWindow):
 
     def _randomize_target(self):
         """Generate a target locally; motion still requires Execute."""
-        for box, limits in zip(self.target_boxes[:-1], JOINT_LIMITS_RAD[:-1]):
+        for box, limits in zip(self.target_boxes[:6], self.node.joint_limits[:6]):
             box.setValue(random.uniform(*limits))
         # Match the integer 0..100 opening accepted by the gripper interface.
-        self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
+        if self.node.with_gripper:
+            self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
         self.user_edited_target = True
         self.status_label.setText(
             "Random target generated. Review it, then press Execute to validate and move."
@@ -396,9 +388,10 @@ class Pro450SliderWindow(QMainWindow):
         """Read radian targets and clamp display rounding to exact URDF limits."""
         positions = [
             min(max(box.value(), lower), upper)
-            for box, (lower, upper) in zip(self.target_boxes, JOINT_LIMITS_RAD)
+            for box, (lower, upper) in zip(self.target_boxes, self.node.joint_limits)
         ]
-        positions[-1] = round(positions[-1] * 100) / 100.0
+        if self.node.with_gripper:
+            positions[-1] = round(positions[-1] * 100) / 100.0
         return positions
 
     def _stop(self):

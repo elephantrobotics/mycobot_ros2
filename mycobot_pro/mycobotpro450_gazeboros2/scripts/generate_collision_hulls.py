@@ -3,6 +3,7 @@
 """Generate low-complexity convex collision STL files from URDF visuals."""
 
 import argparse
+from pro450_configuration import geometry_xml
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -22,6 +23,7 @@ from audit_collision_geometry import (
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("urdf", type=Path)
+    parser.add_argument("--without-gripper", action="store_true")
     parser.add_argument("description_root", type=Path)
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--padding-mm", type=float, default=0.5)
@@ -30,7 +32,7 @@ def main():
     parser.add_argument("--target-faces", type=int, default=1024)
     args = parser.parse_args()
 
-    root = ET.parse(args.urdf).getroot()
+    root = geometry_xml(args.urdf, not args.without_gripper)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     for link in root.findall("link"):

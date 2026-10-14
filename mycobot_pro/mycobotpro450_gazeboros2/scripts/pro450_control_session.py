@@ -60,7 +60,8 @@ class ControlSession(Node):
             raise RuntimeError('A control process is already running; close it before starting this function')
         directory = Path(get_package_prefix(PACKAGE)) / 'lib' / PACKAGE
         for command in control_commands(self.feature, self.environment, directory, sys.executable,
-                                        show_force_execute=self.get_parameter('show_force_execute').value):
+                                        show_force_execute=self.get_parameter('show_force_execute').value,
+                                        with_gripper=self.latch.state['with_gripper']):
             self.children.append(subprocess.Popen(command, start_new_session=True))
         self.get_logger().info(f'{self.feature}: public environment ready; control programs started.')
 

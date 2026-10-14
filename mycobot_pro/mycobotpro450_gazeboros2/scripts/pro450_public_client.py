@@ -17,7 +17,7 @@ class PublicPro450Client:
     public_feedback = True
 
     def __init__(self, ip=None, netport=None, debug=False, feedback_hz=10.,
-                 ownership_timeout=15., feature='slider'):
+                 ownership_timeout=15., feature='slider', with_gripper=True):
         self.owner_token = uuid.uuid4().hex
         self._call_lock = threading.Lock()
         self._condition = threading.Condition()
@@ -39,6 +39,12 @@ class PublicPro450Client:
         try:
             if not self.client.wait_for_service(timeout_sec=5.):
                 raise RuntimeError('Public robot service unavailable; start slider.launch.py environment:=real')
+            from pro450_configuration import joints, require_flag
+            self.with_gripper = require_flag(with_gripper)
+            capabilities = self._rpc('get_capabilities')
+            if (capabilities.get('with_gripper') is not self.with_gripper or
+                    capabilities.get('joints') != joints(self.with_gripper)):
+                raise RuntimeError('Public robot installation profile does not match this feature')
             self._rpc('claim', [feature])
             self._claimed = True
             self.node.create_timer(.5, self._heartbeat)

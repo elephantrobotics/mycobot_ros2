@@ -45,7 +45,7 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
+install(FILES scripts/pro450_configuration.py scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
   scripts/pro450_session_support.py
   scripts/pro450_drag_support.py
   scripts/pro450_public_client.py

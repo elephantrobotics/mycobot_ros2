@@ -16,6 +16,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from pro450_feedback import attach_feedback
+from pro450_configuration import configure_node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from pro450_hold_profile import (
     PositionVelocityEstimator, collision_stop_angle, hold_setpoint, trapezoid_samples,
@@ -72,11 +73,12 @@ class TeleopKeyboard(Node):
 
     def __init__(self):
         super().__init__("teleop_keyboard_gazebo")
+        configure_node(self)
         self.declare_parameter("mode", "simulation")
         self.declare_parameter("real_hold_enabled", True)
         self.declare_parameter("real_gripper_hold_enabled", True)
         self.real_hold_enabled = bool(self.get_parameter("real_hold_enabled").value)
-        self.real_gripper_hold_enabled = bool(
+        self.real_gripper_hold_enabled = self.with_gripper and bool(
             self.get_parameter("real_gripper_hold_enabled").value)
         self.real_transport = None
         self._real_thread = None
@@ -89,7 +91,7 @@ class TeleopKeyboard(Node):
         self.pub_arm = self.create_publisher(
             JointTrajectory, "/arm_controller/joint_trajectory", 10)
         self.pub_gripper = self.create_publisher(
-            JointTrajectory, "/pro_gripper_controller/joint_trajectory", 10)
+            JointTrajectory, "/pro_gripper_controller/joint_trajectory", 10) if self.with_gripper else None
         self.create_subscription(JointState, "/joint_states", self._feedback_cb, 10)
         self.validity_client = self.create_client(
             GetStateValidity, "/check_state_validity")
@@ -130,15 +132,16 @@ class TeleopKeyboard(Node):
                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
             self._connect_read_only()
             self._real_pose_reader = RealPoseReader(
-                self.mc, JOINT_LIMITS_RAD, report=self.get_logger().debug)
-            self._real_pose_reader.seed_gripper(self._startup_pose[6])
+                self.mc, self.joint_limits, report=self.get_logger().debug, with_gripper=self.with_gripper)
+            if self.with_gripper:
+                self._real_pose_reader.seed_gripper(self._startup_pose[6])
             if hasattr(self.mc, 'sample_time'):
                 stamp = self.mc.sample_time('arm')
                 if stamp is not None:
                     self._real_pose_reader.observe_arm(
                         [math.degrees(v) for v in self._startup_pose[:6]], *stamp)
             self.real_transport = RealKeyboardTransport(
-                self.mc, self._real_pose_reader, lambda pose: None, JOINT_LIMITS_RAD,
+                self.mc, self._real_pose_reader, lambda pose: None, self.joint_limits,
                 report_error=self.get_logger().error)
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
             attach_feedback(self, self._real_pose_reader)
@@ -151,17 +154,17 @@ class TeleopKeyboard(Node):
         positions = dict(zip(msg.name, msg.position))
         if self.mode == "real":
             if all(name in positions and math.isfinite(positions[name])
-                   for name in COMMAND_JOINTS):
+                   for name in self.command_joints):
                 with self._state_lock:
-                    self._mirror_positions = [positions[name] for name in COMMAND_JOINTS]
+                    self._mirror_positions = [positions[name] for name in self.command_joints]
                     self._mirror_time = time.monotonic()
             return
         velocities = (dict(zip(msg.name, msg.velocity))
                       if len(msg.velocity) == len(msg.name) else {})
-        if not all(name in positions and name in velocities for name in COMMAND_JOINTS):
+        if not all(name in positions and name in velocities for name in self.command_joints):
             return
-        p = [float(positions[name]) for name in COMMAND_JOINTS]
-        v = [float(velocities[name]) for name in COMMAND_JOINTS]
+        p = [float(positions[name]) for name in self.command_joints]
+        v = [float(velocities[name]) for name in self.command_joints]
         if not all(math.isfinite(value) for value in p + v):
             return
         if self.mode == "simulation":
@@ -216,13 +219,13 @@ class TeleopKeyboard(Node):
 
     def _read_real_pose(self):
         raw = self.mc.get_angles()
-        grip = self.mc.get_pro_gripper_angle()
+        grip = self.mc.get_pro_gripper_angle() if self.with_gripper else None
         if not isinstance(raw, (list, tuple)) or len(raw) != 6:
             raise RuntimeError(f"Invalid Pro450 angles: {raw!r}")
-        gripper_position = valid_gripper_position(grip)
-        pose = [math.radians(float(x)) for x in raw] + [gripper_position]
+        gripper_position = valid_gripper_position(grip) if self.with_gripper else None
+        pose = [math.radians(float(x)) for x in raw] + ([gripper_position] if self.with_gripper else [])
         if not all(math.isfinite(x) and lo <= x <= hi for x, (lo, hi)
-                   in zip(pose, JOINT_LIMITS_RAD)):
+                   in zip(pose, self.joint_limits)):
             raise RuntimeError(f"Pro450 feedback violates joint limits: {pose!r}")
         return pose
 
@@ -231,7 +234,7 @@ class TeleopKeyboard(Node):
         from pro450_public_client import PublicPro450Client as Pro450Client
         self.get_logger().info(
             f"Connecting to Pro450 @ {DEFAULT_PRO450_IP}:{DEFAULT_PRO450_PORT} (read-only)")
-        self.mc = Pro450Client(DEFAULT_PRO450_IP, DEFAULT_PRO450_PORT, feature='keyboard')
+        self.mc = Pro450Client(DEFAULT_PRO450_IP, DEFAULT_PRO450_PORT, feature='keyboard', with_gripper=self.with_gripper)
         if self.mc.is_power_on() != 1:
             raise RuntimeError("Pro450 not powered; automatic power-on is forbidden")
         code = self.mc.get_error_information()
@@ -245,7 +248,7 @@ class TeleopKeyboard(Node):
             if index < 4:
                 time.sleep(0.5)
         if any(max(p[j] for p in samples) - min(p[j] for p in samples)
-               > math.radians(0.2) for j in range(7)):
+               > math.radians(0.2) for j in range(len(self.command_joints))):
             raise RuntimeError("Pro450 startup pose was not stable")
         self._startup_pose = samples[-1]
 
@@ -264,6 +267,8 @@ class TeleopKeyboard(Node):
             point.time_from_start = Duration(sec=sec, nanosec=nanosec)
             arm.points = [point]
             self.pub_arm.publish(arm)
+        if not self.with_gripper:
+            return
         gripper = JointTrajectory()
         gripper.joint_names = [GRIPPER_JOINT]
         point = JointTrajectoryPoint()
@@ -306,8 +311,8 @@ class TeleopKeyboard(Node):
             self._hold_speed_gear = gear
         self.get_logger().info(
             f"Keyboard speed gear {gear}: "
-            f"arm {math.degrees(HOLD_SPEED_GEARS[gear - 1]):.1f} deg/s; "
-            f"gripper {4 * gear}")
+            f"arm {math.degrees(HOLD_SPEED_GEARS[gear - 1]):.1f} deg/s; " +
+            (f"gripper {4 * gear}" if self.with_gripper else ""))
 
     def hold_speed_status(self):
         with self._hold_lock:
@@ -324,6 +329,8 @@ class TeleopKeyboard(Node):
         return arm_speed
 
     def press_hold(self, axis, direction):
+        if axis >= len(self.command_joints):
+            return "rejected: gripper is not installed"
         """Accept a hold, or queue a reversal after measured standstill."""
         if self.mode == "real":
             if not self._armed or not self.real_transport.armed:
@@ -416,7 +423,7 @@ class TeleopKeyboard(Node):
             axis = self._hold_axis
             direction = self._hold_direction
             generation = self._hold_generation
-            low, high = JOINT_LIMITS_RAD[axis]
+            low, high = self.joint_limits[axis]
             advance = (HOLD_FIRST_VALIDATION_ADVANCE
                        if getattr(self, "_hold_first_validation", False)
                        else HOLD_VALIDATION_ADVANCE)
@@ -491,7 +498,7 @@ class TeleopKeyboard(Node):
             generation = self._hold_generation
         if axis is None:
             return
-        low, high = JOINT_LIMITS_RAD[axis]
+        low, high = self.joint_limits[axis]
         goal = high if direction > 0 else low
         worker = threading.Thread(
             target=self._scan_collision_stop,
@@ -512,7 +519,7 @@ class TeleopKeyboard(Node):
 
         def blocked(angle):
             sample = list(pose)
-            low, high = JOINT_LIMITS_RAD[axis]
+            low, high = self.joint_limits[axis]
             sample[axis] = min(high, max(low, angle))
             valid, _contacts, reason = self._state_is_valid(sample)
             if reason and "collision" not in reason.lower():
@@ -808,6 +815,7 @@ class SimulationHoldWindow:
         self.closing = False
         self.pressed_code = None
         self.pressed_scan = 0
+        self.displayed_keys = {}
         self.key_state = X11KeyState()
         self.window = Window(self)
         real = getattr(node, "mode", "simulation") == "real"
@@ -816,8 +824,9 @@ class SimulationHoldWindow:
         self.window.setFocusPolicy(Qt.StrongFocus)
         layout = QVBoxLayout(self.window)
         layout.addWidget(QLabel(
-            "Focus this window. Hold w/s, e/d, r/f, t/g, y/h, or u/j to move joints.\n"
-            "Release to stop. Hold [ or ] to control the gripper.\n"
+            "Focus this window. Hold w/s, e/d, r/f, t/g, y/h, or u/j to move joints.\n" +
+            ("Release to stop. Hold [ or ] to control the gripper.\n"
+             if node.with_gripper else "Release to stop.\n") +
             "- / +: decrease / increase speed. 1-5: select speed gear.\n"
             "Space: stop and lock. Q / Ctrl+C: stop and exit. Losing focus stops motion.\n" +
             ("Real Robot: M enables control. N stops and locks. Keep the hardware E-stop accessible."
@@ -826,10 +835,12 @@ class SimulationHoldWindow:
         self.speed_label = QLabel()
         layout.addWidget(self.speed_label)
         self._refresh_speed_display()
+        self.key_label = QLabel("Pressed key: None")
+        layout.addWidget(self.key_label)
         gear, speed = self.node.hold_speed_status()
         self.status = QLabel(
-            f"Gear {gear}: arm {speed:.1f} deg/s; "
-            f"gripper {4 * gear}; "
+            f"Gear {gear}: arm {speed:.1f} deg/s; " +
+            (f"gripper {4 * gear}; " if node.with_gripper else "") +
             "Waiting for Gazebo feedback.")
         layout.addWidget(self.status)
         self.window.resize(570, 220)
@@ -847,18 +858,21 @@ class SimulationHoldWindow:
         self.window.activateWindow()
         self.window.setFocus()
 
-    def release(self):
+    def release(self, clear_keys=True):
         self.release_timer.stop()
         self.pressed_code = None
         self.pressed_scan = 0
+        if clear_keys:
+            self.displayed_keys.clear()
         self.node.release_hold()
+        self._refresh_key_display()
 
     def _release_if_key_up(self):
         """Debounce fallback only. A key that is still down keeps moving."""
         if hold_release_action(self.key_state.down(self.pressed_scan)) == "ignore":
             self.release_timer.stop()
             return
-        self.release()
+        self.release(clear_keys=False)
         ready = getattr(self.node, "mode", "") == "real"
         self.status.setText("Ready: hold a key to move." if ready
                             else "Key released: decelerating.")
@@ -875,19 +889,32 @@ class SimulationHoldWindow:
             app.quit()
 
     def key_press(self, event):
+        key = event.text().lower()
+        functional_key = (
+            key in JOINT_KEYS
+            or key in ("1", "2", "3", "4", "5", "+", "=", "-", "_")
+            or event.key() in (self.Qt.Key_Space, self.Qt.Key_Q)
+            or (self.node.with_gripper and key in ("[", "]"))
+            or (getattr(self.node, "mode", "simulation") == "real" and key in ("m", "n"))
+        )
+        if functional_key and not event.isAutoRepeat():
+            from python_qt_binding.QtGui import QKeySequence
+            self.displayed_keys.pop(event.key(), None)
+            self.displayed_keys[event.key()] = QKeySequence(event.key()).toString() or event.text().upper()
+            self._refresh_key_display()
         if event.key() == self.pressed_code:
             # The held key's auto-repeat is another press, not a new joint.
             self.release_timer.stop()
             return
         if event.isAutoRepeat():
             return
-        key = event.text().lower()
         if getattr(self.node, "mode", "simulation") == "real" and key in ("m", "n"):
             if key == "m":
                 self.status.setText(self.node.arm_real())
             else:
                 self.node.stop()
                 self.status.setText("STOP requested; real controls locked.")
+            self._refresh_key_display()
             return
         if key in ("1", "2", "3", "4", "5", "+", "=", "-", "_"):
             gear, _ = self.node.hold_speed_status()
@@ -900,12 +927,13 @@ class SimulationHoldWindow:
             self.node.set_hold_speed_gear(gear)
             _, speed = self.node.hold_speed_status()
             self.status.setText(
-                f"Gear {gear}: arm {speed:.1f} deg/s; "
-                f"gripper {4 * gear}.")
+                f"Gear {gear}: arm {speed:.1f} deg/s; " +
+                (f"gripper {4 * gear}." if self.node.with_gripper else ""))
             return
         if event.key() == self.Qt.Key_Space:
             self.pressed_code = None
             self.node.stop()
+            self._refresh_key_display()
             self.status.setText("STOP requested (not a hardware E-stop).")
             return
         if event.key() == self.Qt.Key_Q:
@@ -913,9 +941,9 @@ class SimulationHoldWindow:
             return
         if key in JOINT_KEYS:
             axis, direction = JOINT_KEYS[key]
-        elif key == "[":
+        elif key == "[" and self.node.with_gripper:
             axis, direction = 6, 1
-        elif key == "]":
+        elif key == "]" and self.node.with_gripper:
             axis, direction = 6, -1
         else:
             return
@@ -927,11 +955,17 @@ class SimulationHoldWindow:
         else:
             self.pressed_code = event.key()
             self.pressed_scan = int(event.nativeScanCode() or 0)
+        self._refresh_key_display()
         self.status.setText(f"Joint {axis + 1}: {result}.")
 
     def key_release(self, event):
         if event.isAutoRepeat():
             return
+        # Preserve the display across X11's synthetic auto-repeat releases.
+        scan = int(event.nativeScanCode() or 0)
+        if hold_release_action(self.key_state.down(scan)) != "ignore":
+            self.displayed_keys.pop(event.key(), None)
+            self._refresh_key_display()
         if event.key() != self.pressed_code:
             return
         scan = int(event.nativeScanCode() or self.pressed_scan or 0)
@@ -941,7 +975,7 @@ class SimulationHoldWindow:
             self.release_timer.stop()
             return
         if action == "release":
-            self.release()
+            self.release(clear_keys=False)
             ready = getattr(self.node, "mode", "") == "real"
             self.status.setText("Ready: hold a key to move." if ready
                                 else "Key released: decelerating.")
@@ -950,15 +984,23 @@ class SimulationHoldWindow:
         self.release_timer.start()
         self.status.setText("Key release detected: decelerating after debounce.")
 
+    def _refresh_key_display(self):
+        key = self.displayed_keys.get(self.pressed_code) if not self.node.hold_idle() else None
+        if key is None:
+            key = next(reversed(list(self.displayed_keys.values())), None)
+        self.key_label.setText("Pressed key: " + (key or "None"))
+
     def _refresh_speed_display(self):
         gear, speed = self.node.hold_speed_status()
         self.speed_label.setText(
-            f"Current speed — Gear {gear}: arm {speed:.1f} deg/s; gripper {4 * gear}.")
+            f"Current speed — Gear {gear}: arm {speed:.1f} deg/s" +
+            (f"; gripper {4 * gear}." if self.node.with_gripper else "."))
 
     def tick(self):
         try:
             self._refresh_speed_display()
             self.node.hold_tick()
+            self._refresh_key_display()
             transport = getattr(self.node, "real_transport", None)
             if transport is not None and transport.error:
                 if transport.recovery_ready:
