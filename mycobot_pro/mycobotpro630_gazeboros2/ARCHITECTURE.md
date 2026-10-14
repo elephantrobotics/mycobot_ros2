@@ -132,3 +132,11 @@ colcon build --packages-select mycobot_description mycobotpro630_gazeboros2
 仅连接 127.0.0.1 假机器人的 SDK 和公共连接链路检查。
 真实 Pro630 的速度、制动距离、自由拖动效果及现场碰撞距离尚未实机验证。
 RViz MoveIt Execute 仍连接 Gazebo 控制器，没有新增真机轨迹执行通道。
+
+## 可选夹爪配置
+
+公共入口 `slider.launch.py` 新增 `with_gripper:=true|false`，默认 true。
+三个功能 launch 从公共环境继承配置，不重复指定。false 时模型止于 link6，
+不生成夹爪连接件、夹爪、端子或夹爪控制器；快照、连续反馈、执行、停止
+和拖动切换只处理六轴，公共 RPC 拒绝全部夹爪调用。夹爪初始读取门禁
+只在 true 模式保留。切换安装配置需要退出并重新启动公共环境及功能。
