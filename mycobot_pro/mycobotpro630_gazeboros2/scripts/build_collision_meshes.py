@@ -8,6 +8,7 @@ arm hulls and PCA gripper boxes to keep ODE stable. Neither output changes
 the semantic allowed-collision matrix or adds a second motion check.
 """
 import argparse
+from pro630_configuration import geometry_xml
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -61,9 +62,10 @@ def enclosing_mesh(points, gripper=False, padding=.0005, directions=512, flat_ba
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('urdf', type=Path)
+    parser.add_argument('--without-gripper', action='store_true')
     parser.add_argument('description_root', type=Path)
     args = parser.parse_args()
-    root = ET.parse(args.urdf).getroot()
+    root = geometry_xml(args.urdf, not args.without_gripper)
     output = args.description_root / 'urdf/mycobot_pro_630'
     for directory in ('collision_exact', 'collision_gazebo'):
         (output / directory).mkdir(exist_ok=True)

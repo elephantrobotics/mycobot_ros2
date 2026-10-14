@@ -126,12 +126,11 @@ def collision_stop_angle(start, goal, margin, grid, fine, blocked):
         return start
     if blocked(start):
         return start
-    # Ten grid steps per probe keeps a full-range scan inside a short press.
-    # The bracket is still absolute, so the refined boundary does not depend
-    # on the exact start angle.
+    # Inspect every configured grid point: skipping points can miss a narrow
+    # collision interval even when both ends of the skipped interval are clear.
     last_free = start
     hit = None
-    for sample in absolute_samples(start, goal, grid * 10):
+    for sample in absolute_samples(start, goal, grid):
         if blocked(sample):
             hit = sample
             break

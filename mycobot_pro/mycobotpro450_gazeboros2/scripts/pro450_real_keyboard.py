@@ -568,7 +568,11 @@ class RealKeyboardTransport:
                 opening = 100 if direction > 0 else 0
             signature = ('gripper', opening)
         elif position_goal:
-            signature = ('angle', axis + 1, round(math.degrees(endpoint), 2), speed)
+            lower, upper = self.limits[axis]
+            minimum = math.ceil(math.degrees(lower) * 100 - 1e-9) / 100
+            maximum = math.floor(math.degrees(upper) * 100 + 1e-9) / 100
+            angle = min(max(round(math.degrees(endpoint), 2), minimum), maximum)
+            signature = ('angle', axis + 1, angle, speed)
         else:
             # SDK direction: 1 increases, 0 decreases. One jog runs until stop.
             signature = ('jog', axis + 1, 1 if direction > 0 else 0, speed)

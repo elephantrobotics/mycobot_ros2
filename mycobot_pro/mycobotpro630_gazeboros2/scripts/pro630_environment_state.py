@@ -13,12 +13,13 @@ from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String, Bool, Float64MultiArray
 
-from pro630_session_support import JOINTS
+from pro630_configuration import configure_node, controllers
 
 
 class EnvironmentState(Node):
     def __init__(self, announce=False):
         super().__init__('pro630_environment_ready' if announce else 'pro630_environment_state')
+        configure_node(self)
         self.declare_parameter('environment', 'simulation')
         self.declare_parameter('session_id', '')
         self.environment = self.get_parameter('environment').value
@@ -66,7 +67,7 @@ class EnvironmentState(Node):
 
     def _joints(self, msg):
         positions = dict(zip(msg.name, msg.position))
-        if all(name in positions and math.isfinite(positions[name]) for name in JOINTS):
+        if all(name in positions and math.isfinite(positions[name]) for name in self.command_joints):
             self.feedback_time = time.monotonic()
 
     def _real_age(self, msg):
@@ -83,8 +84,7 @@ class EnvironmentState(Node):
             try:
                 result = self.pending.result()
                 active = {c.name for c in result.controller if c.state == 'active'}
-                self.controllers_active = {'arm_controller', 'joint_state_broadcaster',
-                                           'pro_gripper_controller'} <= active
+                self.controllers_active = set(controllers(self.with_gripper)) <= active
                 self.controllers_time = now
             except Exception:
                 self.controllers_active = False
@@ -102,6 +102,7 @@ class EnvironmentState(Node):
                  and all(c.service_is_ready() for c in self.moveit_clients))
         self.pub.publish(String(data=json.dumps({
             'session_id': self.session, 'environment': self.environment,
+            'with_gripper': self.with_gripper,
             'verified': self.verified, 'ready': bool(ready),
             'tracking_ready': (self.environment == 'simulation' or
                 (self.real_feedback_time is not None and now - self.real_feedback_time < 1.
