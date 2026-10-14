@@ -33,7 +33,8 @@ from python_qt_binding.QtWidgets import (
 )
 
 
-from pro630_model import ARM_JOINTS, GRIPPER_JOINT, COMMAND_JOINTS, JOINT_LIMITS_RAD
+from pro630_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
+COMMAND_JOINTS = joints(True)
 RAD_DISPLAY_DECIMALS = 4
 RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
 GRIPPER_DISPLAY_DECIMALS = 2
@@ -46,6 +47,7 @@ class SliderGuiNode(Node):
 
     def __init__(self):
         super().__init__("pro630_slider_gui")
+        configure_node(self)
         self.declare_parameter("environment", "simulation")
         self.declare_parameter("show_force_execute", False)
         self.show_force_execute = self.get_parameter("show_force_execute").value
@@ -66,6 +68,7 @@ class SliderGuiNode(Node):
         self.create_subscription(String, "/pro630/slider_status", self._status_cb, 10)
 
         self._lock = threading.Lock()
+        self._status_revision = 0
         self._command_busy = False
         self._command_pending = False
         self.create_subscription(Bool, "/pro630/slider_busy", self._busy_cb, 10)
@@ -80,13 +83,13 @@ class SliderGuiNode(Node):
 
     def _joint_cb(self, msg):
         values = dict(zip(msg.name, msg.position))
-        if not all(name in values for name in COMMAND_JOINTS):
+        if not all(name in values for name in self.command_joints):
             return
-        positions = [float(values[name]) for name in COMMAND_JOINTS]
+        positions = [float(values[name]) for name in self.command_joints]
         velocities = dict(zip(msg.name, msg.velocity)) if len(msg.velocity) == len(msg.name) else {}
         feedback_valid = all(math.isfinite(value) for value in positions) and all(
             name in velocities and math.isfinite(float(velocities[name]))
-            for name in COMMAND_JOINTS
+            for name in self.command_joints
         )
         with self._lock:
             age = 0.0
@@ -101,6 +104,7 @@ class SliderGuiNode(Node):
     def _status_cb(self, msg):
         with self._lock:
             self._status = msg.data
+            self._status_revision += 1
             # A request can be rejected before the controller enters busy.
             # Clearing pending does not override the controller's busy state.
             if msg.data.startswith(("Rejected:", "Cancelled", "Execution complete",
@@ -120,10 +124,11 @@ class SliderGuiNode(Node):
 
 
 
-    def snapshot(self):
+    def snapshot(self, include_status_revision=False):
         with self._lock:
             actual = list(self._actual) if self._actual is not None else None
-            return actual, self._actual_time, self._feedback_valid, self._status
+            values = (actual, self._actual_time, self._feedback_valid, self._status)
+            return values + (self._status_revision,) if include_status_revision else values
 
 
     def execute(self, positions_rad, speed_percent, force_collision=False):
@@ -136,12 +141,12 @@ class SliderGuiNode(Node):
             self._command_pending = True
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = list(COMMAND_JOINTS)
+        msg.name = list(self.command_joints)
         msg.position = list(positions_rad)
-        # On this dedicated command topic, velocity carries the selected
-        # speed ratio. The controller applies each joint's own URDF limit.
+        # On this command topic velocity carries the selected speed ratio.
+        # The backend applies each joint's own URDF velocity limit.
         speed_rad_s = max(0.01, min(1.0, speed_percent / 100.0))
-        msg.velocity = [speed_rad_s] * len(COMMAND_JOINTS)
+        msg.velocity = [speed_rad_s] * len(self.command_joints)
         publisher = self.force_target_pub if force_collision else self.target_pub
         try:
             publisher.publish(msg)
@@ -162,6 +167,7 @@ class Pro630SliderWindow(QMainWindow):
         self.target_initialized = False
         self.user_edited_target = False
         self.last_status = None
+        self.last_status_revision = None
         self.sliders = []
         self.target_boxes = []
         self.actual_labels = []
@@ -181,7 +187,7 @@ class Pro630SliderWindow(QMainWindow):
         grid.addWidget(QLabel("Actual (rad)"), 0, 3)
 
         labels = ["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5", "Joint 6", "Gripper"]
-        for row, (label, limits) in enumerate(zip(labels, JOINT_LIMITS_RAD), start=1):
+        for row, (label, limits) in enumerate(zip(labels, self.node.joint_limits), start=1):
             minimum, maximum = limits
             decimals = JOINT_DISPLAY_DECIMALS[row - 1]
             scale = JOINT_SLIDER_SCALES[row - 1]
@@ -275,7 +281,7 @@ class Pro630SliderWindow(QMainWindow):
             self.user_edited_target = True
 
     def _refresh(self):
-        actual, actual_time, state_is_finite, status = self.node.snapshot()
+        actual, actual_time, state_is_finite, status, revision = self.node.snapshot(include_status_revision=True)
         feedback_ok = (
             actual is not None
             and time.monotonic() - actual_time < 1.0
@@ -311,17 +317,20 @@ class Pro630SliderWindow(QMainWindow):
                 if self.node.environment == "real"
                 else "Execute disabled: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset the simulation first."
             )
-        elif status != self.last_status:
+        elif status != self.last_status or revision != self.last_status_revision:
             self.last_status = status
+            self.last_status_revision = revision
             self.status_label.setText(status)
 
     def _execute(self):
         positions = self._target_positions_rad()
+        previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, self.speed_box.value()):
             return
         self.execute_button.setEnabled(False)
         self.force_execute_button.setEnabled(self.node.environment != "simulation")
-        self.last_status = self.node.snapshot()[3]
+        # Capture before publish so even an immediate reply is rendered.
+        self.last_status, self.last_status_revision = previous_status
         self.status_label.setText("Command submitted; waiting for validation...")
         self.user_edited_target = False
 
@@ -351,11 +360,13 @@ class Pro630SliderWindow(QMainWindow):
 
         positions = self._target_positions_rad()
         forced_speed = self.speed_box.value()
+        previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, forced_speed, force_collision=True):
             return
         self.execute_button.setEnabled(False)
         self.force_execute_button.setEnabled(False)
-        self.last_status = self.node.snapshot()[3]
+        # Capture before publish so even an immediate reply is rendered.
+        self.last_status, self.last_status_revision = previous_status
         self.status_label.setText(
             f"FORCE simulation command submitted at {forced_speed}% maximum; "
             "collision validation and physical self-contact will be bypassed."
@@ -364,10 +375,11 @@ class Pro630SliderWindow(QMainWindow):
 
     def _randomize_target(self):
         """Generate a target locally; motion still requires Execute."""
-        for box, limits in zip(self.target_boxes[:-1], JOINT_LIMITS_RAD[:-1]):
+        for box, limits in zip(self.target_boxes[:6], self.node.joint_limits[:6]):
             box.setValue(random.uniform(*limits))
         # Match the integer 0..100 opening accepted by the gripper interface.
-        self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
+        if self.node.with_gripper:
+            self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
         self.user_edited_target = True
         self.status_label.setText(
             "Random target generated. Review it, then press Execute to validate and move."
@@ -386,9 +398,10 @@ class Pro630SliderWindow(QMainWindow):
         """Read radian targets and clamp display rounding to exact URDF limits."""
         positions = [
             min(max(box.value(), lower), upper)
-            for box, (lower, upper) in zip(self.target_boxes, JOINT_LIMITS_RAD)
+            for box, (lower, upper) in zip(self.target_boxes, self.node.joint_limits)
         ]
-        positions[-1] = round(positions[-1] * 100) / 100.0
+        if self.node.with_gripper:
+            positions[-1] = round(positions[-1] * 100) / 100.0
         return positions
 
     def _stop(self):

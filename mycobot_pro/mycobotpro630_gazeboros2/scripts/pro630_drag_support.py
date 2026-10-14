@@ -11,9 +11,11 @@ def set_arm_enabled(sdk, enabled):
         raise RuntimeError(f'Arm motor command was not acknowledged (result={result!r}); state unknown')
 
 
-def set_drag_enabled(sdk, enabled):
+def set_drag_enabled(sdk, enabled, with_gripper=True):
     """Switch six-axis and gripper enable together; partial failure is unknown."""
     set_arm_enabled(sdk, enabled)
+    if not with_gripper:
+        return
     result = sdk.set_pro_gripper_enabled(int(enabled))
     if isinstance(result, bool) or result != 1:
         raise RuntimeError(f'Arm command acknowledged, but gripper command was not acknowledged '
@@ -21,13 +23,15 @@ def set_drag_enabled(sdk, enabled):
 
 
 class DragState:
-    def __init__(self, sdk, enabled=True, clock=time.monotonic):
+    def __init__(self, sdk, enabled=True, clock=time.monotonic, with_gripper=True):
+        self.with_gripper = with_gripper
         self.sdk, self.clock = sdk, clock
         self.lock = threading.Lock()
         self.enabled = enabled
         self.pending = False
         self.request = None
-        self.message = 'Arm and gripper enabled. Press M to release both.'
+        self.message = ('Arm and gripper enabled. Press M to release both.' if with_gripper
+                        else 'Arm enabled. Press M to release all six joints.')
         self.latest = None
         self.sequence = 0
 
@@ -41,7 +45,8 @@ class DragState:
             # Enabled -> disable; unknown -> enable for explicit recovery.
             self.request = False if self.enabled is True else True
             self.pending = True
-            self.message = 'Switching arm and gripper enable states...'
+            self.message = ('Switching arm and gripper enable states...' if self.with_gripper
+                            else 'Switching arm enable state...')
             return True
 
     def apply_request(self):
@@ -54,7 +59,7 @@ class DragState:
                 self.message = 'Motor switch cancelled: joint feedback is stale.'
                 return
         try:
-            set_drag_enabled(self.sdk, target)
+            set_drag_enabled(self.sdk, target, self.with_gripper)
         except Exception as exc:
             with self.lock:
                 self.enabled = None
@@ -64,6 +69,9 @@ class DragState:
                 self.enabled = target
                 self.message = ('Arm and gripper enabled. Press M to release both.' if target else
                                 'Arm and gripper released. Drag by hand. Press M to lock both.')
+                if not self.with_gripper:
+                    self.message = ('Arm enabled. Press M to release all six joints.' if target else
+                                    'Arm released. Drag by hand. Press M to lock all six joints.')
         finally:
             with self.lock:
                 self.pending = False

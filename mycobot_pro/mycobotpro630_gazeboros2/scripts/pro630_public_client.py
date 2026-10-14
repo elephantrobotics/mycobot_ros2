@@ -18,8 +18,9 @@ class PublicPro630Client:
     public_feedback = True
 
     def __init__(self, ip=None, netport=None, debug=False, feedback_hz=10.,
-                 ownership_timeout=15., feature='slider'):
+                 ownership_timeout=15., feature='slider', with_gripper=True):
         self.owner_token = uuid.uuid4().hex
+        self.feature = feature
         self._call_lock = threading.Lock()
         self._condition = threading.Condition()
         self._callback = None
@@ -40,6 +41,12 @@ class PublicPro630Client:
         try:
             if not self.client.wait_for_service(timeout_sec=5.):
                 raise RuntimeError('Public robot service unavailable; start slider.launch.py environment:=real')
+            from pro630_configuration import joints, require_flag
+            self.with_gripper = require_flag(with_gripper)
+            capabilities = self._rpc('get_capabilities')
+            if (capabilities.get('with_gripper') is not self.with_gripper or
+                    capabilities.get('joints') != joints(self.with_gripper)):
+                raise RuntimeError('Public robot installation profile does not match this feature')
             self._rpc('claim', [feature])
             self._claimed = True
             self.node.create_timer(.5, self._heartbeat)
@@ -61,7 +68,9 @@ class PublicPro630Client:
             completed = threading.Event()
             future = self.client.call_async(self._request(method, args, kwargs))
             future.add_done_callback(lambda _: completed.set())
-            if not completed.wait(15.):
+            from pro630_broker_support import READS
+            timeout = 1.0 if self.feature == 'keyboard' and method in READS else 15.0
+            if not completed.wait(timeout):
                 future.cancel()
                 raise RuntimeError(f'Public robot request timed out: {method}')
             response = future.result()
@@ -99,6 +108,18 @@ class PublicPro630Client:
                 pass  # The normal get_angles path validates and reports the same data.
 
     def get_angles(self):
+        if self.feature == 'keyboard':
+            # The public bridge is already sampling. Do not queue another RPC
+            # waiting for a new packet behind slow tool/status queries.
+            with self._condition:
+                deadline = time.monotonic() + .5
+                while self._latest is None and not self._closed and time.monotonic() < deadline:
+                    self._condition.wait(max(0., deadline - time.monotonic()))
+                sample = self._latest
+                if sample is None or time.monotonic() - sample.monotonic > .5:
+                    raise RuntimeError('Public six-axis feedback is missing or older than 0.5 s')
+                self._stamps['arm'] = [sample.monotonic, sample.wall_time]
+                return list(sample.angles)
         packet = self._rpc('get_angles', [self._rpc_sequence])
         self._rpc_sequence = packet['sequence']
         if packet['error']:

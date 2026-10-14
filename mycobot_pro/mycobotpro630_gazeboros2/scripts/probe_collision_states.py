@@ -10,7 +10,7 @@ from moveit_msgs.srv import GetStateValidity
 from rclpy.node import Node
 
 
-from pro630_model import COMMAND_JOINTS as JOINTS, JOINT_LIMITS_RAD as LIMITS
+from pro630_configuration import joints, JOINT_LIMITS_RAD, public_profile
 
 
 def pair(contact):
@@ -23,6 +23,9 @@ def main():
     parser.add_argument("--seed", type=int, default=630)
     args = parser.parse_args()
 
+    with_gripper = public_profile()
+    JOINTS = joints(with_gripper)
+    LIMITS = JOINT_LIMITS_RAD[:len(JOINTS)]
     rclpy.init()
     node = Node("pro630_collision_probe")
     client = node.create_client(GetStateValidity, "/check_state_validity")
@@ -39,7 +42,7 @@ def main():
     for index in range(args.samples):
         positions = [rng.uniform(low, high) for low, high in LIMITS]
         request = GetStateValidity.Request()
-        request.group_name = "arm"
+        request.group_name = ""
         request.robot_state.joint_state.name = JOINTS
         request.robot_state.joint_state.position = positions
         future = client.call_async(request)

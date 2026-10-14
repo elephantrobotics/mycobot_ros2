@@ -1,5 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter">
+    <xacro:arg name="with_gripper" default="true" />
+    <!-- Internal mirror setting; simulation and MoveIt retain normal collisions. -->
+    <xacro:arg name="gazebo_contact_response" default="true" />
+    <xacro:arg name="controller_config_file" default="$(find mycobotpro630_gazeboros2)/config/ros2_controllers.yaml" />
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <!-- MoveIt uses collision_exact by default. Gazebo overrides this with
          collision_gazebo because ODE is unstable with dynamic non-convex,
@@ -17,7 +21,7 @@
 
     <gazebo>
         <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-            <parameters>$(find mycobotpro630_gazeboros2)/config/ros2_controllers.yaml</parameters>
+            <parameters>$(arg controller_config_file)</parameters>
             <!-- The Gazebo entity is spawned from the namespaced description
                  publisher because it uses collision_gazebo and, in real-pose
                  mirror mode, the read-only hardware snapshot.  Do not let the

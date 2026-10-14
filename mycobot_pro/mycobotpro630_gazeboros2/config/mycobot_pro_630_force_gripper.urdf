@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<robot xmlns:ns0="http://www.ros.org/wiki/xacro" name="firefighter">
+<robot xmlns:ns0="http://www.ros.org/wiki/xacro" xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter">
     <link name="world" />
     <joint name="world_to_base" type="fixed">
         <parent link="world" />
@@ -188,6 +188,7 @@
         <origin xyz="-0.053 0 0" rpy="-3.14159 0 3.14159 " />
         <dynamics damping="1.0" friction="0.1" />
     </joint>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_connection">
         <inertial>
             <mass value="0.15" />
@@ -208,6 +209,8 @@
             <origin xyz="-0.03 0.014 0" rpy="0 0 -1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_base">
         <inertial>
             <mass value="0.12" />
@@ -227,6 +230,8 @@
             <origin xyz="-0.107 0.012 0.0" rpy="1.5708 0 1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_left1">
         <inertial>
             <mass value="0.02" />
@@ -246,6 +251,8 @@
             <origin xyz="-0.047 -0.013 0.044" rpy="1.5708 0 1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_left2">
         <inertial>
             <mass value="0.02" />
@@ -265,6 +272,8 @@
             <origin xyz="-0.0 0.03 0.004" rpy="3.14159 0 1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_left3">
         <inertial>
             <mass value="0.02" />
@@ -284,6 +293,8 @@
             <origin xyz="0 -0.03 0.012" rpy="1.5708 3.14159 1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_right1">
         <inertial>
             <mass value="0.02" />
@@ -303,6 +314,8 @@
             <origin xyz="0.047 -0.013 -0.046" rpy="1.5708 3.14 -1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_right2">
         <inertial>
             <mass value="0.02" />
@@ -322,6 +335,8 @@
             <origin xyz="0 0.03 -0.005" rpy="0 0 1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_right3">
         <inertial>
             <mass value="0.02" />
@@ -341,17 +356,26 @@
             <origin xyz="-0.014 -0.029 0.004" rpy="3.14 0 -1.5708" />
         </collision>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="joint6_to_gripper_connect" type="fixed">
         <parent link="link6" />
         <child link="gripper_connection" />
-        <origin xyz="0.01 0.0 -0.01" rpy="1.5708 0 1.5708" />
+        <!-- Align the connector mounting plane and bolt-circle center with
+             the link6 flange. Move the complete visual/collision subtree;
+             retain the existing mounting rotation and finger geometry. -->
+        <origin xyz="0.001 0.0 -0.001" rpy="1.5708 0 1.5708" />
         <dynamics damping="0.1" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="joint6_to_gripper_base" type="fixed">
         <parent link="gripper_connection" />
         <child link="gripper_base" />
         <origin xyz="0 -0.02 0.0364" rpy="1.5708 0 0" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_controller" type="revolute">
         <axis xyz="0 0 1" />
         <limit effort="1000.0" lower="0" upper="1" velocity="1" />
@@ -360,6 +384,8 @@
         <origin xyz="-0.018 0.016 -0.02" rpy="0 0 0" />
         <dynamics damping="10" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_base_to_gripper_left2" type="revolute">
         <axis xyz="0 0 1" />
         <limit effort="1000.0" lower="-1" upper="1" velocity="1" />
@@ -369,6 +395,8 @@
         <mimic joint="gripper_controller" multiplier="1.0" offset="0" />
         <dynamics damping="1.0" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_left3_to_gripper_left1" type="revolute">
         <axis xyz="0 0 1" />
         <limit effort="1000.0" lower="-1" upper="1" velocity="1" />
@@ -378,6 +406,8 @@
         <mimic joint="gripper_controller" multiplier="-1.0" offset="0" />
         <dynamics damping="1.0" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_base_to_gripper_right3" type="revolute">
         <axis xyz="0 0 1" />
         <limit effort="1000.0" lower="-1" upper="1" velocity="1" />
@@ -387,6 +417,8 @@
         <mimic joint="gripper_controller" multiplier="-1.0" offset="0" />
         <dynamics damping="1.0" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_base_to_gripper_right2" type="revolute">
         <axis xyz="0 0 1" />
         <limit effort="1000.0" lower="-1" upper="1" velocity="1" />
@@ -396,6 +428,8 @@
         <mimic joint="gripper_controller" multiplier="-1.0" offset="0" />
         <dynamics damping="1.0" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_right3_to_gripper_right1" type="revolute">
         <axis xyz="0 0 1" />
         <limit effort="1000.0" lower="-1" upper="1" velocity="1" />
@@ -405,6 +439,8 @@
         <mimic joint="gripper_controller" multiplier="1.0" offset="0" />
         <dynamics damping="1.0" friction="0.1" />
     </joint>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <link name="gripper_cable_terminal">
         <collision name="gripper_cable_terminal_collision">
             <origin xyz="-0.029086814 0.042004446 0.106890604" rpy="-1.570796326795 0 0" />
@@ -418,11 +454,14 @@
             <inertia ixx="6.305356e-11" iyy="2.194045e-11" izz="6.305356e-11" ixy="0" ixz="0" iyz="0" />
         </inertial>
     </link>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <joint name="gripper_base_to_cable_terminal" type="fixed">
         <parent link="gripper_base" />
         <child link="gripper_cable_terminal" />
         <origin xyz="-0.107 0.012 0.0" rpy="1.5708 0 1.5708" />
     </joint>
+    </xacro:if>
     <gazebo reference="base">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
@@ -434,6 +473,9 @@
     <gazebo reference="link2">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
+        <!-- The source DAE has zero ambient reflectance, making this link
+             black when backlit. Give Gazebo an explicit lit material. -->
+        <material>Gazebo/White</material>
     </gazebo>
     <gazebo reference="link3">
         <selfCollide>false</selfCollide>
@@ -451,41 +493,94 @@
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_connection">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_base">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_left1">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_left2">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_left3">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_right1">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_right2">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_right3">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
+    <xacro:if value="$(arg with_gripper)">
     <gazebo reference="gripper_cable_terminal">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
     </gazebo>
+    </xacro:if>
     <!--Position-tracking digital twin. Gravity is disabled for uncalibrated inertial dynamics. MoveIt geometric collision checking and external Gazebo contacts remain active.-->
+    <!-- The real mirror follows measured poses. Conservative Gazebo envelopes
+         must not push the model away from those poses; MoveIt collision_exact
+         remains the collision safety check. Pure simulation keeps contacts. -->
+    <xacro:macro name="mirror_no_contacts" params="link">
+        <gazebo reference="${link}">
+            <collision>
+                <surface>
+                    <contact>
+                        <collide_bitmask>0</collide_bitmask>
+                    </contact>
+                </surface>
+            </collision>
+        </gazebo>
+    </xacro:macro>
+    <xacro:unless value="$(arg gazebo_contact_response)">
+        <xacro:mirror_no_contacts link="base" />
+        <xacro:mirror_no_contacts link="link1" />
+        <xacro:mirror_no_contacts link="link2" />
+        <xacro:mirror_no_contacts link="link3" />
+        <xacro:mirror_no_contacts link="link4" />
+        <xacro:mirror_no_contacts link="link5" />
+        <xacro:mirror_no_contacts link="link6" />
+        <xacro:if value="$(arg with_gripper)">
+            <xacro:mirror_no_contacts link="gripper_connection" />
+            <xacro:mirror_no_contacts link="gripper_base" />
+            <xacro:mirror_no_contacts link="gripper_cable_terminal" />
+            <xacro:mirror_no_contacts link="gripper_left1" />
+            <xacro:mirror_no_contacts link="gripper_left2" />
+            <xacro:mirror_no_contacts link="gripper_left3" />
+            <xacro:mirror_no_contacts link="gripper_right1" />
+            <xacro:mirror_no_contacts link="gripper_right2" />
+            <xacro:mirror_no_contacts link="gripper_right3" />
+        </xacro:if>
+    </xacro:unless>
+
 </robot>

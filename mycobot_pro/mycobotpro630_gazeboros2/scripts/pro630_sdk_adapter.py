@@ -52,6 +52,10 @@ class RobotConnectionLease:
             self.handle.close(); self.handle = None
 
 
+class ControllerRejected(RuntimeError):
+    """A complete controller rejection is not a broken TCP stream."""
+
+
 class Pro630Client(_VendorClient):
     """Only this module maps feature operations to Pro630 vendor methods."""
     def __init__(self, ip=DEFAULT_PRO630_IP, netport=DEFAULT_PRO630_PORT,
@@ -62,6 +66,7 @@ class Pro630Client(_VendorClient):
         self._closed = threading.Event()
         self._stamps = {}
         self._last_reply = ''
+        self._motion_reply = None
         self._lease = None
         self._period = 1. / max(1., min(20., feedback_hz))
         self._next_angles = 0.
@@ -81,6 +86,9 @@ class Pro630Client(_VendorClient):
         with self._api_lock:
             if self._closed.is_set():
                 raise RuntimeError('Pro630 connection closed; restart the public environment')
+            motion = command.split('(', 1)[0] in ('set_angles', 'set_coords')
+            if motion:
+                self._motion_reply = {'received': False, 'error': None}
             try:
                 self.tcp_client.sendall((command.rstrip('\n') + '\n').encode())
                 method = command.split('(', 1)[0]
@@ -101,6 +109,9 @@ class Pro630Client(_VendorClient):
                         reply = text.split(':', 1)[1].strip()
                         if method == 'get_robot_state' and len(reply) < 64 and '\n' not in text:
                             continue
+                        if method == 'read_next_error' and not reply and (
+                                '\n' in text or not select.select([self.tcp_client], [], [], .05)[0]):
+                            break
                         if reply in ('-', '+'):
                             continue
                         if (method in ('force_GetGripperAngle', 'force_GetSpeed')
@@ -113,16 +124,85 @@ class Pro630Client(_VendorClient):
                 if ':' not in text:
                     raise RuntimeError(f'Malformed Pro630 response: {text!r}')
                 reply = text.split(':', 1)[1].strip()
-                if not reply or '\n' in reply or '\r' in reply:
+                if (not reply and method != 'read_next_error') or '\n' in reply or '\r' in reply:
                     raise RuntimeError(f'Invalid Pro630 response: {reply!r}')
-                if any(word in reply.lower() for word in ('error', 'failed', 'exception')):
-                    raise RuntimeError(f'Pro630 command failed: {reply}')
+                if motion:
+                    self._motion_reply['received'] = True
+                if (motion and (reply == '-1' or any(reason in reply.lower() for reason in (
+                        'singular', 'no solution', 'no coordinate solution', 'no cartesian solution', 'no inverse',
+                        'exceed', 'out of range', 'not enabled', 'disabled', 'collision')))) or (method != 'read_next_error' and any(
+                        word in reply.lower() for word in ('error', 'failed', 'exception'))):
+                    message = self._describe_rejection(reply)
+                    if motion:
+                        self._motion_reply['error'] = message
+                    raise ControllerRejected(message)
                 self._last_reply = reply
                 self._received = received
                 return reply
+            except ControllerRejected:
+                raise
             except (OSError, UnicodeError, RuntimeError) as exc:
                 self.close()
                 raise RuntimeError(f'Pro630 transport failed: {exc}') from exc
+
+    @staticmethod
+    def _describe_rejection(reply):
+        text = reply.lower()
+        if 'singular' in text:
+            return 'Motion rejected: singular position.'
+        if ('coordinate' in text or 'coord' in text) and ('limit' in text or 'out of range' in text):
+            return 'Motion rejected: coordinates exceed limits.'
+        if any(reason in text for reason in ('no solution', 'no inverse', 'no coordinate solution', 'no cartesian solution')):
+            return 'Motion rejected: no Cartesian solution.'
+        if 'disabled' in text or 'not enabled' in text:
+            return 'Motion rejected: robot disabled.'
+        if 'collision' in text:
+            return 'Motion stopped: controller collision detected.'
+        if reply == '-1':
+            return 'Motion rejected: controller rejected the target.'
+        # Preserve a controller's explicit reason, not a Pro450 numeric mapping.
+        return 'Motion failed: ' + reply.rstrip('.') + '.'
+
+    def get_motion_status(self):
+        with self._api_lock:
+            return None if self._motion_reply is None else dict(self._motion_reply)
+
+    @staticmethod
+    def _six_finite(values):
+        if (not isinstance(values, (list, tuple)) or len(values) != 6 or
+                any(type(v) not in (int, float) or not math.isfinite(v) for v in values)):
+            raise ValueError('Six finite values are required')
+        return list(values)
+
+    def get_coords(self):
+        # Avoid the vendor's plausible-looking sentinel on malformed feedback.
+        reply = self.send_command('get_coords()')
+        return self._six_finite([float(v.strip()) for v in reply.strip('[]').split(',')])
+
+    def send_coords(self, coords, speed, _async=False):
+        # write_coords waits for the text reply, not for motion completion.
+        return super().write_coords(self._six_finite(coords), self._speed(speed))
+
+    def is_in_position(self, target, mode=0):
+        target = self._six_finite(target)
+        if mode == 1:
+            return int(super().coords_equal(target, self.get_coords()))
+        if mode == 0:
+            return int(super().angles_equal(target, self.get_angles()))
+        raise ValueError('Position mode must be joint (0) or Cartesian (1)')
+
+    def get_pro_gripper_status(self):
+        status = super().force_get_gripper(GRIPPER_ID)
+        if type(status) is not int or status not in (0, 1, 2, 3):
+            raise RuntimeError('Invalid Pro630 gripper status')
+        return status
+
+    def clear_error_information(self):
+        # Same SDK read_next_error operation, bounded instead of its endless loop.
+        for _ in range(64):
+            if self.send_command('read_next_error()') == '':
+                return 1
+        raise RuntimeError('Controller error queue did not clear')
 
     def sample_time(self, kind):
         return self._stamps.get(kind)
@@ -148,7 +228,19 @@ class Pro630Client(_VendorClient):
             bad.append(1)
         if state[30] == '1':
             bad.append(30)
-        return 0 if not bad else 'robot state faults at bits ' + ','.join(map(str, bad))
+        if not bad:
+            return 0
+        if state[1] != '1':
+            return 'Motion stopped: emergency stop.'
+        if state[30] == '1':
+            return 'Motion stopped: controller collision detected.'
+        for index in range(2, 8):
+            if state[index] != '1':
+                return f'Motion failed: joint {8-index} motor fault.'
+        for index in range(24, 30):
+            if state[index] != '1':
+                return f'Motion failed: joint {30-index} communication error.'
+        return 'Motion failed: controller reported an error.'
 
     def get_angles(self):
         with self._api_lock:

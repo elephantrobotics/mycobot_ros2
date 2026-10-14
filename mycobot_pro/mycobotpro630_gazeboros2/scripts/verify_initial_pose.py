@@ -4,6 +4,8 @@
 import math
 import time
 
+from pro630_configuration import configure_node
+
 import rclpy
 import yaml
 from rclpy.node import Node
@@ -11,12 +13,12 @@ from sensor_msgs.msg import JointState
 from std_srvs.srv import Empty
 
 
-from pro630_model import COMMAND_JOINTS as JOINTS
 
 
 class InitialPoseVerifier(Node):
     def __init__(self):
         super().__init__("pro630_initial_pose_verifier")
+        configure_node(self)
         self.declare_parameter("expected_file", "")
         self.declare_parameter("tolerance_rad", 0.01)
         self.declare_parameter("timeout_sec", 20.0)
@@ -37,7 +39,7 @@ class InitialPoseVerifier(Node):
         with open(self.expected_file, "r", encoding="utf-8") as handle:
             document = yaml.safe_load(handle)
         initial = document["initial_positions"]
-        self.expected = [float(initial[name]) for name in JOINTS]
+        self.expected = [float(initial[name]) for name in self.command_joints]
         if not all(math.isfinite(value) for value in self.expected):
             raise ValueError("Expected initial pose contains a non-finite value.")
 
@@ -66,9 +68,9 @@ class InitialPoseVerifier(Node):
         if self.success or self.failure_reason:
             return
         values = dict(zip(msg.name, msg.position))
-        if not all(name in values for name in JOINTS):
+        if not all(name in values for name in self.command_joints):
             return
-        actual = [float(values[name]) for name in JOINTS]
+        actual = [float(values[name]) for name in self.command_joints]
         if not all(math.isfinite(value) for value in actual):
             self._fail_and_pause("Gazebo joint feedback contains NaN or infinity.")
             return
@@ -84,7 +86,7 @@ class InitialPoseVerifier(Node):
             # overall timeout expires.
             if now - self._first_complete_feedback_time >= 1.0:
                 self._fail_and_pause(
-                    f"Gazebo startup pose mismatch: {JOINTS[worst_index]} error "
+                    f"Gazebo startup pose mismatch: {self.command_joints[worst_index]} error "
                     f"is {errors[worst_index]:.6f} rad (limit {self.tolerance:.6f})."
                 )
             return

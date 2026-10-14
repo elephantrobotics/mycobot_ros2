@@ -3,10 +3,14 @@ import os
 import logging
 import re
 import uuid
+import sys
+import tempfile
+import yaml
 
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    OpaqueFunction,
     EmitEvent,
     GroupAction,
     IncludeLaunchDescription,
@@ -14,7 +18,7 @@ from launch.actions import (
     RegisterEventHandler,
 )
 from launch.conditions import IfCondition
-from launch.event_handlers import OnProcessExit, OnProcessStart
+from launch.event_handlers import OnProcessExit, OnProcessStart, OnShutdown
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -27,7 +31,9 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_share_directory, get_package_prefix
+sys.path.insert(0, os.path.join(get_package_prefix("mycobotpro630_gazeboros2"), "lib", "mycobotpro630_gazeboros2"))
+from pro630_configuration import controllers as profile_controllers, controller_config, project_moveit
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
@@ -36,15 +42,39 @@ DEFAULT_REAL_SNAPSHOT_FILE = "/tmp/mycobotpro630_real_initial_positions.yaml"
 
 
 class GazeboMulticastLogFilter(logging.Filter):
-    """Hide selected repeated multicast diagnostics; preserve other output."""
+    """Normalize multicast failures without changing their reporting cadence."""
+    # Discovery writes the prefix and strerror separately. Concurrent writers
+    # can interleave them or leave a prefix/error on its own line.
     message = re.compile(
-        r"(?:Exception sending a multicast message:\s*"
-        r"(?:No such device|没有那个设备|没有这个设备|Network is unreachable|网络不可达)\s*)+"
+        r"Exception sending a multicast message:[ \t]*"
+        r"|No such device|Network is unreachable"
+        r"|\u6ca1\u6709\u90a3\u4e2a\u8bbe\u5907"
+        r"|\u6ca1\u6709\u8fd9\u4e2a\u8bbe\u5907"
+        r"|\u7f51\u7edc\u4e0d\u53ef\u8fbe"
     )
 
     def filter(self, record):
-        text = re.sub(r"^\[gz(?:server|client)-\d+\]\s*", "", record.getMessage())
-        return self.message.fullmatch(text.strip()) is None
+        text = record.getMessage()
+        lines = []
+        for line in text.splitlines():
+            prefix = re.match(r"^\[gz(?:server|client)-\d+\]\s*", line)
+            content = line[prefix.end():] if prefix else line
+            if self.message.search(content):
+                remainder = self.message.sub("", content).strip()
+                content = (
+                    "Network device unavailable: Gazebo multicast discovery "
+                    "could not send data."
+                )
+                if remainder:
+                    content += " " + remainder
+                line = (prefix.group() if prefix else "") + content
+            if content.strip():
+                lines.append(line)
+        if not lines:
+            return False
+        record.msg = "\n".join(lines)
+        record.args = ()
+        return True
 
 
 def filter_gazebo_multicast_logs(event, context):
@@ -75,9 +105,9 @@ def use_current_planning_start(moveit_config):
     return moveit_config
 
 
-def controller_spawner(*, inactive=False):
+def controller_spawner(*, inactive=False, with_gripper=True):
     arguments = [
-        *CONTROLLERS,
+        *profile_controllers(with_gripper),
         "--controller-manager",
         "/controller_manager",
         "--controller-manager-timeout",
@@ -123,6 +153,8 @@ def build_simulation_stack(
     coordinated_start,
     control_mode,
     session_id="",
+    with_gripper=True,
+    controller_file="",
 ):
     """Build one isolated Pro630 Gazebo stack for the selected environment."""
     gazebo_robot_description = {
@@ -141,6 +173,9 @@ def build_simulation_stack(
                     " initial_positions_file:=",
                     initial_positions_file,
                     " collision_mesh_dir:=collision_gazebo",
+                    " gazebo_contact_response:=", "false" if control_mode == "real" else "true",
+                    " with_gripper:=", "true" if with_gripper else "false",
+                    " controller_config_file:=", controller_file,
                 ]
             ),
             value_type=str,
@@ -189,13 +224,13 @@ def build_simulation_stack(
         output="screen",
     )
 
-    controllers = controller_spawner(inactive=coordinated_start)
+    controllers = controller_spawner(inactive=coordinated_start, with_gripper=with_gripper)
     controller_activator = Node(
         package="mycobotpro630_gazeboros2",
         executable="activate_gazebo_controllers.py",
         name="pro630_controller_activation_coordinator",
         output="screen",
-        parameters=[{"controllers": CONTROLLERS}],
+        parameters=[{"controllers": profile_controllers(with_gripper)}],
     )
     pose_verifier = Node(
         package="mycobotpro630_gazeboros2",
@@ -210,6 +245,7 @@ def build_simulation_stack(
                 "tolerance_rad": ParameterValue(LaunchConfiguration("initial_pose_tolerance_rad"), value_type=float),
                 "timeout_sec": ParameterValue(LaunchConfiguration("initial_pose_timeout_sec"), value_type=float),
                 "unpause_before_verify": False,
+                "with_gripper": with_gripper,
             }
         ],
     )
@@ -229,6 +265,7 @@ def build_simulation_stack(
         parameters=[{
             "use_sim_time": False,
             "environment": control_mode,
+            "with_gripper": with_gripper,
             "session_id": session_id,
         }],
     )
@@ -283,7 +320,7 @@ def build_simulation_stack(
 
     return [
         RegisterEventHandler(OnProcessExit(target_action=move_group,
-            on_exit=[EmitEvent(event=Shutdown(reason='MoveIt planning and collision service ended'))])),
+            on_exit=[EmitEvent(event=Shutdown(reason="MoveIt planning and collision service ended"))])),
         RegisterEventHandler(OnProcessStart(on_start=filter_gazebo_multicast_logs)),
         Node(package='mycobotpro630_gazeboros2', executable='pro630_collision_scene.py',
              output='screen', parameters=[{'use_sim_time': False}]),
@@ -296,11 +333,24 @@ def build_simulation_stack(
     ]
 
 
-def generate_launch_description():
+def _build_environment(context):
+    with_gripper = LaunchConfiguration("with_gripper").perform(context) == "true"
+    temporary = tempfile.TemporaryDirectory(prefix="pro630_environment_")
+    directory = temporary.name
+    controller_file = os.path.join(directory, "controllers.yaml")
+    source = os.path.join(get_package_share_directory("mycobotpro630_gazeboros2"), "config", "ros2_controllers.yaml")
+    with open(source) as stream:
+        config = controller_config(yaml.safe_load(stream), with_gripper)
+    with open(controller_file, "w") as stream:
+        yaml.safe_dump(config, stream)
+    def cleanup(event, context):
+        temporary.cleanup()
+        return []
     session_id = uuid.uuid4().hex
     moveit_config = use_current_planning_start(MoveItConfigsBuilder(
         "firefighter", package_name="mycobotpro630_gazeboros2"
-    ).to_moveit_configs())
+    ).robot_description(mappings={"with_gripper": "true" if with_gripper else "false"}).to_moveit_configs())
+    project_moveit(moveit_config, with_gripper)
     environment = LaunchConfiguration("environment")
     real_snapshot_file = LaunchConfiguration("real_snapshot_file")
     default_initial_positions = os.path.join(
@@ -311,11 +361,11 @@ def generate_launch_description():
 
     simulation_stack = build_simulation_stack(
         moveit_config, default_initial_positions, "false", False,
-        "simulation", session_id,
+        "simulation", session_id, with_gripper, controller_file,
     )
     real_stack = build_simulation_stack(
         moveit_config, real_snapshot_file, "true", True,
-        "real", session_id,
+        "real", session_id, with_gripper, controller_file,
     )
 
     pose_gate = Node(
@@ -326,6 +376,7 @@ def generate_launch_description():
         parameters=[
             {
                 "output_file": ParameterValue(real_snapshot_file, value_type=str),
+                "with_gripper": with_gripper,
                 "timeout_sec": ParameterValue(LaunchConfiguration("real_snapshot_timeout_sec"), value_type=float),
             }
         ],
@@ -333,7 +384,7 @@ def generate_launch_description():
     )
     robot_bridge = Node(
         package='mycobotpro630_gazeboros2', executable='pro630_robot_bridge.py',
-        output='screen', parameters=[{'use_sim_time': False,
+        output='screen', parameters=[{'use_sim_time': False, 'with_gripper': with_gripper,
             'pro630_ip': ParameterValue(LaunchConfiguration('pro630_ip'), value_type=str),
             'pro630_port': ParameterValue(LaunchConfiguration('pro630_port'), value_type=int)}],
         condition=IfCondition(PythonExpression(["'", environment, "' == 'real'"])),
@@ -347,8 +398,8 @@ def generate_launch_description():
         )
     )
 
-    return LaunchDescription(
-        [
+    return [
+            RegisterEventHandler(OnShutdown(on_shutdown=cleanup)),
             DeclareLaunchArgument(
                 "environment",
                 default_value="simulation",
@@ -393,6 +444,7 @@ def generate_launch_description():
                     "use_sim_time": False,
                     "environment": environment,
                     "session_id": session_id,
+                    "with_gripper": with_gripper,
                 }],
             ),
             pose_gate,
@@ -401,4 +453,10 @@ def generate_launch_description():
             robot_bridge,
             start_real_stack_after_snapshot,
         ]
-    )
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument("with_gripper", default_value="true", choices=["true", "false"]),
+        OpaqueFunction(function=_build_environment),
+    ])
