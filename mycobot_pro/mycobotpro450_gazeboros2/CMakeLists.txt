@@ -32,6 +32,8 @@ install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/activate_gazebo_controllers.py
+  scripts/pro450_gui_backend.py
+  scripts/pro450_control_gui.py
   scripts/pro450_slider_gui.py
   scripts/pro450_pose_gate.py
   scripts/pro450_environment_state.py

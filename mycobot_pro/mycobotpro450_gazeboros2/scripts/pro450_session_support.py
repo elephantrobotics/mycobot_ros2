@@ -40,10 +40,18 @@ class EnvironmentLatch:
 
 
 def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep, with_gripper=True):
-    """Only query hardware. Keep the existing five-sample startup criteria."""
+    """Acquire a stable pose, clearing Cartesian error 36 once if necessary."""
     if sdk.is_power_on() != 1:
         raise RuntimeError('Pro450 is not powered; automatic power-on is forbidden')
     error = sdk.get_error_information()
+    if error == 36:
+        # Clear only this Cartesian error, without power/enable or motion calls.
+        # A fresh error read, rather than a write acknowledgement, confirms it.
+        reply = sdk.clear_error_information()
+        error = sdk.get_error_information()
+        if type(error) is not int or error != 0:
+            raise RuntimeError(f'Failed to clear Pro450 error 36 '
+                               f'(clear reply={reply!r}, error reply={error!r})')
     if error not in (0, None):
         raise RuntimeError(f'Pro450 reports error {error}')
     samples = []
@@ -122,6 +130,9 @@ def control_commands(feature, environment, executable_directory, python, show_fo
                 'environment': environment,
                 'show_force_execute': 'true' if show_force_execute else 'false',
                 'use_sim_time': 'false' if environment == 'real' else 'true'})]
+    if feature == 'gui':
+        return [command('pro450_gui_backend.py', {'use_sim_time': 'false'}),
+                command('pro450_control_gui.py', {'use_sim_time': 'false'})]
     if feature == 'keyboard':
         return [command('teleop_keyboard_gazebo.py', {
             'mode': environment, 'use_sim_time': 'false',

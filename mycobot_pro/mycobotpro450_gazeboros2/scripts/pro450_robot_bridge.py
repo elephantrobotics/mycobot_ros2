@@ -53,7 +53,7 @@ class RobotBridge(Node):
         self.environment_seen = 0.
         try:
             self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20., ownership_timeout=0)
-            # Startup is strictly read-only; feature launches are not needed for the snapshot.
+            # Startup sends no motion; only Cartesian error 36 may be cleared once.
             self.initial_pose = read_initial_snapshot(self.sdk, with_gripper=self.with_gripper)
             self.gripper = self.initial_pose[6] if self.with_gripper else None
             self.stamps = {kind: self.sdk.sample_time(kind) for kind in (('arm', 'gripper') if self.with_gripper else ('arm',))}
@@ -208,7 +208,19 @@ class RobotBridge(Node):
                         if method == 'set_pro_gripper_enabled' and (
                                 len(args) != 1 or type(args[0]) is not int or args[0] not in (0, 1) or kwargs):
                             raise ValueError('Drag mode may only enable or disable the default gripper')
+                        # Record ownership before writes so loss of a reply or
+                        # GUI process cannot orphan a command in the robot.
+                        if self.lease.feature == 'gui':
+                            if method in ('send_angles', 'send_coords'):
+                                self.arm_active, self.arm_goal = True, None
+                            elif method == 'set_pro_gripper_angle':
+                                self.gripper_active = True
                         result = getattr(self.sdk, method)(*args, **kwargs)
+                        if self.lease.feature == 'gui':
+                            if method == 'is_in_position' and result == 1:
+                                self.arm_active, self.arm_goal = False, None
+                            elif method == 'get_pro_gripper_status' and result in (1, 2, 3):
+                                self.gripper_active = False
                         if method == 'get_pro_gripper_angle':
                             self.update_gripper(result)
                         elif method == 'set_pro_gripper_angle' and result == 1:
@@ -220,7 +232,10 @@ class RobotBridge(Node):
                                 self.arm_goal = [math.degrees(v) for v in self.frame[2][:6]]
                                 self.arm_goal[int(args[0])-1] = args[1]
                         elif method == 'stop':
+                            if result not in (0, 1):
+                                raise RuntimeError(f'Robot STOP failed: {result!r}')
                             self.arm_active = False
+                            self.arm_goal = None
             res.success = True
             res.result_json = json.dumps(result, allow_nan=False)
             res.stamps_json = json.dumps(self.stamps)

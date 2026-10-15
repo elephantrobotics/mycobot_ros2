@@ -53,7 +53,7 @@ class Pro450PoseGate(Node):
         )
         self.create_timer(0.2, self._timeout_cb)
         self.get_logger().info(
-            "Waiting for a stable, read-only Pro450 pose snapshot; "
+            "Waiting for a stable Pro450 pose snapshot; "
             "Gazebo startup is gated."
         )
 

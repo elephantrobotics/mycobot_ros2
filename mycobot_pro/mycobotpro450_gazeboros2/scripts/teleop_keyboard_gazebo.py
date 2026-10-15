@@ -58,6 +58,14 @@ HOLD_GRIPPER_URDF_VELOCITY_LIMIT = 1.0
 HOLD_ARM_URDF_VELOCITY_LIMIT = 1.0
 HOLD_SPEED_GEARS = tuple(SDK_RAD_PER_SPEED * value for value in (4, 8, 12, 16, 20))
 DEFAULT_HOLD_SPEED_GEAR = 2
+HOLD_MONITOR_PERIOD = 0.1
+HOLD_MONITOR_MAX_AGE = 0.5
+
+
+class HoldCancelled(Exception):
+    """An obsolete collision query must not affect a newer key press."""
+
+
 if max(HOLD_SPEED_GEARS) >= HOLD_ARM_URDF_VELOCITY_LIMIT:
     raise ValueError("Pro450 hold speed gears must stay below the URDF velocity limit")
 if max(HOLD_GRIPPER_SPEED_GEARS) >= HOLD_GRIPPER_URDF_VELOCITY_LIMIT:
@@ -66,7 +74,6 @@ if max(HOLD_GRIPPER_SPEED_GEARS) >= HOLD_GRIPPER_URDF_VELOCITY_LIMIT:
 
 class TeleopKeyboard(Node):
     _path_is_valid = SliderControl._path_is_valid
-    _state_is_valid = SliderControl._state_is_valid
     _collision_is_decreasing = SliderControl._collision_is_decreasing
     _format_collision_reason = staticmethod(SliderControl._format_collision_reason)
     _wait_for_future = SliderControl._wait_for_future
@@ -116,6 +123,7 @@ class TeleopKeyboard(Node):
         self._hold_validation_pending = False
         self._hold_first_validation = False
         self._hold_validation_worker = None
+        self._hold_scan_worker = None
         self._hold_generation = 0
         self._hold_last_tick = time.monotonic()
         self._hold_speed_gear = DEFAULT_HOLD_SPEED_GEAR
@@ -124,6 +132,10 @@ class TeleopKeyboard(Node):
         self._brake_since = 0.0
         self._hold_final_target = None
         self._hold_goal_sent = False
+        self._hold_notice = None
+        self._hold_checked_at = None
+        self._hold_query_lock = threading.RLock()
+        self._hold_monitor_shutdown = threading.Event()
 
         if self.mode == "real":
             qos = QoSProfile(
@@ -149,6 +161,8 @@ class TeleopKeyboard(Node):
             self.get_logger().info("Real robot READ ONLY. Wait for Gazebo sync before arming.")
         else:
             self.get_logger().info("Simulation mode; no real connection or startup motion.")
+        self._hold_monitor_worker = threading.Thread(target=self._monitor_hold, daemon=True)
+        self._hold_monitor_worker.start()
 
     def _feedback_cb(self, msg):
         positions = dict(zip(msg.name, msg.position))
@@ -396,6 +410,8 @@ class TeleopKeyboard(Node):
             self._hold_first_validation = True
             self._hold_final_target = None
             self._hold_goal_sent = False
+            self._hold_checked_at = None
+            self._hold_notice = None
         if self.mode != "real":
             self._request_hold_clearance(positions)
         self._request_collision_stop(positions)
@@ -518,6 +534,93 @@ class TeleopKeyboard(Node):
         self._hold_scan_worker = worker
         worker.start()
 
+    def _state_is_valid(self, pose):
+        with self._hold_query_lock:
+            return SliderControl._state_is_valid(self, pose)
+
+    def _hold_state_is_valid(self, pose, axis, generation):
+        # Serialize monitor and scan queries; never accumulate service requests.
+        with self._hold_query_lock:
+            with self._hold_lock:
+                if (self._stop_requested or self._hold_monitor_shutdown.is_set()
+                        or self._hold_generation != generation
+                        or self._hold_axis != axis or not self._hold_pressed):
+                    raise HoldCancelled()
+            return self._state_is_valid(pose)
+
+    def _halt_collision_hold(self, axis, generation, reason):
+        with self._hold_lock:
+            if self._hold_generation != generation or self._hold_axis != axis:
+                return
+            self._hold_generation += 1
+            self._hold_axis = None
+            self._hold_pressed = False
+            self._hold_pending = None
+            self._hold_final_target = None
+            self._hold_velocity = 0.
+            self._hold_notice = f'Joint {axis + 1}: stopped: {reason}'
+        if self.mode == 'real':
+            self.real_transport.stop(emergency=True)
+        else:
+            feedback = self._fresh_feedback()
+            if feedback is None:
+                with self._state_lock:
+                    pose = self._positions
+            else:
+                pose = feedback[0]
+            if pose is not None:
+                self._publish_trajectory(pose, MIN_DURATION)
+        self.get_logger().warning(f'Keyboard collision guard: {reason}')
+
+    def _monitor_hold(self):
+        """One worker checks measured geometry and the near stopping corridor."""
+        while not self._hold_monitor_shutdown.wait(HOLD_MONITOR_PERIOD):
+            with self._hold_lock:
+                axis, generation = self._hold_axis, self._hold_generation
+                direction, target = self._hold_direction, self._hold_final_target
+                active = axis is not None and self._hold_pressed
+            if not active:
+                continue
+            checked_at = time.monotonic()
+            try:
+                feedback = self._fresh_feedback()
+                if feedback is None:
+                    continue
+                pose, velocities = feedback
+                self._check_hold_corridor(pose, velocities, axis, direction, target, generation)
+            except HoldCancelled:
+                continue
+            except Exception as exc:
+                self._halt_collision_hold(axis, generation, str(exc))
+                continue
+            with self._hold_lock:
+                if self._hold_generation == generation and self._hold_axis == axis:
+                    # Timestamp the start of the query, not a delayed response.
+                    self._hold_checked_at = checked_at
+
+    def _check_hold_corridor(self, pose, velocities, axis, direction, target, generation):
+        speed = max(self._hold_speed_limit(axis), abs(velocities[axis]))
+        # Feedback/service latency plus a conservative software braking horizon.
+        # Firmware stopping distance still requires physical calibration.
+        distance = speed * 0.2 + speed * speed / (2 * HOLD_TRACKED_ACCELERATION)
+        distance = 0. if target is None else max(0., min(distance, direction * (target - pose[axis])))
+        step = HOLD_GRIPPER_SCAN_GRID if axis == 6 else HOLD_SCAN_GRID
+        count = max(1, math.ceil(distance / step))
+        for index in range(count + 1):
+            sample = list(pose)
+            sample[axis] += direction * distance * index / count
+            valid, _contacts, reason = self._hold_state_is_valid(sample, axis, generation)
+            if reason:
+                raise RuntimeError(reason)
+            if not valid:
+                where = 'measured pose' if index == 0 else 'stopping corridor'
+                raise RuntimeError(f'collision detected in {where}; release the key')
+
+    def _hold_pose_changed(self, pose, axis):
+        origin = self._hold_validation_origin
+        return any(abs(a - b) > (math.radians(0.5) if i < 6 else 0.01)
+                   for i, (a, b) in enumerate(zip(pose, origin)) if i != axis)
+
     def _scan_collision_stop(self, pose, axis, generation, start, goal):
         """One absolute-grid scan. The same pose always yields the same stop."""
         if axis == 6:
@@ -531,7 +634,7 @@ class TeleopKeyboard(Node):
             sample = list(pose)
             low, high = self.joint_limits[axis]
             sample[axis] = min(high, max(low, angle))
-            valid, _contacts, reason = self._state_is_valid(sample)
+            valid, _contacts, reason = self._hold_state_is_valid(sample, axis, generation)
             if reason and "collision" not in reason.lower():
                 raise RuntimeError(reason)
             return not valid
@@ -539,15 +642,13 @@ class TeleopKeyboard(Node):
         try:
             # Public environment readiness guarantees the shared ground scene.
             target = collision_stop_angle(start, goal, margin, grid, fine, blocked)
+        except HoldCancelled:
+            return
         except Exception as exc:
-            if self.mode == "real":
-                with self._hold_lock:
-                    if generation != self._hold_generation or axis != self._hold_axis:
-                        return
-                    self._hold_pressed = False
-                self.get_logger().warning(f"Collision scan failed; no real motion sent: {exc}")
-            else:
-                self.get_logger().warning(f"Collision scan failed; jog stays inside the short check: {exc}")
+            self._halt_collision_hold(axis, generation, f'collision check failed: {exc}')
+            return
+        if abs(target - start) <= 1e-6:
+            self._halt_collision_hold(axis, generation, 'no collision-free travel from the current pose')
             return
         with self._hold_lock:
             if generation != self._hold_generation or axis != self._hold_axis:
@@ -555,6 +656,7 @@ class TeleopKeyboard(Node):
             self._hold_final_target = target
             self._hold_validated_limit = target
             self._hold_goal_sent = False
+            self._hold_notice = f'Joint {axis + 1}: collision check passed; hold to move.'
 
     def _submit_real_gripper_hold(self):
         """One gripper opening at the scanned stop, using the window gear."""
@@ -564,10 +666,10 @@ class TeleopKeyboard(Node):
             origin = getattr(self, "_hold_validation_origin", None)
             gear = self._hold_speed_gear
             target = self._hold_final_target
-        if origin is None or target is None:
-            return
-        speed = HOLD_SPEED_GEARS[gear - 1]
-        self.real_transport.submit(6, target, speed, origin, target, position_goal=True)
+            if origin is None or target is None:
+                return
+            speed = HOLD_SPEED_GEARS[gear - 1]
+            self.real_transport.submit(6, target, speed, origin, target, position_goal=True)
 
     def _publish_hold_waypoint(self, positions, axis, endpoint, duration):
         if self.mode == "real":
@@ -576,10 +678,11 @@ class TeleopKeyboard(Node):
                 pressed = self._hold_pressed
                 gear = self._hold_speed_gear
                 final = self._hold_final_target
-            if origin is not None and pressed and axis != 6 and final is not None:
-                speed = HOLD_SPEED_GEARS[gear - 1]
-                self.real_transport.submit(
-                    axis, final, speed, origin, final, position_goal=True)
+                if (origin is not None and pressed and axis != 6 and final is not None
+                        and self._hold_axis == axis):
+                    speed = HOLD_SPEED_GEARS[gear - 1]
+                    self.real_transport.submit(
+                        axis, final, speed, origin, final, position_goal=True)
             return
         # Position-only JTC points interpolate linearly. Bound their requested
         # average speed even if a future gear change bypasses the table guard.
@@ -605,7 +708,11 @@ class TeleopKeyboard(Node):
         # other joints even when their requested endpoint is unchanged.
         point.time_from_start = Duration(sec=seconds, nanosec=nanoseconds)
         msg.points = [point]
-        publisher.publish(msg)
+        with self._hold_lock:
+            if (abs(endpoint - positions[axis]) > 1e-9
+                    and (self._hold_axis != axis or not self._hold_pressed)):
+                return
+            publisher.publish(msg)
 
     def _publish_tracked_goal(self, positions, axis, goal, speed):
         """One trapezoid to the scanned stop. Same target the real firmware is given."""
@@ -623,12 +730,15 @@ class TeleopKeyboard(Node):
                 point.positions = list(positions[:6])
                 point.positions[axis] = sample
             msg.points.append(point)
-        if axis == 6:
-            msg.joint_names = [GRIPPER_JOINT]
-            self.pub_gripper.publish(msg)
-        else:
-            msg.joint_names = list(ARM_JOINTS)
-            self.pub_arm.publish(msg)
+        with self._hold_lock:
+            if self._hold_axis != axis or not self._hold_pressed:
+                return
+            if axis == 6:
+                msg.joint_names = [GRIPPER_JOINT]
+                self.pub_gripper.publish(msg)
+            else:
+                msg.joint_names = list(ARM_JOINTS)
+                self.pub_arm.publish(msg)
 
     def hold_tick(self):
         """Run at 20 Hz; hardware I/O is confined to the transport owner."""
@@ -644,6 +754,12 @@ class TeleopKeyboard(Node):
             dt = max(0.01, now - self._hold_last_tick)
             self._hold_last_tick = now
             pending = self._hold_validation_pending
+            checked_at = self._hold_checked_at
+            generation = self._hold_generation
+
+        if checked_at is not None and now - checked_at > HOLD_MONITOR_MAX_AGE:
+            self._halt_collision_hold(axis, generation, 'collision check timed out; release and retry')
+            return
 
         feedback = self._fresh_feedback()
         if feedback is None:
@@ -654,6 +770,16 @@ class TeleopKeyboard(Node):
             self.get_logger().error("Hold stopped: slider_control_gazebo is also running.")
             return
         positions, velocities = feedback
+        with self._hold_lock:
+            if self._hold_generation != generation or self._hold_axis != axis:
+                return
+            checked_at = self._hold_checked_at
+            changed = self._hold_pose_changed(positions, axis)
+        if changed:
+            self._halt_collision_hold(axis, generation, 'other joint positions changed; release and retry')
+            return
+        if checked_at is None:
+            return
         if self.mode == "real":
             if self.real_transport.error:
                 self.stop()
@@ -1017,6 +1143,11 @@ class SimulationHoldWindow:
                 self.release()
             self.node.hold_tick()
             self._refresh_key_display()
+            with self.node._hold_lock:
+                notice = self.node._hold_notice
+                self.node._hold_notice = None
+            if notice:
+                self.status.setText(notice)
             transport = getattr(self.node, "real_transport", None)
             if transport is not None and transport.error:
                 if transport.recovery_ready:
@@ -1074,6 +1205,7 @@ def main(args=None):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if node is not None:
+            node._hold_monitor_shutdown.set()
             if node.real_transport is not None:
                 node.real_transport.close()
                 node._real_thread.join(timeout=2.0)
@@ -1083,6 +1215,9 @@ def main(args=None):
                 node.stop()
             if node._hold_validation_worker is not None:
                 node._hold_validation_worker.join(timeout=2.0)
+            node._hold_monitor_worker.join(timeout=2.5)
+            if node._hold_scan_worker is not None:
+                node._hold_scan_worker.join(timeout=2.5)
             # Never release servo torque; the loaded real robot could fall.
             if node.mc is not None and hasattr(node.mc, "close"):
                 node.mc.close()

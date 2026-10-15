@@ -357,7 +357,8 @@ class SliderControl(Node):
                 return
 
         # Validate and execute the same discrete opening sent to the SDK.
-        target[-1] = round(target[-1] * 100) / 100.0
+        if self.with_gripper:
+            target[-1] = round(target[-1] * 100) / 100.0
 
         speed_scale = 0.2
         if msg.velocity:
@@ -501,12 +502,18 @@ class SliderControl(Node):
         request.group_name = ""
 
         future = self.validity_client.call_async(request)
+        reply_ready = threading.Event()
+        future.add_done_callback(lambda _future: reply_ready.set())
         deadline = time.monotonic() + 2.0
         while not future.done() and time.monotonic() < deadline:
             if self._stop_requested:
+                future.cancel()
                 return False, {}, "STOP requested."
-            time.sleep(0.01)
+            # Wake as soon as ROS supplies the result. Sleeping per sample adds
+            # seconds to a dense keyboard scan despite sub-millisecond replies.
+            reply_ready.wait(min(0.01, max(0., deadline - time.monotonic())))
         if not future.done():
+            future.cancel()
             return False, {}, "MoveIt state-validity check timed out."
         response = future.result()
         if response is None:
