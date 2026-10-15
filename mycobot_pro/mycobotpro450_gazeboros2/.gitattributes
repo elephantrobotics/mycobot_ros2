@@ -1,0 +1,2 @@
+# Linux ROS launch executes these Python files directly via their shebang.
+*.py text eol=lf

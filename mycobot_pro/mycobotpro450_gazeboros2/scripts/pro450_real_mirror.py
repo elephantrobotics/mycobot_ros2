@@ -23,8 +23,10 @@ MAX_SAMPLE_AGE_S = 0.5
 class RealPoseBuffer:
     """Thread-safe pose history. The SDK thread pushes; the renderer reads."""
 
-    def __init__(self, clock=time.monotonic, pose_size=POSE_SIZE):
+    def __init__(self, clock=time.monotonic, pose_size=POSE_SIZE,
+                 max_sample_age=MAX_SAMPLE_AGE_S):
         self.pose_size = pose_size
+        self.max_sample_age = max_sample_age
         self._clock = clock
         self._lock = threading.Lock()
         self._samples = []
@@ -55,7 +57,7 @@ class RealPoseBuffer:
             current = self._clock() if now is None else float(now)
             target_time = current - (self._period + RENDER_MARGIN_S)
             newest_time, newest = self._samples[-1]
-            if current - newest_time > MAX_SAMPLE_AGE_S:
+            if current - newest_time > self.max_sample_age:
                 return None
             if target_time >= newest_time:
                 return list(newest), [0.0] * self.pose_size

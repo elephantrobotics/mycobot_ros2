@@ -24,6 +24,11 @@ from pro450_real_mirror import RealPoseBuffer
 from pro450_configuration import configure_node
 
 
+GRIPPER_SAMPLE_PERIOD = .1
+GRIPPER_RETRY_PERIOD = .5
+GRIPPER_MAX_SAMPLE_AGE = .8
+
+
 class RobotBridge(Node):
     def __init__(self):
         super().__init__('pro450_robot_bridge')
@@ -38,6 +43,9 @@ class RobotBridge(Node):
         self.arm_active = self.gripper_active = False
         self.arm_goal = None
         self.mirror = RealPoseBuffer(pose_size=len(self.command_joints))
+        self.gripper_mirror = (RealPoseBuffer(pose_size=1,
+                              max_sample_age=GRIPPER_MAX_SAMPLE_AGE)
+                               if self.with_gripper else None)
         self.next_gripper = 0.
         self.worker = None
         self.frame = None
@@ -49,6 +57,8 @@ class RobotBridge(Node):
             self.initial_pose = read_initial_snapshot(self.sdk, with_gripper=self.with_gripper)
             self.gripper = self.initial_pose[6] if self.with_gripper else None
             self.stamps = {kind: self.sdk.sample_time(kind) for kind in (('arm', 'gripper') if self.with_gripper else ('arm',))}
+            if self.with_gripper and self.stamps['gripper'] is not None:
+                self.gripper_mirror.push([self.gripper], when=self.stamps['gripper'][0])
             self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 1)
             self.gripper_pub = (self.create_publisher(JointTrajectory, '/pro_gripper_controller/joint_trajectory', 1)
                                 if self.with_gripper else None)
@@ -80,9 +90,15 @@ class RobotBridge(Node):
     def update_gripper(self, value):
         if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and 0 <= value <= 100:
             stamp = self.sdk.sample_time('gripper')
-            if stamp is not None:
+            previous = self.stamps.get('gripper')
+            if stamp is not None and (previous is None or stamp[0] > previous[0]):
                 self.gripper = value / 100.
                 self.stamps['gripper'] = stamp
+                self.gripper_mirror.push([self.gripper], when=stamp[0])
+                # A feature RPC may supply a sample between periodic reads.
+                self.next_gripper = max(self.next_gripper, stamp[0] + GRIPPER_SAMPLE_PERIOD)
+                return True
+        return False
 
     def sample_loop(self):
         while not self.stop_event.is_set():
@@ -119,15 +135,21 @@ class RobotBridge(Node):
             with self.cache_condition:
                 self.packet = {'sequence': self.packet['sequence'] + 1, 'value': value, 'error': error}
                 self.cache_condition.notify_all()
-            # Publish the arm packet before a possibly slow idle gripper query.
+            # Publish the arm packet before a possibly slow gripper query.
             if self.with_gripper and time.monotonic() >= self.next_gripper:
                 with self.hardware_lock:
-                    if not self.stop_event.is_set():
+                    if not self.stop_event.is_set() and time.monotonic() >= self.next_gripper:
+                        started = time.monotonic()
+                        updated = False
                         try:
-                            self.update_gripper(self.sdk.get_pro_gripper_angle())
+                            updated = self.update_gripper(self.sdk.get_pro_gripper_angle())
                         except Exception:
                             pass  # Preserve the last measured opening and timestamp.
-                        self.next_gripper = time.monotonic() + .5
+                        # Schedule from query start; do not add another full
+                        # sample period after each successful SDK response.
+                        self.next_gripper = (max(started + GRIPPER_SAMPLE_PERIOD,
+                                                 time.monotonic() + .005) if updated
+                                             else time.monotonic() + GRIPPER_RETRY_PERIOD)
             self.stop_event.wait(.005)
 
     def release_owner(self, token):
@@ -238,9 +260,13 @@ class RobotBridge(Node):
             if rendered is None:
                 return
             shown, velocity = rendered
-        # Gripper rendering uses only the latest successfully measured opening.
+        # Interpolate the gripper's own measured history, never arm timestamps
+        # or commanded goals. Zero terminal velocity prevents extrapolation
+        # after feedback stops, including at an opening-direction reversal.
         if self.with_gripper:
-            shown[6], velocity[6] = self.gripper, 0.0
+            rendered_gripper = self.gripper_mirror.render(now=now)
+            shown[6] = rendered_gripper[0][0] if rendered_gripper is not None else self.gripper
+            velocity[6] = 0.0
         self.arm_pub.publish(self.trajectory(self.command_joints[:6], shown[:6], velocity[:6]))
         if self.with_gripper:
             self.gripper_pub.publish(self.trajectory(self.command_joints[6:], shown[6:], velocity[6:]))

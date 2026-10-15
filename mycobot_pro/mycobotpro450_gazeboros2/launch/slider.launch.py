@@ -42,7 +42,7 @@ DEFAULT_REAL_SNAPSHOT_FILE = "/tmp/mycobotpro450_real_initial_positions.yaml"
 
 
 class GazeboMulticastLogFilter(logging.Filter):
-    """Hide selected repeated multicast diagnostics; preserve other output."""
+    """Normalize multicast failures without changing their reporting cadence."""
     # Discovery writes the prefix and strerror separately. Concurrent writers
     # can interleave them or leave a prefix/error on its own line.
     message = re.compile(
@@ -55,12 +55,19 @@ class GazeboMulticastLogFilter(logging.Filter):
 
     def filter(self, record):
         text = record.getMessage()
-        if self.message.search(text) is None:
-            return True
-        text = self.message.sub("", text)
         lines = []
         for line in text.splitlines():
-            content = re.sub(r"^\[gz(?:server|client)-\d+\]\s*", "", line)
+            prefix = re.match(r"^\[gz(?:server|client)-\d+\]\s*", line)
+            content = line[prefix.end():] if prefix else line
+            if self.message.search(content):
+                remainder = self.message.sub("", content).strip()
+                content = (
+                    "Network device unavailable: Gazebo multicast discovery "
+                    "could not send data."
+                )
+                if remainder:
+                    content += " " + remainder
+                line = (prefix.group() if prefix else "") + content
             if content.strip():
                 lines.append(line)
         if not lines:
@@ -166,6 +173,7 @@ def build_simulation_stack(
                     " initial_positions_file:=",
                     initial_positions_file,
                     " collision_mesh_dir:=collision_gazebo",
+                    " gazebo_contact_response:=", "false" if control_mode == "real" else "true",
                     " with_gripper:=", "true" if with_gripper else "false",
                     " controller_config_file:=", controller_file,
                 ]

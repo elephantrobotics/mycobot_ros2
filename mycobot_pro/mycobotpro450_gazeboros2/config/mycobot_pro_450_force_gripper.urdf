@@ -1,5 +1,8 @@
 <?xml version="1.0" ?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter">
+    <!-- Six-axis mesh frames are anchored at their incoming CAD flange centers.
+         Joint origins use outgoing flange centers; visual/collision/inertial
+         translations move together. Mesh sizes, motion axes and limits are unchanged. -->
     <!-- collision_mesh_dir is selected by the parent xacro. MoveIt uses
          collision_exact for accurate self-collision checks, while Gazebo
          uses collision_gazebo for stable ODE dynamics. -->
@@ -34,18 +37,18 @@
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J2.dae" />
             </geometry>
-            <origin xyz="0.0405 0 0.0475 " rpy=" -1.5708 0 -1.5708 " />
+            <origin xyz="0.040000183626 -0.000000146929 0.049999853071" rpy=" -1.5708 0 -1.5708 " />
         </visual>
         <collision>
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J2_exact.stl" />
             </geometry>
-            <origin xyz="0.0405 0 0.0475" rpy="-1.5708 0 -1.5708" />
+            <origin xyz="0.040000183626 -0.000000146929 0.049999853071" rpy="-1.5708 0 -1.5708" />
         </collision>
         <inertial>
             <mass value="3.5" />
             <inertia ixx="0.02" iyy="0.02" izz="0.01" ixy="0.0" ixz="0.0" iyz="0.0" />
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.000499816374 -0.000000146929 0.002499853071" rpy="0 0 0" />
         </inertial>
     </link>
     <link name="link2">
@@ -53,18 +56,18 @@
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J3.dae" />
             </geometry>
-            <origin xyz="0.0598 0.005 -0.203 " rpy=" 0 0 1.5708 " />
+            <origin xyz="0.061975797427 0.003696511883 -0.202709604601" rpy=" 0 0 1.5708 " />
         </visual>
         <collision>
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J3_exact.stl" />
             </geometry>
-            <origin xyz="0.0598 0.005 -0.203" rpy="0 0 1.5708" />
+            <origin xyz="0.061975797427 0.003696511883 -0.202709604601" rpy="0 0 1.5708" />
         </collision>
         <inertial>
             <mass value="2.8" />
             <inertia ixx="0.008" iyy="0.06" izz="0.06" ixy="0.0" ixz="0.0" iyz="0.0" />
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.002175797427 -0.001303488117 0.000290395399" rpy="0 0 0" />
         </inertial>
     </link>
     <link name="link3">
@@ -72,18 +75,18 @@
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J4.dae" />
             </geometry>
-            <origin xyz="0.07 0.005 -0.383 " rpy=" 0 0 1.5708" />
+            <origin xyz="0.066475801252 0.00369367272 -0.382709504153" rpy=" 0 0 1.5708" />
         </visual>
         <collision>
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J4_exact.stl" />
             </geometry>
-            <origin xyz="0.07 0.005 -0.383" rpy="0 0 1.5708" />
+            <origin xyz="0.066475801252 0.00369367272 -0.382709504153" rpy="0 0 1.5708" />
         </collision>
         <inertial>
             <mass value="2.2" />
             <inertia ixx="0.006" iyy="0.05" izz="0.05" ixy="0.0" ixz="0.0" iyz="0.0" />
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.003524198748 -0.00130632728 0.000290495847" rpy="0 0 0" />
         </inertial>
     </link>
     <link name="link4">
@@ -91,18 +94,18 @@
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J5.dae" />
             </geometry>
-            <origin xyz="-0.015 0 -0.002 " rpy=" 0 -1.5708 0" />
+            <origin xyz="-0.012 0 -0.000000044169" rpy=" 0 -1.5708 0" />
         </visual>
         <collision>
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J5_exact.stl" />
             </geometry>
-            <origin xyz="-0.015 0 -0.002" rpy="0 -1.5708 0" />
+            <origin xyz="-0.012 0 -0.000000044169" rpy="0 -1.5708 0" />
         </collision>
         <inertial>
             <mass value="1.2" />
             <inertia ixx="0.003" iyy="0.003" izz="0.001" ixy="0.0" ixz="0.0" iyz="0.0" />
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.003 0 0.001999955831" rpy="0 0 0" />
         </inertial>
     </link>
     <link name="link5">
@@ -110,18 +113,18 @@
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J6.dae" />
             </geometry>
-            <origin xyz="0.003 -0.025 -0.608 " rpy=" 0 0 0" />
+            <origin xyz="0.003690246142 -0.023985946242 -0.610208779143" rpy=" 0 0 0" />
         </visual>
         <collision>
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J6_exact.stl" />
             </geometry>
-            <origin xyz="0.003 -0.025 -0.608" rpy="0 0 0" />
+            <origin xyz="0.003690246142 -0.023985946242 -0.610208779143" rpy="0 0 0" />
         </collision>
         <inertial>
             <mass value="0.8" />
             <inertia ixx="0.002" iyy="0.002" izz="0.001" ixy="0.0" ixz="0.0" iyz="0.0" />
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="0.000690246142 0.001014053758 -0.002208779143" rpy="0 0 0" />
         </inertial>
     </link>
     <link name="link6">
@@ -129,18 +132,18 @@
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/PRO450_J6_end.dae" />
             </geometry>
-            <origin xyz="0 0 0.001 " rpy=" 3.14159 0 0" />
+            <origin xyz="-0.004199999809 0 0" rpy=" 3.14159 0 0" />
         </visual>
         <collision>
             <geometry>
                 <mesh filename="package://mycobot_description/urdf/mycobot_pro_450/$(arg collision_mesh_dir)/PRO450_J6_end_exact.stl" />
             </geometry>
-            <origin xyz="0 0 0.001" rpy="3.14159 0 0" />
+            <origin xyz="-0.004199999809 0 0" rpy="3.14159 0 0" />
         </collision>
         <inertial>
             <mass value="0.4" />
             <inertia ixx="0.001" iyy="0.001" izz="0.0005" ixy="0.0" ixz="0.0" iyz="0.0" />
-            <origin xyz="0 0 0" rpy="0 0 0" />
+            <origin xyz="-0.004199999809 0 -0.001" rpy="0 0 0" />
         </inertial>
     </link>
     <xacro:if value="$(arg with_gripper)">
@@ -358,7 +361,8 @@
         <limit effort="1000.0" lower="-2.8274" upper="2.8274" velocity="1" />
         <parent link="base" />
         <child link="link1" />
-        <origin xyz="-0.0045 0 0.155" rpy="0 0 0" />
+        <!-- Seat link1 on the external top flange, not the lower CAD step. -->
+        <origin xyz="-0.003696284968 -0.000524188133 0.162208908081" rpy="0 0 0" />
         <dynamics damping="0.5" friction="0.1" />
     </joint>
     <joint name="joint2" type="revolute">
@@ -366,7 +370,7 @@
         <limit effort="1000.0" lower="-2.1816" upper="2.1816" velocity="1" />
         <parent link="link1" />
         <child link="link2" />
-        <origin xyz="0.05 0 0.048" rpy="0 0 0" />
+        <origin xyz="0.047000183626 -0.000000172583 0.049999827418" rpy="0 0 0" />
         <dynamics damping="0.5" friction="0.1" />
     </joint>
     <joint name="joint3" type="revolute">
@@ -374,7 +378,7 @@
         <limit effort="1000.0" lower="-2.6878" upper="2.6878" velocity="1" />
         <parent link="link2" />
         <child link="link3" />
-        <origin xyz="-0.01 0 0.18" rpy="0 0 0" />
+        <origin xyz="-0.004000003825 0.000002823248 0.179999372705" rpy="0 0 0" />
         <dynamics damping="0.5" friction="0.1" />
     </joint>
     <joint name="joint4" type="revolute">
@@ -382,7 +386,7 @@
         <limit effort="1000.0" lower="-2.8274" upper="2.8274" velocity="1" />
         <parent link="link3" />
         <child link="link4" />
-        <origin xyz="0.0 0 0.1735" rpy="0 0 0" />
+        <origin xyz="-0.005999977121 0.000002620318 0.172999270259" rpy="0 0 0" />
         <dynamics damping="0.3" friction="0.1" />
     </joint>
     <joint name="joint5" type="revolute">
@@ -390,7 +394,7 @@
         <limit effort="1000.0" lower="-2.8274" upper="2.8274" velocity="1" />
         <parent link="link4" />
         <child link="link5" />
-        <origin xyz="0.046 0.0003 0.05" rpy="0 0 0" />
+        <origin xyz="0.047989648139 0.000003599231 0.054000176186" rpy="0 0 0" />
         <dynamics damping="0.3" friction="0.1" />
     </joint>
     <joint name="joint6" type="revolute">
@@ -399,7 +403,7 @@
         <parent link="link5" />
         <child link="link6" />
         <!-- Add +90 deg about the existing local X axis to the zero-pose mounting. -->
-        <origin xyz="0 0.04 0.0435" rpy="2.3561944901948966 0 1.5708" />
+        <origin xyz="-0.000002439502 0.039949245866 0.042500131832" rpy="2.3561944901948966 0 1.5708" />
         <dynamics damping="0.2" friction="0.1" />
     </joint>
     <xacro:if value="$(arg with_gripper)">
@@ -409,7 +413,8 @@
         <!-- Rotate the original complete gripper mounting -90 deg about the
              link6 frame's X axis through its origin, including translation.
              T_new = Rx(-pi/2) * T_original. -->
-        <origin xyz="0.03 -0.01 0" rpy="-0.0000036732217733577977 -1.5707926535897934 -3.1415926535731233" />
+        <!-- Preserve the gripper assembly relative to the re-anchored link6 mesh. -->
+        <origin xyz="0.025800000191 -0.01 -0.001" rpy="-0.0000036732217733577977 -1.5707926535897934 -3.1415926535731233" />
     </joint>
     </xacro:if>
     <xacro:if value="$(arg with_gripper)">
@@ -512,6 +517,41 @@
         <selfCollide>false</selfCollide>
     </gazebo>
     </xacro:if>
+
+    <!-- The real mirror follows measured poses. Conservative Gazebo envelopes
+         must not push the model away from those poses; MoveIt collision_exact
+         remains the collision safety check. Pure simulation keeps contacts. -->
+    <xacro:macro name="mirror_no_contacts" params="link">
+        <gazebo reference="${link}">
+            <collision>
+                <surface>
+                    <contact>
+                        <collide_bitmask>0</collide_bitmask>
+                    </contact>
+                </surface>
+            </collision>
+        </gazebo>
+    </xacro:macro>
+    <xacro:unless value="$(arg gazebo_contact_response)">
+        <xacro:mirror_no_contacts link="base" />
+        <xacro:mirror_no_contacts link="link1" />
+        <xacro:mirror_no_contacts link="link2" />
+        <xacro:mirror_no_contacts link="link3" />
+        <xacro:mirror_no_contacts link="link4" />
+        <xacro:mirror_no_contacts link="link5" />
+        <xacro:mirror_no_contacts link="link6" />
+        <xacro:if value="$(arg with_gripper)">
+            <xacro:mirror_no_contacts link="gripper_connection" />
+            <xacro:mirror_no_contacts link="gripper_base" />
+            <xacro:mirror_no_contacts link="gripper_cable_terminal" />
+            <xacro:mirror_no_contacts link="gripper_left1" />
+            <xacro:mirror_no_contacts link="gripper_left2" />
+            <xacro:mirror_no_contacts link="gripper_left3" />
+            <xacro:mirror_no_contacts link="gripper_right1" />
+            <xacro:mirror_no_contacts link="gripper_right2" />
+            <xacro:mirror_no_contacts link="gripper_right3" />
+        </xacro:if>
+    </xacro:unless>
 
     <!-- GazeboSystem follows the URDF mimic signs through ros2_control.
          Do not also load position-writing mimic plugins here. -->

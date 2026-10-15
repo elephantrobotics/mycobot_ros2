@@ -200,13 +200,20 @@ class TeleopKeyboard(Node):
     def arm_real(self):
         if self.mode != "real" or not self.real_hold_enabled:
             return "rejected: real_hold_enabled is false (read-only startup)"
+        if self.real_transport.waiting_reason:
+            return f"waiting: {self.real_transport.waiting_reason}; release and press the motion key again after recovery"
+        if self.real_transport.error and not self.real_transport.recovery_ready:
+            return f"rejected: fault remains locked: {self.real_transport.error}"
         feedback = self._fresh_feedback()
         with self._state_lock:
             mirror = self._mirror_positions
             age = time.monotonic() - self._mirror_time
-        if (feedback is None or mirror is None or age > 0.5 or
-                max(abs(a - b) for a, b in zip(feedback[0], mirror)) > 0.01):
-            return "rejected: fresh synchronized real/Gazebo feedback required"
+        if feedback is None:
+            return "waiting: real robot feedback is missing or stale"
+        if mirror is None or age > .5:
+            return "waiting: Gazebo mirror feedback is missing or older than 0.5 s"
+        if max(abs(a - b) for a, b in zip(feedback[0], mirror)) > .01:
+            return "rejected: Gazebo mirror differs from the real robot by more than 0.01 rad"
         if "slider_control_gazebo" in self.get_node_names():
             return "rejected: competing slider controller"
         if self.get_node_names().count("teleop_keyboard_gazebo") > 1:
@@ -345,6 +352,9 @@ class TeleopKeyboard(Node):
             return "rejected: another keyboard controller is running"
         feedback = self._fresh_feedback()
         if feedback is None:
+            if self.mode == "real":
+                reason = self.real_transport.waiting_reason or self.real_transport.error or 'Real robot feedback is missing or stale'
+                return f"waiting: {reason}"
             return "rejected: Gazebo feedback is stale"
         positions, velocities = feedback
         replacing = False
@@ -816,6 +826,7 @@ class SimulationHoldWindow:
         self.pressed_code = None
         self.pressed_scan = 0
         self.displayed_keys = {}
+        self._observed_waiting_generation = 0
         self.key_state = X11KeyState()
         self.window = Window(self)
         real = getattr(node, "mode", "simulation") == "real"
@@ -841,7 +852,7 @@ class SimulationHoldWindow:
         self.status = QLabel(
             f"Gear {gear}: arm {speed:.1f} deg/s; " +
             (f"gripper {4 * gear}; " if node.with_gripper else "") +
-            "Waiting for Gazebo feedback.")
+            ("Waiting for real robot feedback." if real else "Waiting for Gazebo feedback."))
         layout.addWidget(self.status)
         self.window.resize(570, 220)
         self.timer = QTimer(self.window)
@@ -949,7 +960,7 @@ class SimulationHoldWindow:
             return
         self.release_timer.stop()
         result = self.node.press_hold(axis, direction)
-        if result.startswith("rejected"):
+        if result.startswith(("rejected", "waiting")):
             self.pressed_code = None
             self.pressed_scan = 0
         else:
@@ -999,18 +1010,28 @@ class SimulationHoldWindow:
     def tick(self):
         try:
             self._refresh_speed_display()
+            transport = getattr(self.node, "real_transport", None)
+            if transport is not None and transport.waiting_generation != self._observed_waiting_generation:
+                self._observed_waiting_generation = transport.waiting_generation
+                # A held key must be pressed again after a feedback interruption.
+                self.release()
             self.node.hold_tick()
             self._refresh_key_display()
             transport = getattr(self.node, "real_transport", None)
             if transport is not None and transport.error:
                 if transport.recovery_ready:
                     self.status.setText(
-                        "Feedback recovered and stable; motion remains locked. "
+                        f"Feedback recovered. Previous fault: {transport.last_fault or transport.error}. "
                         "Press M to explicitly re-arm after checking the scene.")
                 else:
                     self.status.setText(
                         f"Read/control fault (locked): {transport.error}. "
                         "No automatic motion recovery; hardware E-stop if physical danger.")
+            elif transport is not None and transport.waiting_reason:
+                self.status.setText(f"Waiting for feedback: {transport.waiting_reason}. Release the key; retry after recovery.")
+            elif transport is not None and self.status.text().startswith('Waiting for feedback:'):
+                self.status.setText("Feedback available. Press a motion key again." if transport.armed
+                                    else "Feedback available. Press M to enable control.")
         except Exception as exc:
             self.node.stop()
             self.status.setText(f"Control error: {exc}")
