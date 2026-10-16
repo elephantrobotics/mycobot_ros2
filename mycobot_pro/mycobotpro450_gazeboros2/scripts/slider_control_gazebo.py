@@ -523,16 +523,12 @@ class SliderControl(Node):
 
         contacts = {}
         for contact in response.contacts:
-            if contact.depth <= self.collision_depth_tolerance_m:
-                continue
+            # MoveIt already decided this state is invalid. Contact depth,
+            # including zero, must not turn that result back into a pass.
+            # Mounting contacts stay in the allowed-collision matrix.
             pair = tuple(sorted((contact.contact_body_1, contact.contact_body_2)))
             contacts[pair] = max(contacts.get(pair, 0.0), contact.depth)
 
-        # FCL can report tiny contacts at coincident triangle surfaces. Ignore
-        # only the configured numerical tolerance. An invalid response without
-        # contacts can be a constraint failure and must remain a hard failure.
-        if response.contacts and not contacts:
-            return True, {}, ""
         if not contacts:
             return False, {}, "MoveIt reported an invalid state without contacts."
         return False, contacts, ""
