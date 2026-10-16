@@ -473,9 +473,6 @@
     <gazebo reference="link2">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
-        <!-- The source DAE has zero ambient reflectance, making this link
-             black when backlit. Give Gazebo an explicit lit material. -->
-        <material>Gazebo/White</material>
     </gazebo>
     <gazebo reference="link3">
         <selfCollide>false</selfCollide>
