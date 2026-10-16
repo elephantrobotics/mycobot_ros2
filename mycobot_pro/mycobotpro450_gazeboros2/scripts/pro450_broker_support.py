@@ -7,7 +7,7 @@ READS = {'get_angles', 'is_power_on', 'is_moving', 'get_error_information', 'get
 WRITES = {
     'gui': {'send_angles', 'set_pro_gripper_angle', 'set_pro_gripper_speed', 'stop',
             'get_coords', 'get_pro_gripper_status', 'send_coords', 'is_in_position',
-            'clear_error_information'},
+            'clear_error_information', 'get_motion_status'},
     'slider': {'send_angles', 'set_pro_gripper_angle', 'set_pro_gripper_speed', 'stop'},
     'keyboard': {'send_angle', 'jog_angle', 'set_fresh_mode', 'set_pro_gripper_angle',
                  'set_pro_gripper_speed', 'stop'},

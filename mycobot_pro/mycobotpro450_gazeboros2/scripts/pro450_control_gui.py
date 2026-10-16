@@ -10,13 +10,14 @@ import uuid
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String, Empty
+from std_msgs.msg import String, Empty, Float64MultiArray
+from sensor_msgs.msg import JointState
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
     QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QDoubleSpinBox, QSpinBox,
     QPushButton)
 
-from pro450_configuration import configure_node, JOINT_LIMITS_RAD
+from pro450_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
 
 
 class GuiTransport(Node):
@@ -27,6 +28,33 @@ class GuiTransport(Node):
         self.command_pub = self.create_publisher(String, '/pro450/gui/command', 10)
         self.stop_pub = self.create_publisher(Empty, '/pro450/gui_stop', 10)
         self.create_subscription(String, '/pro450/gui/feedback', self.feedback, 1)
+        self.gripper_measured = None
+        self.gripper_received = self.gripper_sampled = float('-inf')
+        if self.with_gripper:
+            # Reuse public measurements; this display never queries the SDK.
+            self.create_subscription(JointState, '/pro450/real_joint_states', self.gripper_feedback, 1)
+            self.create_subscription(Float64MultiArray, '/pro450/real_feedback_age', self.gripper_age, 1)
+
+    def gripper_feedback(self, msg):
+        values = dict(zip(msg.name, msg.position))
+        value = values.get(GRIPPER_JOINT)
+        if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1:
+            with self.lock:
+                self.gripper_measured = value * 100.
+                self.gripper_received = time.monotonic()
+
+    def gripper_age(self, msg):
+        age = msg.data[1] if len(msg.data) > 1 else float('inf')
+        with self.lock:
+            self.gripper_sampled = (time.monotonic()-age
+                                    if math.isfinite(age) and age >= 0 else float('-inf'))
+
+    def measured_gripper(self):
+        with self.lock:
+            now = time.monotonic()
+            if now-self.gripper_received <= 1. and now-self.gripper_sampled <= 1.:
+                return self.gripper_measured
+            return None
 
     def feedback(self, msg):
         try:
@@ -85,7 +113,6 @@ class ControlWindow(QMainWindow):
         self.joints_button.clicked.connect(lambda: self.submit('joints', self.joint_inputs))
         self.coords_button.clicked.connect(lambda: self.submit('coords', self.coord_inputs))
         options = QHBoxLayout()
-        layout.addLayout(options)
         options.addWidget(QLabel('Speed'))
         self.speed = QSpinBox()
         self.speed.setRange(1, 100)
@@ -98,13 +125,23 @@ class ControlWindow(QMainWindow):
         options.addWidget(self.clear_button)
         self.command_buttons = [self.joints_button, self.coords_button, self.clear_button]
         if node.with_gripper:
-            gripper = QHBoxLayout()
-            layout.addLayout(gripper)
-            for title, value in [('Gripper Open', node.joint_limits[6][1]), ('Gripper Close', node.joint_limits[6][0])]:
-                button = QPushButton(title)
-                button.clicked.connect(lambda _, target=value: self.send('gripper', [target]))
-                gripper.addWidget(button)
-                self.command_buttons.append(button)
+            group, gripper = QGroupBox('Gripper'), QGridLayout()
+            group.setLayout(gripper)
+            layout.addWidget(group)
+            gripper.addWidget(QLabel('Target (0–100)'), 0, 0)
+            self.gripper_target = QSpinBox()
+            self.gripper_target.setRange(0, 100)
+            self.gripper_button = QPushButton('Set Gripper')
+            self.gripper_button.clicked.connect(lambda: self.send_gripper())
+            gripper.addWidget(self.gripper_target, 0, 1)
+            gripper.addWidget(self.gripper_button, 0, 2, 1, 2)
+            self.command_buttons.append(self.gripper_button)
+            gripper.addWidget(QLabel('Measured (0–100)'), 0, 4)
+            self.gripper_feedback = QLabel('—')
+            self.gripper_feedback.setMinimumWidth(65)
+            self.gripper_feedback.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            gripper.addWidget(self.gripper_feedback, 0, 5)
+        layout.addLayout(options)
         stop = QPushButton('STOP')
         stop.setStyleSheet('background: #ca2547; color: white; font-weight: bold; padding: 10px;')
         stop.clicked.connect(self.stop)
@@ -116,13 +153,18 @@ class ControlWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(50)
-        self.resize(850, 460)
+        self.resize(850, 520 if node.with_gripper else 460)
         self.refresh()
 
     def submit(self, kind, inputs):
         for control in inputs:
             control.interpretText()
         self.send(kind, [control.value() for control in inputs])
+
+    def send_gripper(self):
+        self.gripper_target.interpretText()
+        # Keep the existing normalized RPC target; the SDK receives 0..100.
+        self.send('gripper', [self.gripper_target.value() / 100.])
 
     def send(self, kind, target):
         if self.pending:
@@ -139,6 +181,9 @@ class ControlWindow(QMainWindow):
         self.node.stop_pub.publish(Empty())
 
     def refresh(self):
+        if self.node.with_gripper:
+            measured = self.node.measured_gripper()
+            self.gripper_feedback.setText('—' if measured is None else f'{measured:.0f}')
         with self.node.lock:
             data, received = self.node.snapshot, self.node.received
         ready = False

@@ -184,6 +184,7 @@ class Pro450Client(_VendorClient):
         self.owner_token = uuid.uuid4().hex
         self.invalid_frames = 0
         self.feedback_error = ''
+        self._motion_reply = None
 
     def set_angle_callback(self, callback):
         with self._feedback_lock:
@@ -228,9 +229,16 @@ class Pro450Client(_VendorClient):
                         self.read_command.discard(genre)
                         self.write_command[:] = [g for g in self.write_command if g != genre]
 
+    def get_motion_status(self):
+        """Read cached motion replies; never send a robot command."""
+        with self._feedback_lock:
+            return None if self._motion_reply is None else dict(self._motion_reply)
+
     def _send_command(self, genre, real_command):
         raw = self._flatten(real_command)
         with self._feedback_lock:
+            if genre in (0x22, 0x25):  # SEND_ANGLES / SEND_COORDS
+                self._motion_reply = {'sent': time.monotonic(), 'genre': genre, 'received': False, 'error': None}
             pending = self._pending.get(genre)
             if pending is not None:
                 pending['sent'] = time.monotonic()
@@ -269,6 +277,21 @@ class Pro450Client(_VendorClient):
         for frame in frames:
             genre = frame[3]
             with self._feedback_lock:
+                # Async vendor calls return before these replies arrive. Retain
+                # their status independently of the synchronous response queue.
+                reply = self._motion_reply
+                if reply is not None and mono >= reply['sent'] and genre in (reply['genre'], ARRIVED):
+                    code = None
+                    success = (0,)
+                    if len(frame) == 8 and frame[2] == 5 and frame[4] == 0xFF:
+                        code = frame[5]
+                        success = (0, 1)
+                    elif len(frame) == 7 and frame[2] == 4:
+                        code = frame[4]
+                    if code is not None:
+                        reply['received'] = True
+                        if code not in success and reply['error'] is None:
+                            reply['error'] = code
                 pending = self._pending.get(genre)
                 is_ack = ResponseList.key(frame)[1]
                 matches = pending is not None and pending['sent'] is not None and mono >= pending['sent']

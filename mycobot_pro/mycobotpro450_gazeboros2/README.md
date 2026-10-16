@@ -62,7 +62,7 @@ ros2 launch mycobotpro450_gazeboros2 slider_control_gazebo.launch.py environment
 # 纯仿真时使用 environment:=simulation
 ```
 
-- 启动成功后，会拉起用于`滑块和随机数操作`的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
+- 启动成功后，会拉起用于`滑块和随机数操作`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
 - `environment` 参数需要与公共环境一致。检测到路径碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
 - Force Execute 测试按钮默认隐藏，仅在启动滑块功能时显式设置 `show_force_execute:=true` 才显示。其功能为即使检测到碰撞也执行，且仅在纯仿真环境下开放。
 
@@ -75,7 +75,7 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 # 纯仿真时使用 environment:=simulation
 ```
 
-- 启动成功后，会拉起用于`键盘控制`的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
+- 启动成功后，会拉起用于`键盘控制`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
 
 真机模式下：
 
@@ -93,7 +93,7 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
 
 ## 拖动跟随
 
-先启动真机公共环境，再另开终端：
+公共环境就绪后，另开终端：
 
 ```bash
 ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
@@ -101,13 +101,13 @@ ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
 
 仅支持真机。
 
-- 启动成功后，会拉起用于`拖动跟随`的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
+- 启动成功后，会拉起用于`拖动跟随`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
 - `M`：控制六轴和夹爪使能 / 失能。六轴失能后，托住机械臂手动拖动；夹爪失能后可手动掰动。Gazebo 公共环境中的机械臂跟随真机运动。再次按下 `M`，锁紧六轴和夹爪。
 - `Q`：关闭窗口退出。
 
 ## GUI 控制
 
-先启动真机公共环境，再另开终端：
+公共环境就绪后，另开终端：
 
 ```bash
 ros2 launch mycobotpro450_gazeboros2 gui_control_gazebo.launch.py
@@ -115,11 +115,8 @@ ros2 launch mycobotpro450_gazeboros2 gui_control_gazebo.launch.py
 
 仅支持真机。
 
-- 启动成功后，会拉起用于`GUI 控制`的 Qt 界面，界面和实际功能会自动适配公共环境是否有myGripper F100 力控夹爪的情况。
-- `Set Joints`：输入 Joint 1～6 的目标角度，单位为 °，点击后执行关节运动。
-- `Set Coordinates`：输入 X、Y、Z（mm）和 RX、RY、RZ（°），点击后执行笛卡尔坐标运动。
-- `Measured` 区域持续显示当前实测关节角度和 SDK 返回的末端坐标；首次收到有效反馈时填入目标输入框，后续反馈不会覆盖编辑中的目标。
-- `Speed`：设置 SDK 速度值，范围为 1～100，默认 20。界面以百分比显示，不代表确定的末端线速度。
-- `Gripper Open` / `Gripper Close`：控制夹爪打开或闭合；无夹爪时不显示这两个按钮。
-- `Clear Errors`：手动清除控制器错误，并读取错误状态确认结果。发送坐标运动前不会自动清错；清错不会改变目标是否可解。
-- `STOP`：停止当前操作。执行或清错期间禁止重复提交命令，STOP 始终可用，操作结果在窗口底部显示。
+- 启动成功后，会拉起用于 `GUI 控制` 的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪。
+- 输入速度、目标角度或坐标后，点击 `Set Gripper`、`Set Joints` 或 `Set Coordinates`，执行相应运动。
+- 当输入坐标为奇异位置时，机械臂会运动到一半，显示 `Motion rejected: singular position` 后停止运动，link5 的 LED 光圈变成蓝色。
+- 需要点击 Qt 界面中的 `Clear Errors`，并通过角度控制脱离奇异位置，才能继续坐标运动；之后 LED 光圈变成绿色。角度运动不受奇异位置影响。
+- 角度运动的路径检测到碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。

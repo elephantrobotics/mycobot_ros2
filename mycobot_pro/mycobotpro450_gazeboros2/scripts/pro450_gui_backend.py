@@ -10,16 +10,23 @@ import time
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Empty, String
+from moveit_msgs.srv import GetStateValidity
 
 from pro450_configuration import configure_node
 from pro450_public_client import PublicPro450Client
+from pro450_collision_check import CollisionCheck, DEFAULT_COLLISION_DEPTH_TOLERANCE_M
+from pro450_real_keyboard import RealPoseReader
 
 
 class CommandStopped(Exception):
     pass
 
 
-class GuiBackend(Node):
+class CommandRejected(Exception):
+    pass
+
+
+class GuiBackend(CollisionCheck, Node):
     def __init__(self):
         super().__init__('pro450_gui_backend')
         configure_node(self)
@@ -41,6 +48,11 @@ class GuiBackend(Node):
         # This proxy claims the already-running real public bridge; it never
         # constructs an SDK connection or powers/enables any motor.
         self.mc = PublicPro450Client(feature='gui', with_gripper=self.with_gripper)
+        self.validity_client = self.create_client(GetStateValidity, '/check_state_validity')
+        self.collision_depth_tolerance_m = DEFAULT_COLLISION_DEPTH_TOLERANCE_M
+        self._joint_pose_reader = RealPoseReader(
+            self.mc, self.joint_limits, with_gripper=self.with_gripper,
+            report=self.get_logger().debug)
         self.feedback_pub = self.create_publisher(String, '/pro450/gui/feedback', 1)
         self.create_subscription(String, '/pro450/gui/command', self.command, 10)
         self.create_subscription(Empty, '/pro450/gui_stop', self.stop, 10)
@@ -106,6 +118,8 @@ class GuiBackend(Node):
                 raise ValueError('Invalid target values')
             if data['kind'] == 'gripper' and not self.with_gripper:
                 raise ValueError('No gripper is installed')
+            if data['kind'] == 'gripper' and not 0 <= data['target'][0] <= 1:
+                raise ValueError('Invalid gripper target')
             with self._lock:
                 if self._busy or self._stop.is_set():
                     raise RuntimeError('A command or STOP is in progress')
@@ -125,6 +139,52 @@ class GuiBackend(Node):
         if self._stop.is_set() or self._closing.is_set():
             raise CommandStopped()
 
+    @property
+    def _stop_requested(self):
+        # Shared collision queries use the existing GUI cancellation events.
+        return self._stop.is_set() or self._closing.is_set()
+
+    def _joint_preflight_pose(self):
+        self.cancelled()
+        try:
+            if self.with_gripper:
+                self._joint_pose_reader.force_gripper_read()
+            pose = self._joint_pose_reader(moving=False)
+        except Exception as exc:
+            self.cancelled()
+            self.get_logger().debug(f'Joint collision preflight feedback: {exc}')
+            raise CommandRejected('Current real robot pose is unavailable or stale.') from exc
+        self.cancelled()
+        return pose
+
+    def _validate_joint_target(self, target):
+        arm = [math.radians(value) for value in target]
+        if any(not lo <= value <= hi for value, (lo, hi) in zip(arm, self.joint_limits[:6])):
+            raise CommandRejected('Joint target exceeds its limits.')
+        current = self._joint_preflight_pose()
+        # Reuse the slider's full path checks, including its collision-exit rules.
+        # Never move the gripper as a side effect of a six-axis GUI command.
+        for _ in range(3):
+            self.status('Validating joint path for collisions...')
+            goal = arm + ([current[6]] if self.with_gripper else [])
+            try:
+                valid, reason = self._path_is_valid(current, goal)
+            except Exception as exc:
+                self.cancelled()
+                raise CommandRejected(f'Collision validation failed: {exc}') from exc
+            self.cancelled()
+            if not valid:
+                raise CommandRejected(reason)
+            confirmed = self._joint_preflight_pose()
+            changed = max(abs(a-b) for a, b in zip(current[:6], confirmed[:6])) > 0.01
+            if self.with_gripper:
+                changed = changed or abs(current[6] - confirmed[6]) > 1e-6
+            if not changed:
+                return
+            current = confirmed
+            self.status('Start pose changed; revalidating before motion...')
+        raise CommandRejected('Start pose keeps changing; release external control and retry.')
+
     @staticmethod
     def motion_reply(result, *, asynchronous_send=False):
         accepted = (1,) if asynchronous_send else (0, 1)
@@ -138,23 +198,45 @@ class GuiBackend(Node):
         if result not in (1, -1, None):
             raise RuntimeError(f'SDK gripper command returned {result!r}')
 
+    @staticmethod
+    def controller_error(code):
+        messages = {
+            32: 'Motion rejected: no Cartesian solution.',
+            33: 'Motion rejected: no continuous linear solution.',
+            34: 'Motion failed: velocity fusion error.',
+            35: 'Motion rejected: no continuous null-space solution.',
+            36: 'Motion rejected: singular position.',
+            49: 'Motion rejected: robot disabled.',
+            50: 'Motion failed: motor fault.',
+            51: 'Motion failed: encoder fault.',
+            52: 'Motion failed: motor execution error.',
+            53: 'Motion failed: joint position error.',
+            64: 'Motion rejected: coordinates exceed limits.',
+            10: 'Motion stopped.', 11: 'Motion stopped: emergency stop.',
+        }
+        for first, last, text in (
+                (1, 6, 'Motion rejected: joint {} near limit.'),
+                (65, 70, 'Motion failed: joint {} positioning accuracy error.'),
+                (81, 86, 'Motion stopped: joint {} collision detected.'),
+                (97, 102, 'Motion failed: joint {} communication error.'),
+                (113, 118, 'Motion failed: joint {} communication error.'),
+                (129, 134, 'Motion rejected: joint {} disabled.'),
+                (145, 150, 'Motion failed: joint {} motor fault.'),
+                (161, 166, 'Motion failed: joint {} encoder fault.'),
+                (193, 198, 'Motion failed: joint {} position error.')):
+            if first <= code <= last:
+                return text.format(code-first+1)
+        return messages.get(code, 'Motion failed: unknown controller error.')
+
     def arm_error(self, *, joint_motion=False):
         result = self.mc.get_error_information()
         if type(result) is not int or result < 0:
-            raise RuntimeError(f'SDK get_error_information returned {result!r}')
-        # Cartesian solver errors may remain latched while joint control works.
-        # Do not clear them or misreport a joint command as failed because of them.
+            raise RuntimeError('Command failed: no controller response.')
+        # A latched Cartesian error must not invalidate a working joint command.
         if joint_motion and 32 <= result <= 36:
             return
         if result:
-            description = {
-                32: 'no Cartesian solution',
-                33: 'no adjacent solution for linear motion',
-                34: 'velocity fusion error',
-                35: 'no adjacent solution for null-space motion',
-                36: 'singular position; use joint control to leave the singularity',
-            }.get(result, f'joint {result} exceeds its limit' if 1 <= result <= 6 else 'controller error')
-            raise RuntimeError(f'SDK error {result}: {description}')
+            raise RuntimeError(self.controller_error(result))
 
     def stop_robot(self):
         errors = []
@@ -184,6 +266,9 @@ class GuiBackend(Node):
             self.arm_error()
             self.status('Errors cleared: SDK reports no controller error.')
             return
+        if kind == 'joints':
+            self._validate_joint_target(target)
+            self.cancelled()
         self._active_kind = kind
         if kind == 'joints':
             self.motion_reply(self.mc.send_angles(target, speed, _async=True), asynchronous_send=True)
@@ -201,6 +286,7 @@ class GuiBackend(Node):
             raise CommandStopped()
         deadline = time.monotonic()+600.
         idle_since = None
+        reply = None
         while time.monotonic() < deadline:
             self.cancelled()
             if kind == 'gripper':
@@ -213,14 +299,21 @@ class GuiBackend(Node):
                     self.status('SDK reports gripper ' + description + '.')
                     return
             else:
+                reply = self.mc.get_motion_status()
+                if reply is not None and reply['error'] is not None:
+                    raise RuntimeError(self.controller_error(reply['error']))
                 result = self.mc.is_moving()
                 if type(result) is not int or result not in (0, 1):
-                    raise RuntimeError(f'SDK is_moving returned {result!r}')
+                    raise RuntimeError('Command failed: no controller response.')
                 if result == 0:
                     self.arm_error(joint_motion=kind == 'joints')
                     arrived = self.mc.is_in_position(target, 1 if kind == 'coords' else 0)
                     if type(arrived) is not int or arrived not in (0, 1):
-                        raise RuntimeError(f'SDK is_in_position returned {arrived!r}')
+                        raise RuntimeError('Command failed: no controller response.')
+                    # A rejection may arrive while the status queries are waiting.
+                    reply = self.mc.get_motion_status()
+                    if reply is not None and reply['error'] is not None:
+                        raise RuntimeError(self.controller_error(reply['error']))
                     if arrived == 1:
                         self.status('Motion complete: SDK confirmed the target position.')
                         return
@@ -229,8 +322,8 @@ class GuiBackend(Node):
                     if idle_since is None:
                         idle_since = time.monotonic()
                     elif time.monotonic() - idle_since >= 3.:
-                        raise RuntimeError('Robot is idle but the SDK has not confirmed the target '
-                                           '(is_moving=0, is_in_position=0)')
+                        raise RuntimeError('Motion not completed: target not reached.' if reply and reply['received']
+                                           else 'Command failed: no controller response.')
                 else:
                     idle_since = None
             self.refresh_feedback()
@@ -257,6 +350,9 @@ class GuiBackend(Node):
                 continue
             try:
                 self.execute(command)
+            except CommandRejected as exc:
+                # Validation has not sent any motion: reject without SDK writes.
+                self.status(f'Rejected: {exc}')
             except CommandStopped:
                 try:
                     self.stop_robot()
@@ -264,7 +360,10 @@ class GuiBackend(Node):
                 except Exception as exc:
                     self.status(f'STOP failed: {exc}')
             except Exception as exc:
-                message = f'Command failed: {exc}'
+                message = str(exc)
+                if not message.startswith(('Motion rejected:', 'Motion failed:', 'Motion stopped',
+                                           'Motion not completed:', 'Command failed:')):
+                    message = f'Command failed: {message}'
                 if self._active_kind is not None:
                     try:
                         self.stop_robot()

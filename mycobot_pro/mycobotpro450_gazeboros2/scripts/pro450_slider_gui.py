@@ -68,6 +68,7 @@ class SliderGuiNode(Node):
         self.create_subscription(String, "/pro450/slider_status", self._status_cb, 10)
 
         self._lock = threading.Lock()
+        self._status_revision = 0
         self._command_busy = False
         self._command_pending = False
         self.create_subscription(Bool, "/pro450/slider_busy", self._busy_cb, 10)
@@ -103,6 +104,7 @@ class SliderGuiNode(Node):
     def _status_cb(self, msg):
         with self._lock:
             self._status = msg.data
+            self._status_revision += 1
             # A request can be rejected before the controller enters busy.
             # Clearing pending does not override the controller's busy state.
             if msg.data.startswith(("Rejected:", "Cancelled", "Execution complete",
@@ -122,10 +124,11 @@ class SliderGuiNode(Node):
 
 
 
-    def snapshot(self):
+    def snapshot(self, include_status_revision=False):
         with self._lock:
             actual = list(self._actual) if self._actual is not None else None
-            return actual, self._actual_time, self._feedback_valid, self._status
+            values = (actual, self._actual_time, self._feedback_valid, self._status)
+            return values + (self._status_revision,) if include_status_revision else values
 
 
     def execute(self, positions_rad, speed_percent, force_collision=False):
@@ -165,6 +168,7 @@ class Pro450SliderWindow(QMainWindow):
         self.target_initialized = False
         self.user_edited_target = False
         self.last_status = None
+        self.last_status_revision = None
         self.sliders = []
         self.target_boxes = []
         self.actual_labels = []
@@ -276,7 +280,7 @@ class Pro450SliderWindow(QMainWindow):
             self.user_edited_target = True
 
     def _refresh(self):
-        actual, actual_time, state_is_finite, status = self.node.snapshot()
+        actual, actual_time, state_is_finite, status, revision = self.node.snapshot(include_status_revision=True)
         feedback_ok = (
             actual is not None
             and time.monotonic() - actual_time < 1.0
@@ -312,17 +316,20 @@ class Pro450SliderWindow(QMainWindow):
                 if self.node.environment == "real"
                 else "Execute disabled: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset the simulation first."
             )
-        elif status != self.last_status:
+        elif status != self.last_status or revision != self.last_status_revision:
             self.last_status = status
+            self.last_status_revision = revision
             self.status_label.setText(status)
 
     def _execute(self):
         positions = self._target_positions_rad()
+        previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, self.speed_box.value()):
             return
         self.execute_button.setEnabled(False)
         self.force_execute_button.setEnabled(self.node.environment != "simulation")
-        self.last_status = self.node.snapshot()[3]
+        # Capture before publish so even an immediate reply is rendered.
+        self.last_status, self.last_status_revision = previous_status
         self.status_label.setText("Command submitted; waiting for validation...")
         self.user_edited_target = False
 
@@ -352,11 +359,13 @@ class Pro450SliderWindow(QMainWindow):
 
         positions = self._target_positions_rad()
         forced_speed = self.speed_box.value()
+        previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, forced_speed, force_collision=True):
             return
         self.execute_button.setEnabled(False)
         self.force_execute_button.setEnabled(False)
-        self.last_status = self.node.snapshot()[3]
+        # Capture before publish so even an immediate reply is rendered.
+        self.last_status, self.last_status_revision = previous_status
         self.status_label.setText(
             f"FORCE simulation command submitted at {forced_speed}% maximum; "
             "collision validation and physical self-contact will be bypassed."
