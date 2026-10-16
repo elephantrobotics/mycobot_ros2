@@ -34,6 +34,8 @@ from pro630_model import DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT, MAX_VELOCITY_RA
 
 from pro630_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
 COMMAND_JOINTS = joints(True)
+# Match Pro450 operator speed in simulation; keep native real-motion limits.
+SIMULATION_MAX_VELOCITY_RAD_S = (1.0,) * 7
 MIN_TRAJECTORY_DURATION = 0.5
 MAX_TRAJECTORY_DURATION = 600.0
 SPLINE_PEAK_VELOCITY_FACTOR = 1.5
@@ -415,7 +417,8 @@ class SliderControl(CollisionCheck, Node):
                     self._publish_status(f"Rejected: {reason}")
                     return
 
-            duration = self._trajectory_duration(current, target, speed_scale)
+            duration = self._trajectory_duration(
+                current, target, speed_scale, velocity_limits=SIMULATION_MAX_VELOCITY_RAD_S)
             if self._stop_requested:
                 self._publish_status("Cancelled before execution.")
                 return
@@ -441,9 +444,10 @@ class SliderControl(CollisionCheck, Node):
 
 
     @staticmethod
-    def _trajectory_duration(current, target, speed_scale):
+    def _trajectory_duration(current, target, speed_scale, velocity_limits=None):
+        limits = MAX_VELOCITY_RAD_S if velocity_limits is None else velocity_limits
         durations = []
-        for start, end, maximum in zip(current, target, MAX_VELOCITY_RAD_S):
+        for start, end, maximum in zip(current, target, limits):
             # joint_trajectory_controller uses spline interpolation.  With
             # zero endpoint velocity, peak speed is about 1.5x the average,
             # so size the duration for the peak rather than the average.
