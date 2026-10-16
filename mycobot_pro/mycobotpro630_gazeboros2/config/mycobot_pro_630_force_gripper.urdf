@@ -361,10 +361,10 @@
     <joint name="joint6_to_gripper_connect" type="fixed">
         <parent link="link6" />
         <child link="gripper_connection" />
-        <!-- Align the connector mounting plane and bolt-circle center with
-             the link6 flange. Move the complete visual/collision subtree;
-             retain the existing mounting rotation and finger geometry. -->
-        <origin xyz="0.001 0.0 -0.001" rpy="1.5708 0 1.5708" />
+        <!-- Rotate the complete gripper around the flange center (~22.5 deg)
+             and align the three mounting-hole axes. Preserve axial spacing
+             and all geometry/internal gripper transforms. -->
+        <origin xyz="0.00100009253398768 0.000382689546078907 -0.00092260545579551" rpy="1.57069206326867 -0.3927026643656 1.57083622706422" />
         <dynamics damping="0.1" friction="0.1" />
     </joint>
     </xacro:if>
@@ -473,9 +473,6 @@
     <gazebo reference="link2">
         <selfCollide>false</selfCollide>
         <gravity>false</gravity>
-        <!-- The source DAE has zero ambient reflectance, making this link
-             black when backlit. Give Gazebo an explicit lit material. -->
-        <material>Gazebo/White</material>
     </gazebo>
     <gazebo reference="link3">
         <selfCollide>false</selfCollide>
