@@ -22,6 +22,7 @@ from pro450_real_keyboard import RealPoseReader, sdk_speed_for_rad
 from pro450_public_client import PublicPro450Client as Pro450Client
 from pro450_feedback import attach_feedback
 from pro450_gripper_control import gripper_speed_for_percentage
+from pro450_control_logging import emit_log
 from pro450_scene_support import CollisionSceneSupport
 from pro450_collision_check import (
     CollisionCheck, COLLISION_SAMPLE_STEP, MAX_COLLISION_SAMPLES,
@@ -157,12 +158,12 @@ class SliderControl(CollisionCheck, Node):
         else:
             self._publish_status("Ready: Gazebo simulation mode.")
 
-    def _publish_status(self, message):
-        self.get_logger().info(message)
+    def _publish_status(self, message, level="info"):
         msg = String()
         msg.data = message
         self.status_pub.publish(msg)
         self._publish_command_busy()
+        emit_log(self.get_logger(), message, level)
 
     def _publish_command_busy(self):
         if self.busy_pub is not None:
@@ -325,30 +326,30 @@ class SliderControl(CollisionCheck, Node):
     def _force_target_cb(self, msg):
         if self.mode != 1:
             self._publish_status(
-                "Rejected: collision override is disabled in Real Robot + Gazebo mode."
+                "Rejected: collision override is disabled in Real Robot + Gazebo mode.", level="warning"
             )
             return
         self._handle_target(msg, force_collision=True)
 
     def _handle_target(self, msg, force_collision):
         if "teleop_keyboard_gazebo" in self.get_node_names():
-            self._publish_status("Rejected: keyboard controller is running.")
+            self._publish_status("Rejected: keyboard controller is running.", level="warning")
             return
         values = dict(zip(msg.name, msg.position))
         if (len(msg.name) != len(self.command_joints) or len(msg.position) != len(self.command_joints)
                 or set(msg.name) != set(self.command_joints)):
-            self._publish_status("Rejected: target joints do not match the installation profile.")
+            self._publish_status("Rejected: target joints do not match the installation profile.", level="warning")
             return
 
         target = [float(values[name]) for name in self.command_joints]
         if not all(math.isfinite(value) for value in target):
-            self._publish_status("Rejected: target contains NaN or infinity.")
+            self._publish_status("Rejected: target contains NaN or infinity.", level="warning")
             return
 
         for name, value, limits in zip(self.command_joints, target, self.joint_limits):
             if not limits[0] <= value <= limits[1]:
                 self._publish_status(
-                    f"Rejected: {name}={value:.4f} rad is outside its limits."
+                    f"Rejected: {name}={value:.4f} rad is outside its limits.", level="warning"
                 )
                 return
 
@@ -369,7 +370,7 @@ class SliderControl(CollisionCheck, Node):
 
         with self._state_lock:
             if self._command_active:
-                self._publish_status("Rejected: a command is already being validated/executed.")
+                self._publish_status("Rejected: a command is already being validated/executed.", level="warning")
                 return
             current = (
                 list(self._current_positions)
@@ -391,7 +392,7 @@ class SliderControl(CollisionCheck, Node):
             with self._state_lock:
                 self._command_active = False
             self._publish_status(
-                "Rejected: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset simulation."
+                "Rejected: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset simulation.", level="warning"
             )
             return
 
@@ -406,13 +407,13 @@ class SliderControl(CollisionCheck, Node):
             if force_collision:
                 self._publish_status(
                     "WARNING: simulation-only collision override active; "
-                    "MoveIt collision validation is being skipped."
+                    "MoveIt collision validation is being skipped.", level="warning"
                 )
             else:
                 self._publish_status("Validating interpolated path for collisions...")
                 valid, reason = self._path_is_valid(current, target)
                 if not valid:
-                    self._publish_status(f"Rejected: {reason}")
+                    self._publish_status(f"Rejected: {reason}", level="warning")
                     return
 
             duration = self._trajectory_duration(current, target, speed_scale)
@@ -432,8 +433,7 @@ class SliderControl(CollisionCheck, Node):
             else:
                 self._publish_status("Execution complete.")
         except Exception as exc:
-            self.get_logger().error(f"Slider command failed: {exc}")
-            self._publish_status(f"Execution failed: {exc}")
+            self._publish_status(f"Execution failed: {exc}", level="error")
         finally:
             with self._state_lock:
                 self._command_active = False
@@ -491,7 +491,7 @@ class SliderControl(CollisionCheck, Node):
     def _queue_real_motion(self, target, speed_scale):
         with self._state_lock:
             if self._command_active:
-                self._publish_status("Rejected: a command is already being validated/executed.")
+                self._publish_status("Rejected: a command is already being validated/executed.", level="warning")
                 return
             self._command_active = True
             self._stop_requested = False
@@ -502,7 +502,7 @@ class SliderControl(CollisionCheck, Node):
         except queue.Full:
             with self._state_lock:
                 self._command_active = False
-            self._publish_status("Rejected: a command is already being validated/executed.")
+            self._publish_status("Rejected: a command is already being validated/executed.", level="warning")
 
     def _read_real_positions(self, moving=None):
         pose = self._pose_reader(moving=self._arm_moving if moving is None else moving)
@@ -698,7 +698,7 @@ class SliderControl(CollisionCheck, Node):
             self._publish_status("Cancelled before execution.")
             return
         if "teleop_keyboard_gazebo" in self.get_node_names():
-            self._publish_status("Rejected: keyboard controller is running.")
+            self._publish_status("Rejected: keyboard controller is running.", level="warning")
             return
         if self.with_gripper:
             self._pose_reader.cached_gripper()
@@ -708,13 +708,13 @@ class SliderControl(CollisionCheck, Node):
                 self._publish_status("Cancelled before execution.")
             else:
                 self._publish_status(
-                    f"Rejected: Gazebo differs from the real robot by more than {REAL_POSE_TOLERANCE_RAD:.2f} rad."
+                    f"Rejected: Gazebo differs from the real robot by more than {REAL_POSE_TOLERANCE_RAD:.2f} rad.", level="warning"
                 )
             return
         while not self._stop_requested:
             valid, reason = self._validate_real_motion(current, target)
             if not valid:
-                self._publish_status(f"Rejected: {reason}")
+                self._publish_status(f"Rejected: {reason}", level="warning")
                 return
             confirmed = self._read_real_positions(moving=True)
             changed = max(abs(a-b) for a,b in zip(confirmed,current)) > 0.01
@@ -758,7 +758,7 @@ class SliderControl(CollisionCheck, Node):
         if not sdk_motion_accepted(result):
             self._stop_real_motion()
             self._publish_status(
-                f"Real robot command failed: send_angles returned {result!r}")
+                f"Real robot command failed: send_angles returned {result!r}", level="error")
             return
         if not self._follow_real_line(
                 current, target, duration * 2.0 + REAL_ARRIVAL_MARGIN_S):
@@ -776,7 +776,7 @@ class SliderControl(CollisionCheck, Node):
                     self._stop_real_motion()
                     self._publish_status("Execution stopped.")
                 except Exception as exc:
-                    self._publish_status(f"Real robot STOP failed: {exc}")
+                    self._publish_status(f"Real robot STOP failed: {exc}", level="error")
                 continue
             try:
                 target, speed_scale = self.command_queue.get(timeout=0.1)
@@ -794,7 +794,7 @@ class SliderControl(CollisionCheck, Node):
             try:
                 self._run_real_motion(target, speed_scale)
             except Exception as exc:
-                self._publish_status(f"Real robot command failed: {exc}")
+                self._publish_status(f"Real robot command failed: {exc}", level="error")
                 try:
                     self._stop_real_motion()
                 except Exception:

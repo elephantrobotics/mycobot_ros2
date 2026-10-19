@@ -56,6 +56,7 @@ install(FILES scripts/pro450_configuration.py scripts/pro450_hold_profile.py scr
   scripts/pro450_sdk_adapter.py scripts/pro450_feedback.py
   scripts/pro450_gripper_control.py scripts/pro450_scene_support.py
   scripts/pro450_collision_check.py
+  scripts/pro450_control_logging.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
