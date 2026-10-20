@@ -16,6 +16,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from pro630_feedback import attach_feedback
+from pro630_control_logging import ControlLog
 from pro630_configuration import configure_node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from pro630_hold_profile import (
@@ -330,9 +331,9 @@ class TeleopKeyboard(Node):
         with self._hold_lock:
             self._hold_speed_gear = gear
         self.get_logger().info(
-            f"Keyboard speed gear {gear}: "
+            f"Gear {gear}: "
             f"arm {math.degrees(HOLD_SPEED_GEARS[gear - 1]):.1f} deg/s; " +
-            (f"gripper {4 * gear}" if self.with_gripper else ""))
+            (f"gripper {4 * gear}." if self.with_gripper else ""))
 
     def hold_speed_status(self):
         with self._hold_lock:
@@ -937,15 +938,18 @@ class SimulationHoldWindow:
                 self.owner.key_release(event)
 
             def focusOutEvent(self, event):
-                self.owner.release()
+                self.owner.log.event("Window focus lost; releasing held keys.")
+                self.owner.release(source="focus lost")
                 super().focusOutEvent(event)
 
             def closeEvent(self, event):
-                self.owner.release()
+                self.owner.log.event("Keyboard window closed.")
+                self.owner.release(source="window closed")
                 self.owner.closing = True
                 event.accept()
 
         self.node = node
+        self.log = ControlLog(node.get_logger())
         self.Qt = Qt
         self.closing = False
         self.pressed_code = None
@@ -979,6 +983,7 @@ class SimulationHoldWindow:
             (f"gripper {4 * gear}; " if node.with_gripper else "") +
             ("Waiting for real robot feedback." if real else "Waiting for Gazebo feedback."))
         layout.addWidget(self.status)
+        self.log.event(self.status.text())
         self.window.resize(570, 220)
         self.timer = QTimer(self.window)
         self.timer.setInterval(50)
@@ -994,11 +999,22 @@ class SimulationHoldWindow:
         self.window.activateWindow()
         self.window.setFocus()
 
-    def release(self, clear_keys=True):
+    def _set_status(self, text, level='info', state=None, log=True):
+        self.status.setText(text)
+        if not log:
+            return
+        if state is None:
+            self.log.event(text, level)
+        else:
+            self.log.state('status', state, text, level)
+
+    def release(self, clear_keys=True, source='control reset'):
         self.release_timer.stop()
         self.pressed_code = None
         self.pressed_scan = 0
         if clear_keys:
+            for key in self.displayed_keys.values():
+                self.log.event(f"Key {key} cleared ({source}; synthetic release).")
             self.displayed_keys.clear()
         self.node.release_hold()
         self._refresh_key_display()
@@ -1010,16 +1026,17 @@ class SimulationHoldWindow:
             return
         self.release(clear_keys=False)
         ready = getattr(self.node, "mode", "") == "real"
-        self.status.setText("Ready: hold a key to move." if ready
+        self._set_status("Ready: hold a key to move." if ready
                             else "Key released: decelerating.")
 
     def request_exit(self, source):
         from python_qt_binding.QtWidgets import QApplication
         if self.closing:
             os._exit(0)
+        self.log.event(f"{source}: exit requested.")
         self.closing = True
-        self.release()
-        self.status.setText(f"{source}: braking, then exiting.")
+        self.release(source=source)
+        self._set_status(f"{source}: braking, then exiting.")
         app = QApplication.instance()
         if app is not None:
             app.quit()
@@ -1035,6 +1052,8 @@ class SimulationHoldWindow:
         )
         if functional_key and not event.isAutoRepeat():
             from python_qt_binding.QtGui import QKeySequence
+            if event.key() not in self.displayed_keys:
+                self.log.event(f"Key {QKeySequence(event.key()).toString() or event.text().upper()} pressed.")
             self.displayed_keys.pop(event.key(), None)
             self.displayed_keys[event.key()] = QKeySequence(event.key()).toString() or event.text().upper()
             self._refresh_key_display()
@@ -1046,10 +1065,12 @@ class SimulationHoldWindow:
             return
         if getattr(self.node, "mode", "simulation") == "real" and key in ("m", "n"):
             if key == "m":
-                self.status.setText(self.node.arm_real())
+                result = self.node.arm_real()
+                self._set_status(result, "warning" if not self.node.real_transport.armed else "info")
             else:
                 self.node.stop()
-                self.status.setText("STOP requested; real controls locked.")
+                # stop() already prints this exact response.
+                self._set_status("STOP requested; real controls locked.", log=False)
             self._refresh_key_display()
             return
         if key in ("1", "2", "3", "4", "5", "+", "=", "-", "_"):
@@ -1062,15 +1083,15 @@ class SimulationHoldWindow:
                 gear = int(key)
             self.node.set_hold_speed_gear(gear)
             _, speed = self.node.hold_speed_status()
-            self.status.setText(
+            self._set_status(
                 f"Gear {gear}: arm {speed:.1f} deg/s; " +
-                (f"gripper {4 * gear}." if self.node.with_gripper else ""))
+                (f"gripper {4 * gear}." if self.node.with_gripper else ""), log=False)
             return
         if event.key() == self.Qt.Key_Space:
             self.pressed_code = None
             self.node.stop()
             self._refresh_key_display()
-            self.status.setText("STOP requested (not a hardware E-stop).")
+            self._set_status("STOP requested (not a hardware E-stop).")
             return
         if event.key() == self.Qt.Key_Q:
             self.request_exit("Q")
@@ -1092,7 +1113,8 @@ class SimulationHoldWindow:
             self.pressed_code = event.key()
             self.pressed_scan = int(event.nativeScanCode() or 0)
         self._refresh_key_display()
-        self.status.setText(f"Joint {axis + 1}: {result}.")
+        self._set_status(f"Joint {axis + 1}: {result}.",
+                         "warning" if result.startswith(("rejected", "waiting")) else "info")
 
     def key_release(self, event):
         if event.isAutoRepeat():
@@ -1100,7 +1122,9 @@ class SimulationHoldWindow:
         # Preserve the display across X11's synthetic auto-repeat releases.
         scan = int(event.nativeScanCode() or 0)
         if hold_release_action(self.key_state.down(scan)) != "ignore":
-            self.displayed_keys.pop(event.key(), None)
+            label = self.displayed_keys.pop(event.key(), None)
+            if label is not None:
+                self.log.event(f"Key {label} released.")
             self._refresh_key_display()
         if event.key() != self.pressed_code:
             return
@@ -1113,12 +1137,12 @@ class SimulationHoldWindow:
         if action == "release":
             self.release(clear_keys=False)
             ready = getattr(self.node, "mode", "") == "real"
-            self.status.setText("Ready: hold a key to move." if ready
+            self._set_status("Ready: hold a key to move." if ready
                                 else "Key released: decelerating.")
             return
         self.pressed_scan = scan
         self.release_timer.start()
-        self.status.setText("Key release detected: decelerating after debounce.")
+        self._set_status("Key release detected: decelerating after debounce.")
 
     def _refresh_key_display(self):
         key = self.displayed_keys.get(self.pressed_code) if not self.node.hold_idle() else None
@@ -1146,26 +1170,31 @@ class SimulationHoldWindow:
                 notice = self.node._hold_notice
                 self.node._hold_notice = None
             if notice:
-                self.status.setText(notice)
+                self._set_status(notice, "warning")
             transport = getattr(self.node, "real_transport", None)
             if transport is not None and transport.error:
                 if transport.recovery_ready:
-                    self.status.setText(
+                    self._set_status(
                         f"Feedback recovered. Previous fault: {transport.last_fault or transport.error}. "
-                        "Press M to explicitly re-arm after checking the scene.")
+                        "Press M to explicitly re-arm after checking the scene.",
+                        level="warning", state=("recovered", transport.last_fault or transport.error))
                 else:
-                    self.status.setText(
+                    self._set_status(
                         f"Read/control fault (locked): {transport.error}. "
-                        "No automatic motion recovery; hardware E-stop if physical danger.")
+                        "No automatic motion recovery; hardware E-stop if physical danger.",
+                        level="error", state=("fault", transport.error))
             elif transport is not None and transport.waiting_reason:
-                self.status.setText(f"Waiting for feedback: {transport.waiting_reason}. Release the key; retry after recovery.")
+                self._set_status(f"Waiting for feedback: {transport.waiting_reason}. Release the key; retry after recovery.",
+                                 level="warning", state=("waiting", transport.waiting_reason))
             elif transport is not None and self.status.text().startswith('Waiting for feedback:'):
-                self.status.setText("Feedback available. Press a motion key again." if transport.armed
+                self._set_status("Feedback available. Press a motion key again." if transport.armed
                                     else "Feedback available. Press M to enable control.")
+                self.log.clear("status")
+            else:
+                self.log.clear("status")
         except Exception as exc:
             self.node.stop()
-            self.status.setText(f"Control error: {exc}")
-            self.node.get_logger().error(f"Simulation hold failed: {exc}")
+            self._set_status(f"Control error: {exc}", "error", state=("control_error", str(exc)))
         if self.closing and self.node.hold_idle():
             self.window.close()
 
