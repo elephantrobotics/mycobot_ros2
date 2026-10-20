@@ -34,6 +34,7 @@ from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 sys.path.insert(0, os.path.join(get_package_prefix("mycobotpro630_gazeboros2"), "lib", "mycobotpro630_gazeboros2"))
 from pro630_configuration import controllers as profile_controllers, controller_config, project_moveit
+from pro630_model import DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
@@ -407,8 +408,8 @@ def _build_environment(context):
                 description="Pro630 environment: simulation or real-pose mirror.",
             ),
             DeclareLaunchArgument("gazebo_gui", default_value="true"),
-            DeclareLaunchArgument("pro630_ip", default_value="192.168.1.191"),
-            DeclareLaunchArgument("pro630_port", default_value="5001"),
+            DeclareLaunchArgument("pro630_ip", default_value=DEFAULT_PRO630_IP),
+            DeclareLaunchArgument("pro630_port", default_value=str(DEFAULT_PRO630_PORT)),
             DeclareLaunchArgument(
                 "real_snapshot_file",
                 default_value=DEFAULT_REAL_SNAPSHOT_FILE,

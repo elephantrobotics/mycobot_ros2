@@ -33,6 +33,7 @@ from python_qt_binding.QtWidgets import (
 )
 
 
+from pro630_control_logging import ControlLog, command_details, track_speed
 from pro630_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
 COMMAND_JOINTS = joints(True)
 RAD_DISPLAY_DECIMALS = 4
@@ -164,6 +165,7 @@ class Pro630SliderWindow(QMainWindow):
     def __init__(self, node):
         super().__init__()
         self.node = node
+        self.log = ControlLog(node.get_logger())
         self.target_initialized = False
         self.user_edited_target = False
         self.last_status = None
@@ -238,6 +240,7 @@ class Pro630SliderWindow(QMainWindow):
         self.speed_box.setValue(20)
         self.speed_box.setSuffix(" %")
         controls.addWidget(self.speed_box)
+        track_speed(self.speed_box, self.log)
         controls.addStretch(1)
 
         self.randomize_button = QPushButton("Randomize Target")
@@ -269,6 +272,7 @@ class Pro630SliderWindow(QMainWindow):
         outer.addLayout(controls)
 
         self.status_label = QLabel(self.node._status)
+        self.log.event(self.node._status)
         self.status_label.setWordWrap(True)
         outer.addWidget(self.status_label)
 
@@ -311,63 +315,87 @@ class Pro630SliderWindow(QMainWindow):
         self.force_execute_button.setEnabled(self.node.environment != "simulation" or can_execute)
         if not feedback_ok:
             self.last_status = None
-            self.status_label.setText(
+            self._set_status(
                 (f"Execute disabled: real robot feedback is stale (age {time.monotonic() - actual_time:.1f}s)."
                  if actual is not None else "Execute disabled: waiting for real robot feedback.")
                 if self.node.environment == "real"
-                else "Execute disabled: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset the simulation first."
+                else "Execute disabled: Gazebo position/velocity feedback is missing, stale, or contains NaN. Restart/reset the simulation first.",
+                state="unavailable", level="warning"
             )
-        elif status != self.last_status or revision != self.last_status_revision:
+        else:
+            self.log.state("feedback", "available", "Position feedback available.")
+        if feedback_ok and (status != self.last_status or revision != self.last_status_revision):
             self.last_status = status
             self.last_status_revision = revision
-            self.status_label.setText(status)
+            self._set_status(status, log=False)
+
+    def _set_status(self, text, *, state=None, level='info', log=True):
+        self.status_label.setText(text)
+        if log:
+            if state is None:
+                self.log.event(text, level)
+            else:
+                self.log.state('feedback', state, text, level)
+
+    def closeEvent(self, event):
+        self.log.event('Slider window closed.')
+        super().closeEvent(event)
 
     def _execute(self):
         positions = self._target_positions_rad()
+        self.log.event(command_details("Execute", positions, self.speed_box.value()))
         previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, self.speed_box.value()):
+            self.log.event("Execute not submitted: a command is already pending or busy.", "warning")
             return
         self.execute_button.setEnabled(False)
         self.force_execute_button.setEnabled(self.node.environment != "simulation")
         # Capture before publish so even an immediate reply is rendered.
         self.last_status, self.last_status_revision = previous_status
-        self.status_label.setText("Command submitted; waiting for validation...")
+        self._set_status("Command submitted; waiting for validation...")
         self.user_edited_target = False
 
     def _force_execute(self):
+        self.log.event("Force Execute requested.")
         if self.node.environment != "simulation":
-            QMessageBox.warning(
-                self, "Force Execute Unavailable",
-                "Force Execute is available only in Simulation mode.\n"
-                "This action is disabled in Real Robot mode. No motion command has been sent.",
-            )
+            text = ("Force Execute is available only in Simulation mode.\n"
+                    "This action is disabled in Real Robot mode. No motion command has been sent.")
+            self.log.event(text, 'warning')
+            QMessageBox.warning(self, "Force Execute Unavailable", text)
             return
         if self.node.command_busy():
+            self.log.event("Force Execute not submitted: a command is already pending or busy.", "warning")
             return
-        answer = QMessageBox.warning(
-            self,
-            "Simulation Collision Override",
+        text = (
             "This bypasses MoveIt collision rejection and is allowed only in "
             "Gazebo simulation mode. Motion uses the speed selected in the slider window. "
             "Joint limits, finite feedback, and STOP remain active. Gazebo physical self-contact is "
             "disabled, so intersecting robot links will not stop the motion.\n\n"
-            "Execute this target anyway?",
+            "Execute this target anyway?"
+        )
+        self.log.event(text, "warning")
+        answer = QMessageBox.warning(
+            self, "Simulation Collision Override", text,
             QMessageBox.Yes | QMessageBox.Cancel,
             QMessageBox.Cancel,
         )
         if answer != QMessageBox.Yes:
+            self.log.event("Force Execute cancelled; no command submitted.")
             return
+        self.log.event("Force Execute confirmed.")
 
         positions = self._target_positions_rad()
         forced_speed = self.speed_box.value()
+        self.log.event(command_details("Force Execute", positions, forced_speed))
         previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, forced_speed, force_collision=True):
+            self.log.event("Force Execute not submitted: a command is already pending or busy.", "warning")
             return
         self.execute_button.setEnabled(False)
         self.force_execute_button.setEnabled(False)
         # Capture before publish so even an immediate reply is rendered.
         self.last_status, self.last_status_revision = previous_status
-        self.status_label.setText(
+        self._set_status(
             f"FORCE simulation command submitted at {forced_speed}% maximum; "
             "collision validation and physical self-contact will be bypassed."
         )
@@ -381,7 +409,8 @@ class Pro630SliderWindow(QMainWindow):
         if self.node.with_gripper:
             self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
         self.user_edited_target = True
-        self.status_label.setText(
+        self.log.event(f"Target loaded (rad; gripper normalized 0..1): {self._target_positions_rad()}.")
+        self._set_status(
             "Random target generated. Review it, then press Execute to validate and move."
         )
 
@@ -390,7 +419,8 @@ class Pro630SliderWindow(QMainWindow):
         for box in self.target_boxes:
             box.setValue(0.0)
         self.user_edited_target = True
-        self.status_label.setText(
+        self.log.event(f"Target loaded (rad; gripper normalized 0..1): {self._target_positions_rad()}.")
+        self._set_status(
             "Zero target loaded. Press Execute to validate and return to zero."
         )
 
@@ -405,8 +435,9 @@ class Pro630SliderWindow(QMainWindow):
         return positions
 
     def _stop(self):
+        self.log.event('STOP requested.')
         self.node.stop()
-        self.status_label.setText("STOP requested.")
+        self._set_status("STOP requested.", log=False)
 
 
 def main(args=None):
@@ -418,8 +449,11 @@ def main(args=None):
     # Let Qt own process termination.  rclpy's default signal path can shut
     # the context down in the middle of a Qt timer callback and print a
     # spurious KeyboardInterrupt traceback during an otherwise normal exit.
-    signal.signal(signal.SIGINT, lambda *_args: app.quit())
-    signal.signal(signal.SIGTERM, lambda *_args: app.quit())
+    def interrupted(source):
+        window.log.event(f'{source}: exit requested.')
+        app.quit()
+    signal.signal(signal.SIGINT, lambda *_args: interrupted('Ctrl+C'))
+    signal.signal(signal.SIGTERM, lambda *_args: interrupted('SIGTERM'))
 
     ros_timer = QTimer()
 
@@ -448,6 +482,7 @@ def main(args=None):
     except KeyboardInterrupt:
         exit_code = 0
     finally:
+        window.log.event('Slider event loop exiting.')
         ros_timer.stop()
         node.destroy_node()
         rclpy.try_shutdown()

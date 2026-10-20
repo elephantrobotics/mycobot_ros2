@@ -23,7 +23,8 @@ def set_drag_enabled(sdk, enabled, with_gripper=True):
 
 
 class DragState:
-    def __init__(self, sdk, enabled=True, clock=time.monotonic, with_gripper=True):
+    def __init__(self, sdk, enabled=True, clock=time.monotonic, with_gripper=True, report=None):
+        self.report = report or (lambda text, level='info': None)
         self.with_gripper = with_gripper
         self.sdk, self.clock = sdk, clock
         self.lock = threading.Lock()
@@ -38,32 +39,45 @@ class DragState:
     def request_toggle(self):
         with self.lock:
             if self.pending:
-                return False
-            if self.latest is None or self.clock() - self.latest[0] > .5:
+                message, level, accepted = 'Motor switch ignored: another switch is in progress.', 'warning', False
+            elif self.latest is None or self.clock() - self.latest[0] > .5:
                 self.message = 'Fresh joint feedback is required before switching motor state.'
-                return False
-            # Enabled -> disable; unknown -> enable for explicit recovery.
-            self.request = False if self.enabled is True else True
-            self.pending = True
-            self.message = ('Switching arm and gripper enable states...' if self.with_gripper
-                            else 'Switching arm enable state...')
-            return True
+                message, level, accepted = self.message, 'warning', False
+            else:
+                # Enabled -> disable; unknown -> enable for explicit recovery.
+                self.request = False if self.enabled is True else True
+                self.pending = True
+                self.message = ('Switching arm and gripper enable states...' if self.with_gripper
+                                else 'Switching arm enable state...')
+                target = self.request
+                message, level, accepted = self.message, 'info', True
+        if accepted:
+            self.report('Motor switch requested: ' + ('enable.' if target else 'release.'))
+        self.report(message, level)
+        return accepted
 
     def apply_request(self):
         with self.lock:
             if not self.pending:
                 return
             target = self.request
+            cancelled = False
             if self.latest is None or self.clock() - self.latest[0] > .5:
                 self.pending = False
                 self.message = 'Motor switch cancelled: joint feedback is stale.'
-                return
+                cancelled = True
+                message = self.message
+        if cancelled:
+            self.report(message, 'warning')
+            return
+        level = 'info'
         try:
             set_drag_enabled(self.sdk, target, self.with_gripper)
         except Exception as exc:
             with self.lock:
                 self.enabled = None
                 self.message = str(exc) + '. Press M to request enable.'
+                level = 'error'
         else:
             with self.lock:
                 self.enabled = target
@@ -75,6 +89,8 @@ class DragState:
         finally:
             with self.lock:
                 self.pending = False
+                message = self.message
+            self.report(message, level)
 
     def observe(self, angles, measured, wall):
         if (len(angles) != 6 or not all(isinstance(v, (int, float)) and not isinstance(v, bool)

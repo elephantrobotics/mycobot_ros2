@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
     QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QDoubleSpinBox, QSpinBox,
     QPushButton)
 
+from pro630_control_logging import ControlLog, command_details, track_speed
 from pro630_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
 
 
@@ -69,6 +70,7 @@ class ControlWindow(QMainWindow):
     def __init__(self, node):
         super().__init__()
         self.node, self.seeded, self.pending = node, False, False
+        self.log = ControlLog(node.get_logger())
         self.pending_since = 0.
         self.command_id = ''
         self.setWindowTitle('Pro630 GUI Control')
@@ -118,6 +120,7 @@ class ControlWindow(QMainWindow):
         self.speed.setRange(1, 100)
         self.speed.setValue(20)
         self.speed.setSuffix(' %')
+        track_speed(self.speed, self.log)
         options.addWidget(self.speed)
         options.addStretch()
         self.clear_button = QPushButton('Clear Errors')
@@ -147,6 +150,7 @@ class ControlWindow(QMainWindow):
         stop.clicked.connect(self.stop)
         layout.addWidget(stop)
         self.status = QLabel('Connecting to the robot...')
+        self.log.event(self.status.text())
         self.status.setWordWrap(True)
         self.status.setMinimumHeight(50)
         layout.addWidget(self.status)
@@ -167,16 +171,20 @@ class ControlWindow(QMainWindow):
         self.send('gripper', [self.gripper_target.value() / 100.])
 
     def send(self, kind, target):
+        self.log.event(command_details(kind, target, self.speed.value()))
         if self.pending:
+            self.log.event("Command not submitted: waiting for command acknowledgement.", "warning")
             return
         self.pending, self.pending_since = True, time.monotonic()
         self.command_id = uuid.uuid4().hex
+        self.log.event(f"Command submitted: kind={kind}, id={self.command_id}.")
         self.node.command_pub.publish(String(data=json.dumps({'id': self.command_id, 'kind': kind, 'target': target,
             'speed': self.speed.value()})))
         for button in self.command_buttons:
             button.setEnabled(False)
 
     def stop(self):
+        self.log.event("STOP requested.")
         self.pending = False
         self.node.stop_pub.publish(Empty())
 
@@ -206,9 +214,21 @@ class ControlWindow(QMainWindow):
             if data.get('feedback_error'):
                 text += '\n' + data['feedback_error']
             self.status.setText(text if ready else 'Control session is unavailable.')
+            self.log.state('session', ready, 'Control session available.' if ready else
+                           'Control session is unavailable.', 'info' if ready else 'warning')
+            if data.get('feedback_error') and ready:
+                self.log.state('feedback', data['feedback_error'], data['feedback_error'], 'warning')
+            else:
+                if ready:
+                    self.log.state('feedback', 'available', 'SDK feedback available.')
+                else:
+                    self.log.clear('feedback')
             ready = ready and not data['busy']
         if self.pending and time.monotonic()-self.pending_since > 5.:
             self.status.setText('Waiting for command acknowledgement...')
+            self.log.state('ack', self.command_id, 'Waiting for command acknowledgement...', 'warning')
+        else:
+            self.log.clear('ack')
         for button in self.command_buttons:
             button.setEnabled(ready and not self.pending)
 
@@ -219,6 +239,7 @@ class ControlWindow(QMainWindow):
             self.stop()
 
     def closeEvent(self, event):
+        self.log.event("GUI window closed.")
         self.stop_if_busy()
         event.accept()
 
@@ -237,12 +258,16 @@ def main():
             pass
     spin = threading.Thread(target=spin_ros, daemon=True)
     spin.start()
-    signal.signal(signal.SIGTERM, lambda *_: app.quit())
-    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    def interrupted(source):
+        window.log.event(f'{source}: exit requested.')
+        app.quit()
+    signal.signal(signal.SIGTERM, lambda *_: interrupted('SIGTERM'))
+    signal.signal(signal.SIGINT, lambda *_: interrupted('Ctrl+C'))
     window.show()
     try:
         app.exec_()
     finally:
+        window.log.event("GUI event loop exiting.")
         window.stop_if_busy()
         rclpy.try_shutdown()
         spin.join(timeout=2.)

@@ -56,6 +56,7 @@ install(FILES scripts/pro630_configuration.py scripts/pro630_model.py scripts/pr
   scripts/pro630_real_mirror.py
   scripts/pro630_sdk_adapter.py scripts/pro630_feedback.py
   scripts/pro630_collision_check.py
+  scripts/pro630_control_logging.py
   scripts/pro630_gripper_control.py scripts/pro630_scene_support.py
   DESTINATION lib/${PROJECT_NAME})
 
