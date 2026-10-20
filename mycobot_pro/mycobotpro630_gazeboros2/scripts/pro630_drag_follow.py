@@ -14,10 +14,12 @@ from pro630_public_client import PublicPro630Client as Pro630Client
 from pro630_session_support import read_initial_gripper
 from pro630_configuration import configure_node
 from pro630_model import DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT
+from pro630_control_logging import ControlLog
 
 class DragFollow(Node):
     def __init__(self):
         super().__init__('pro630_drag_follow')
+        self.log = ControlLog(self.get_logger())
         configure_node(self)
         self.declare_parameter('startup_enabled', False)
         self.declare_parameter('initial_gripper', -1.0)
@@ -31,12 +33,17 @@ class DragFollow(Node):
             if not self.get_parameter('startup_enabled').value:
                 if self.sdk.is_moving() != 0:
                     raise RuntimeError('Stop robot motion before starting drag following')
+                self.log.event('Startup motor enable requested.')
                 set_drag_enabled(self.sdk, True, self.with_gripper)
+                self.log.event('Startup motor enable acknowledged.')
+            else:
+                self.log.event('Startup motor enable was completed by the control session.')
             if self.with_gripper:
                 self.gripper = float(self.get_parameter('initial_gripper').value)
                 if not math.isfinite(self.gripper) or not 0 <= self.gripper <= 1:
                     self.gripper = read_initial_gripper(self.sdk) / 100.0
-            self.state = DragState(self.sdk, with_gripper=self.with_gripper)
+            self.state = DragState(self.sdk, with_gripper=self.with_gripper, report=self.log.event)
+            self.log.event(self.state.message)
             self.sdk.set_angle_callback(self._sample)
             self.worker = threading.Thread(target=self._read_loop, daemon=True)
             self.worker.start()
@@ -77,6 +84,7 @@ class DragFollow(Node):
         if self.worker is not None:
             self.worker.join(timeout=1.0)
         # No automatic enable, disable, STOP, motion or gripper write on exit.
+        self.log.state('closing', True, 'Drag following closed; motor enable states are preserved.')
 
 
 def main():
@@ -88,15 +96,47 @@ def main():
     app = QApplication(sys.argv[:1])
 
     class Window(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.held_keys = set()
+
         def keyPressEvent(self, event):
             if event.isAutoRepeat():
                 return
             if event.key() == Qt.Key_M:
+                self._pressed(event.key(), 'M')
                 node.state.request_toggle()
             elif event.key() == Qt.Key_Q:
+                self._pressed(event.key(), 'Q')
                 self.close()
             else:
                 super().keyPressEvent(event)
+
+        def _pressed(self, key, label):
+            if key not in self.held_keys:
+                self.held_keys.add(key)
+                node.log.event(f'Key {label} pressed.')
+
+        def keyReleaseEvent(self, event):
+            if not event.isAutoRepeat() and event.key() in self.held_keys:
+                self.held_keys.remove(event.key())
+                label = 'M' if event.key() == Qt.Key_M else 'Q'
+                node.log.event(f'Key {label} released.')
+            super().keyReleaseEvent(event)
+
+        def _clear_keys(self, source):
+            for key in self.held_keys:
+                node.log.event(f'Key {"M" if key == Qt.Key_M else "Q"} cleared ({source}; synthetic release).')
+            self.held_keys.clear()
+
+        def focusOutEvent(self, event):
+            self._clear_keys('focus lost')
+            super().focusOutEvent(event)
+
+        def closeEvent(self, event):
+            node.log.event('Drag follow window closed; motor enable states are preserved.')
+            self._clear_keys('window closed')
+            super().closeEvent(event)
 
     try:
         node = DragFollow()
@@ -123,13 +163,19 @@ def main():
                 return
             rclpy.spin_once(node, timeout_sec=0)
             _, _, message, fresh = node.render()
+            node.log.state('feedback', fresh, 'Live joint feedback.' if fresh else
+                           'Joint feedback unavailable; Gazebo holds the last valid pose.',
+                           'info' if fresh else 'warning')
             status.setText(message + ('\nLive joint feedback.' if fresh else
                                       '\nJoint feedback unavailable; Gazebo holds the last valid pose.'))
 
         timer.timeout.connect(tick)
         timer.start(20)
-        signal.signal(signal.SIGINT, lambda *_: window.close())
-        signal.signal(signal.SIGTERM, lambda *_: window.close())
+        def interrupted(source):
+            node.log.event(f'{source}: exit requested.')
+            window.close()
+        signal.signal(signal.SIGINT, lambda *_: interrupted('Ctrl+C'))
+        signal.signal(signal.SIGTERM, lambda *_: interrupted('SIGTERM'))
         window.show()
         return app.exec_()
     except Exception as exc:

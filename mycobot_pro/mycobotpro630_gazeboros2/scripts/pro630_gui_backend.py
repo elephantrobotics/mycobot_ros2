@@ -13,6 +13,7 @@ from std_msgs.msg import Empty, String
 from moveit_msgs.srv import GetStateValidity
 
 from pro630_model import ARM_SDK_SPEED_MAX
+from pro630_control_logging import ControlLog
 from pro630_configuration import configure_node
 from pro630_public_client import PublicPro630Client
 from pro630_collision_check import CollisionCheck, DEFAULT_COLLISION_DEPTH_TOLERANCE_M
@@ -39,6 +40,8 @@ class GuiBackend(CollisionCheck, Node):
         self._active_kind = None
         self._gripper_active = False
         self._command_id = ''
+        self._command_kind = None
+        self.log = ControlLog(self.get_logger())
         self._status = 'Ready.'
         self._angles = self._coords = None
         self._feedback_when = 0.
@@ -61,10 +64,13 @@ class GuiBackend(CollisionCheck, Node):
         self.worker = threading.Thread(target=self.work, daemon=True)
         self.worker.start()
 
-    def status(self, text):
+    def status(self, text, level='info', *, context=None):
         with self._lock:
             self._status = text
-        self.get_logger().info(text)
+            kind, command_id = self._command_kind, self._command_id
+        if context is not None:
+            kind, command_id = context
+        self.log.event(f'[kind={kind}, id={command_id}] {text}', level)
 
     def feedback(self):
         with self._lock:
@@ -125,13 +131,15 @@ class GuiBackend(CollisionCheck, Node):
                 if self._busy or self._stop.is_set():
                     raise RuntimeError('A command or STOP is in progress')
                 self._busy, self._command_id = True, data['id']
+                self._command_kind = data['kind']
                 self.status('Sending command...')
                 self._queue.put_nowait(data)
         except Exception as exc:
             with self._lock:
                 if not self._busy:
                     self._command_id = data.get('id', '') if isinstance(data, dict) else ''
-            self.status(f'Rejected: {exc}')
+            context = (data.get('kind'), data.get('id')) if isinstance(data, dict) else (None, None)
+            self.status(f'Rejected: {exc}', 'warning', context=context)
 
     def stop(self, _msg):
         self._stop.set()
@@ -316,7 +324,7 @@ class GuiBackend(CollisionCheck, Node):
                         self.stop_robot()
                         self.status('STOP sent.')
                     except Exception as exc:
-                        self.status(f'STOP failed: {exc}')
+                        self.status(f'STOP failed: {exc}', 'error')
                     finally:
                         self._stop.clear()
                 if not self._closing.is_set():
@@ -326,13 +334,13 @@ class GuiBackend(CollisionCheck, Node):
                 self.execute(command)
             except CommandRejected as exc:
                 # Validation has not sent any motion: reject without SDK writes.
-                self.status(f'Rejected: {exc}')
+                self.status(f'Rejected: {exc}', 'warning')
             except CommandStopped:
                 try:
                     self.stop_robot()
                     self.status('STOP sent.')
                 except Exception as exc:
-                    self.status(f'STOP failed: {exc}')
+                    self.status(f'STOP failed: {exc}', 'error')
             except Exception as exc:
                 message = str(exc)
                 if not message.startswith(('Motion rejected:', 'Motion failed:', 'Motion stopped',
@@ -343,7 +351,7 @@ class GuiBackend(CollisionCheck, Node):
                         self.stop_robot()
                     except Exception as stop_error:
                         message += f'; STOP failed: {stop_error}'
-                self.status(message)
+                self.status(message, "error")
             finally:
                 with self._lock:
                     self._active_kind = None
