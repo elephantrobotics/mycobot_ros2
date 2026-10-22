@@ -12,8 +12,9 @@ import time
 
 from pro630_hold_profile import PositionVelocityEstimator
 
-from pro630_model import ARM_SDK_SPEED_MAX
-SDK_RAD_PER_SPEED = 3.14 / ARM_SDK_SPEED_MAX  # Nominal Pro630 scale, not a physical speed calibration.
+from pro630_model import (ARM_FULL_SPEED_RAD_S, ARM_JOINT_SDK_SPEED_MAX,
+                         KEYBOARD_ARM_FEEDBACK_MAX_AGE_S)
+SDK_RAD_PER_SPEED = ARM_FULL_SPEED_RAD_S / ARM_JOINT_SDK_SPEED_MAX
 
 
 class FeedbackUnavailable(RuntimeError):
@@ -45,7 +46,7 @@ def sdk_speed_for_rad(velocity, urdf_limit=3.14):
     if not math.isfinite(velocity) or not math.isfinite(urdf_limit) or urdf_limit <= 0:
         raise ValueError("invalid speed")
     # Round down, never exceed either the requested or the URDF speed.
-    return max(0, min(ARM_SDK_SPEED_MAX, int((min(abs(velocity), urdf_limit) + 1e-12) /
+    return max(0, min(ARM_JOINT_SDK_SPEED_MAX, int((min(abs(velocity), urdf_limit) + 1e-12) /
                              SDK_RAD_PER_SPEED)))
 
 
@@ -92,8 +93,10 @@ class RealPoseReader:
     """
     supports_motion_cache = True
 
-    def __init__(self, sdk, limits, clock=time.monotonic, report=None, with_gripper=True):
+    def __init__(self, sdk, limits, clock=time.monotonic, report=None, with_gripper=True,
+                 arm_max_age=0.5):
         self.with_gripper = with_gripper
+        self.arm_max_age = arm_max_age
         self.sdk, self.limits, self.clock = sdk, limits, clock
         self.report = report or (lambda _: None)
         self.cache = RosPoseCache(with_gripper)
@@ -151,7 +154,7 @@ class RealPoseReader:
 
     def fresh(self):
         now = self.clock()
-        if self.cache.arm_time is None or now - self.cache.arm_time > 0.5:
+        if self.cache.arm_time is None or now - self.cache.arm_time > self.arm_max_age:
             return False
         if not self.with_gripper:
             return True
@@ -287,8 +290,8 @@ class RealPoseReader:
 
     def _combined(self):
         if not self.fresh():
-            if self.cache.arm_time is None or self.clock() - self.cache.arm_time > .5:
-                reason = 'Six-axis feedback is missing or older than 0.5 s'
+            if self.cache.arm_time is None or self.clock() - self.cache.arm_time > self.arm_max_age:
+                reason = f'Six-axis feedback is missing or older than {self.arm_max_age:g} s'
             else:
                 reason = 'Gripper feedback is unavailable or older than 0.8 s'
             raise FeedbackUnavailable(reason)
@@ -341,7 +344,7 @@ class RealKeyboardTransport:
     def feedback(self):
         with self.lock:
             if (self.waiting_reason or (self.error and not self.recovery_ready) or self.pose is None or
-                    self.clock() - self.received > 0.5 or
+                    self.clock() - self.received > KEYBOARD_ARM_FEEDBACK_MAX_AGE_S or
                     (hasattr(self.read_pose, 'fresh') and not self.read_pose.fresh())):
                 return None
             return list(self.pose), list(self.velocity)
@@ -349,7 +352,7 @@ class RealKeyboardTransport:
     def arm(self):
         with self.lock:
             if (self.waiting_reason or (self.error and not self.recovery_ready) or self.pose is None or
-                    self.clock() - self.received > 0.5 or
+                    self.clock() - self.received > KEYBOARD_ARM_FEEDBACK_MAX_AGE_S or
                     (hasattr(self.read_pose, 'fresh') and not self.read_pose.fresh())
                     or any(abs(v) > 0.01 for v in self.velocity)
                     or self.moving or self.motion_sent or self.stop_pending is not None):

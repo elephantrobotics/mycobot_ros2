@@ -25,6 +25,7 @@ from pro630_hold_profile import (
 from pro630_real_keyboard import (
     RealKeyboardTransport, RealPoseReader, SDK_RAD_PER_SPEED, valid_gripper_position,
 )
+from pro630_model import KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
 
 # Borrow the existing Pro630 slider's collision implementation, not its node
 # constructor. This keeps the same floor, contact tolerance and path sampling.
@@ -144,7 +145,8 @@ class TeleopKeyboard(Node):
                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
             self._connect_read_only()
             self._real_pose_reader = RealPoseReader(
-                self.mc, self.joint_limits, report=self.get_logger().debug, with_gripper=self.with_gripper)
+                self.mc, self.joint_limits, report=self.get_logger().debug, with_gripper=self.with_gripper,
+                arm_max_age=KEYBOARD_ARM_FEEDBACK_MAX_AGE_S)
             if self.with_gripper:
                 self._real_pose_reader.seed_gripper(self._startup_pose[6])
             if hasattr(self.mc, 'sample_time'):

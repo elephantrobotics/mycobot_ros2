@@ -15,6 +15,8 @@ HARDWARE_OFFSETS_DEG = (0.0, 90.0, 0.0, 90.0, 0.0, 0.0)
 DEFAULT_PRO630_IP = '192.168.1.159'
 DEFAULT_PRO630_PORT = 5001
 GRIPPER_ID = 14
-# Preserve the old project's 0..1000 arm command scale. The SDK documents
-# no angular speed conversion; this is nominal scaling, not measured deg/s.
-ARM_SDK_SPEED_MAX = 1000
+# Native command bounds; angular scale is used by slider/keyboard conversion.
+ARM_JOINT_SDK_SPEED_MAX = 5999
+ARM_CARTESIAN_SDK_SPEED_MAX = 6000
+ARM_FULL_SPEED_RAD_S = math.radians(90.0)
+KEYBOARD_ARM_FEEDBACK_MAX_AGE_S = 1.0

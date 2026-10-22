@@ -26,6 +26,8 @@ class DragFollow(Node):
         self.sdk = None
         self.worker = None
         self.stop_event = threading.Event()
+        self._closing = False
+        self._exit_mode_required = False
         try:
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
@@ -33,10 +35,12 @@ class DragFollow(Node):
             if not self.get_parameter('startup_enabled').value:
                 if self.sdk.is_moving() != 0:
                     raise RuntimeError('Stop robot motion before starting drag following')
+                self._exit_mode_required = True
                 self.log.event('Startup motor enable requested.')
                 set_drag_enabled(self.sdk, True, self.with_gripper)
                 self.log.event('Startup motor enable acknowledged.')
             else:
+                self._exit_mode_required = True
                 self.log.event('Startup motor enable was completed by the control session.')
             if self.with_gripper:
                 self.gripper = float(self.get_parameter('initial_gripper').value)
@@ -77,14 +81,31 @@ class DragFollow(Node):
         return enabled, pending, message, True
 
     def close(self):
+        if self._closing:
+            return
+        self._closing = True
         self.stop_event.set()
-        if self.sdk is not None:
-            self.sdk.close()
-            self.sdk = None
         if self.worker is not None:
-            self.worker.join(timeout=1.0)
-        # No automatic enable, disable, STOP, motion or gripper write on exit.
-        self.log.state('closing', True, 'Drag following closed; motor enable states are preserved.')
+            self.worker.join(timeout=5.0)
+        if self.sdk is not None:
+            try:
+                if self._exit_mode_required:
+                    if self.worker is not None and self.worker.is_alive():
+                        self.log.event('Exit free-move request not confirmed: control worker is still active.', 'error')
+                    else:
+                        self.log.event('Exit requested: disabling arm free-move mode.')
+                        # The public adapter maps this to set_free_move_mode(False).
+                        # Do not call set_drag_enabled: gripper state stays unchanged.
+                        result = self.sdk.set_motor_enabled(254, 1)
+                        if type(result) is not int or result != 1:
+                            raise RuntimeError(f'Free-move exit was not acknowledged (result={result!r})')
+                        self.log.event('Arm free-move exit acknowledged.')
+            except Exception as exc:
+                self.log.event(f'Exit free-move request failed: {exc}', 'error')
+            finally:
+                self.sdk.close()
+                self.sdk = None
+        self.log.state('closing', True, 'Drag following closed.')
 
 
 def main():
@@ -134,7 +155,7 @@ def main():
             super().focusOutEvent(event)
 
         def closeEvent(self, event):
-            node.log.event('Drag follow window closed; motor enable states are preserved.')
+            node.log.event('Drag follow window closed; arm free-move exit will be requested.')
             self._clear_keys('window closed')
             super().closeEvent(event)
 
@@ -150,8 +171,8 @@ def main():
             ('M: release / lock all six arm joints and the gripper together. Q: close this window.\n' if node.with_gripper else
              'M: release / lock all six arm joints. Q: close this window.\n') +
             'When disabled, support the arm and drag it by hand. Gazebo follows the measured pose.\n' +
-            ('Closing this window preserves arm and gripper enable states.' if node.with_gripper else
-             'Closing this window preserves arm enable state.')))
+            ('Closing this window exits arm free-move; the gripper enable state is preserved.' if node.with_gripper else
+             'Closing this window exits arm free-move.')))
         status = QLabel('Waiting for joint feedback...')
         layout.addWidget(status)
         window.resize(720, 190)

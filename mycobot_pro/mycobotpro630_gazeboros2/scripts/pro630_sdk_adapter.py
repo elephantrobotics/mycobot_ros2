@@ -13,13 +13,17 @@ import tempfile
 import threading
 import time
 import uuid
-from pro630_model import (ARM_SDK_SPEED_MAX, DEFAULT_PRO630_IP,
+from pro630_model import (ARM_CARTESIAN_SDK_SPEED_MAX, ARM_JOINT_SDK_SPEED_MAX, DEFAULT_PRO630_IP,
                          DEFAULT_PRO630_PORT, GRIPPER_ID,
                          HARDWARE_OFFSETS_DEG, LIMITS_DEG)
 try:
     from pymycobot import ElephantRobot as _VendorClient
 except ImportError:
     _VendorClient = object
+
+
+TCP_TIMEOUT_S = 2.0
+GRIPPER_ANGLE_TIMEOUT_S = 3.0
 
 
 class RobotConnectionLease:
@@ -56,6 +60,10 @@ class ControllerRejected(RuntimeError):
     """A complete controller rejection is not a broken TCP stream."""
 
 
+class TransportClosedError(RuntimeError):
+    """The unframed connection cannot be reused after a transport failure."""
+
+
 class Pro630Client(_VendorClient):
     """Only this module maps feature operations to Pro630 vendor methods."""
     def __init__(self, ip=DEFAULT_PRO630_IP, netport=DEFAULT_PRO630_PORT,
@@ -64,6 +72,7 @@ class Pro630Client(_VendorClient):
             raise RuntimeError('pymycobot and numpy are required for real Pro630 mode')
         self._api_lock = threading.RLock()
         self._closed = threading.Event()
+        self._transport_error = None
         self._stamps = {}
         self._last_reply = ''
         self._motion_reply = None
@@ -74,7 +83,7 @@ class Pro630Client(_VendorClient):
         self._lease = RobotConnectionLease(ip, netport, ownership_timeout)
         try:
             super().__init__(ip, netport, debug)
-            self.tcp_client.settimeout(2.)
+            self.tcp_client.settimeout(TCP_TIMEOUT_S)
             self.tcp_client.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             if not super().start_client():
                 raise RuntimeError(f'Cannot connect to Pro630 at {ip}:{netport}')
@@ -85,14 +94,21 @@ class Pro630Client(_VendorClient):
     def send_command(self, command):
         with self._api_lock:
             if self._closed.is_set():
-                raise RuntimeError('Pro630 connection closed; restart the public environment')
-            motion = command.split('(', 1)[0] in ('set_angles', 'set_coords')
+                raise TransportClosedError(self.get_transport_error() or
+                                           'Pro630 connection closed; restart the public environment')
+            method = command.split('(', 1)[0]
+            motion = method in ('set_angles', 'set_coords')
             if motion:
                 self._motion_reply = {'received': False, 'error': None}
+            data = bytearray()
             try:
+                # Firmware can return an invalid opening (255) just after 2 s.
+                # Receive that complete reply instead of racing its arrival and
+                # discarding the stream. Every other command retains 2 s.
+                timeout = (GRIPPER_ANGLE_TIMEOUT_S if method == 'force_GetGripperAngle'
+                           else TCP_TIMEOUT_S)
+                self.tcp_client.settimeout(timeout)
                 self.tcp_client.sendall((command.rstrip('\n') + '\n').encode())
-                method = command.split('(', 1)[0]
-                data = bytearray()
                 while len(data) < 65536:
                     chunk = self.tcp_client.recv(4096)
                     if not chunk:
@@ -142,8 +158,22 @@ class Pro630Client(_VendorClient):
             except ControllerRejected:
                 raise
             except (OSError, UnicodeError, RuntimeError) as exc:
-                self.close()
-                raise RuntimeError(f'Pro630 transport failed: {exc}') from exc
+                # Preserve the first failure before later closed-connection reads.
+                # Include only a bounded reply prefix, not motion arguments.
+                if self._transport_error is None:
+                    self._transport_error = (
+                        f'Pro630 transport failed during {method}: '
+                        f'{type(exc).__name__}: {exc}; reply_prefix={bytes(data[:256])!r}')
+                try:
+                    self.close()
+                except Exception as cleanup_exc:
+                    self._transport_error += (
+                        f'; connection cleanup failed: {type(cleanup_exc).__name__}: {cleanup_exc}')
+                raise TransportClosedError(self._transport_error) from exc
+
+    def get_transport_error(self):
+        """Return the original failure without querying hardware."""
+        return self._transport_error
 
     @staticmethod
     def _describe_rejection(reply):
@@ -181,7 +211,8 @@ class Pro630Client(_VendorClient):
 
     def send_coords(self, coords, speed, _async=False):
         # write_coords waits for the text reply, not for motion completion.
-        return super().write_coords(self._six_finite(coords), self._speed(speed))
+        return super().write_coords(self._six_finite(coords),
+                                    self._speed(speed, ARM_CARTESIAN_SDK_SPEED_MAX))
 
     def is_in_position(self, target, mode=0):
         target = self._six_finite(target)
@@ -223,15 +254,16 @@ class Pro630Client(_VendorClient):
         state = super().get_robot_state().strip()
         if len(state) != 64 or set(state) - {'0', '1'}:
             raise RuntimeError(f'Invalid Pro630 robot state: {state!r}')
-        bad = [i for i in (*range(2, 8), *range(24, 30)) if state[i] != '1']
-        if state[1] != '1':
-            bad.append(1)
+        # The SDK's bit-1 description contradicts its normal-state example.
+        # On this Pro630 it stays zero both before and after an E-stop.
+        # Do not label it as E-stop; retain the documented power/fault checks.
+        bad = [i for i in (0, *range(2, 8), *range(24, 30)) if state[i] != '1']
         if state[30] == '1':
             bad.append(30)
         if not bad:
             return 0
-        if state[1] != '1':
-            return 'Motion stopped: emergency stop.'
+        if state[0] != '1':
+            return 'Motion stopped: robot power is off.'
         if state[30] == '1':
             return 'Motion stopped: controller collision detected.'
         for index in range(2, 8):
@@ -261,9 +293,9 @@ class Pro630Client(_VendorClient):
             return values
 
     @staticmethod
-    def _speed(value):
-        if type(value) not in (int, float) or not math.isfinite(value) or not 1 <= value <= ARM_SDK_SPEED_MAX:
-            raise ValueError('Pro630 arm SDK speed must be in 1..1000')
+    def _speed(value, maximum):
+        if type(value) not in (int, float) or not math.isfinite(value) or not 1 <= value <= maximum:
+            raise ValueError(f'Pro630 SDK speed must be in 1..{maximum}')
         return int(value)
 
     def send_angles(self, angles, speed, _async=False):
@@ -276,7 +308,7 @@ class Pro630Client(_VendorClient):
             raw = [v - offset for v, offset in zip(angles, HARDWARE_OFFSETS_DEG)]
             # Vendor write_angles returns None. Arrival is checked from
             # measured feedback rather than inventing a motion acknowledgment.
-            return super().write_angles(raw, self._speed(speed))
+            return super().write_angles(raw, self._speed(speed, ARM_JOINT_SDK_SPEED_MAX))
 
     def send_angle(self, joint, angle, speed, _async=False):
         if type(joint) is not int or not 1 <= joint <= 6:
@@ -288,7 +320,8 @@ class Pro630Client(_VendorClient):
     def jog_angle(self, joint, direction, speed, _async=False):
         if type(joint) is not int or not 1 <= joint <= 6 or direction not in (0, 1):
             raise ValueError('Invalid Pro630 jog joint or direction')
-        return super().jog_angle(f'J{joint}', 1 if direction else -1, self._speed(speed))
+        return super().jog_angle(f'J{joint}', 1 if direction else -1,
+                                 self._speed(speed, ARM_JOINT_SDK_SPEED_MAX))
 
     def stop(self, deceleration=0, _async=False):
         return super().task_stop()  # No deceleration selector in Pro630 SDK.
@@ -335,23 +368,25 @@ class Pro630Client(_VendorClient):
         with self._api_lock:
             if self.is_power_on() != 1:
                 raise RuntimeError('Pro630 must already be powered for drag following')
-            if enabled:
-                super()._state_on()
-                if self._flag('state_check()') != 1:
-                    raise RuntimeError('Pro630 arm enable was not confirmed')
+            # Drag locking means leaving free-move. Its acknowledged mode
+            # request is sufficient; do not send state_on or gate on state_check.
             super().set_free_move_mode(not bool(enabled))
-            if self._last_reply.lower() not in ('1', '0', 'ok', 'true'):
+            if self._last_reply.strip().lower() not in ('1', '0', 'ok', '[ok]', 'true'):
                 raise RuntimeError(f'Pro630 free-move command unconfirmed: {self._last_reply!r}')
             return 1
 
     def close(self):
         self._closed.set()
         sock = getattr(self, 'tcp_client', None)
-        if sock is not None:
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-            sock.close(); self.is_client_started = False
-        if self._lease is not None:
-            self._lease.close(); self._lease = None
+        try:
+            if sock is not None:
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                sock.close()
+        finally:
+            self.is_client_started = False
+            if self._lease is not None:
+                lease, self._lease = self._lease, None
+                lease.close()
