@@ -79,7 +79,7 @@ def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep, with_grip
 def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10.0):
     deadline = clock() + timeout
     finished, cancelled = threading.Event(), threading.Event()
-    result = {'last': None}
+    result = {'first': None, 'last': None}
     def read():
         try:
             while not cancelled.is_set() and clock() < deadline:
@@ -87,6 +87,12 @@ def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10
                     value = sdk.get_pro_gripper_angle()
                 except Exception as exc:
                     value = str(exc)
+                    transport_error = getattr(sdk, 'get_transport_error', None)
+                    if callable(transport_error) and transport_error():
+                        result['error'] = transport_error()
+                        return  # A permanently closed stream cannot recover by retrying.
+                if result['first'] is None:
+                    result['first'] = value
                 result['last'] = value
                 if (not isinstance(value, bool) and isinstance(value, (int, float))
                         and math.isfinite(value) and 0 <= value <= 100
@@ -98,9 +104,14 @@ def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10
             finished.set()
     worker = threading.Thread(target=read, daemon=True)
     worker.start()
-    if not finished.wait(timeout) or 'value' not in result:
+    completed = finished.wait(timeout)
+    if 'error' in result:
         cancelled.set()
-        raise RuntimeError(f'Initial gripper feedback timed out after {timeout:g} s (last={result["last"]!r})')
+        raise RuntimeError(f'Initial gripper feedback failed: {result["error"]}')
+    if not completed or 'value' not in result:
+        cancelled.set()
+        raise RuntimeError(f'Initial gripper feedback timed out after {timeout:g} s '
+                           f'(first={result["first"]!r}, last={result["last"]!r})')
     worker.join()
     return result['value']
 

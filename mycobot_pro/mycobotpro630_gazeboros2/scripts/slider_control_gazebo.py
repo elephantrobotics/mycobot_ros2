@@ -17,7 +17,7 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Empty, String, Bool
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from pro630_real_keyboard import RealPoseReader, sdk_speed_for_rad
+from pro630_real_keyboard import RealPoseReader
 
 from pro630_public_client import PublicPro630Client as Pro630Client
 from pro630_feedback import attach_feedback
@@ -31,11 +31,13 @@ from pro630_collision_check import (
 )
 
 
-from pro630_model import DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT, MAX_VELOCITY_RAD_S
+from pro630_model import (DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT,
+                         ARM_JOINT_SDK_SPEED_MAX, ARM_FULL_SPEED_RAD_S)
 
 from pro630_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
 COMMAND_JOINTS = joints(True)
-# Match Pro450 operator speed in simulation; keep native real-motion limits.
+# Match Pro450 slider timing in both modes; these are feature speed limits.
+MAX_VELOCITY_RAD_S = (1.0,) * 7
 SIMULATION_MAX_VELOCITY_RAD_S = (1.0,) * 7
 MIN_TRAJECTORY_DURATION = 0.5
 MAX_TRAJECTORY_DURATION = 600.0
@@ -46,6 +48,20 @@ WAYPOINT_GRIPPER_TOLERANCE = 0.02
 # Distance from the MoveIt-checked joint-space line that stops the real arm.
 LINE_DEVIATION_LIMIT_RAD = math.radians(1.0)
 REAL_ARRIVAL_MARGIN_S = 10.0
+
+
+def slider_sdk_speed_for_rad(velocity):
+    """Match Pro450's 1.5 deg/s speed steps using Pro630's native range.
+
+    Full scale is 90 deg/s. Preserve Pro450 slider quantization and round
+    down when mapping the resulting percentage to the Pro630 command.
+    """
+    if not math.isfinite(velocity) or velocity < 0:
+        raise ValueError('Invalid slider angular speed')
+    # Keep the 1.5 deg/s feature steps independent of native full-scale calibration.
+    step = math.radians(1.5)
+    steps = max(1, int((min(velocity, 1.0) + 1e-12) / step))
+    return max(1, int(steps * step / ARM_FULL_SPEED_RAD_S * ARM_JOINT_SDK_SPEED_MAX))
 
 
 def sdk_motion_accepted(result):
@@ -737,7 +753,7 @@ class SliderControl(CollisionCheck, Node):
             grip_goal = int(round(target[6] * 100.0))
             grip_speed = gripper_speed_for_percentage(grip_start, grip_goal, speed_scale)
         mean_arm_speed = max(abs(b-a) for a,b in zip(current[:6], target[:6])) / duration
-        speed = max(1, sdk_speed_for_rad(mean_arm_speed))
+        speed = slider_sdk_speed_for_rad(mean_arm_speed)
         if self._stop_requested:
             self._publish_status("Cancelled before execution.")
             return

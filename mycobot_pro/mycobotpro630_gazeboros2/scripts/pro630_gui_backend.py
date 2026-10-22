@@ -12,7 +12,7 @@ from rclpy.node import Node
 from std_msgs.msg import Empty, String
 from moveit_msgs.srv import GetStateValidity
 
-from pro630_model import ARM_SDK_SPEED_MAX
+from pro630_model import ARM_JOINT_SDK_SPEED_MAX, ARM_CARTESIAN_SDK_SPEED_MAX
 from pro630_control_logging import ControlLog
 from pro630_configuration import configure_node
 from pro630_public_client import PublicPro630Client
@@ -254,9 +254,9 @@ class GuiBackend(CollisionCheck, Node):
             self.cancelled()
         self._active_kind = kind
         if kind == 'joints':
-            self.motion_reply(self.mc.send_angles(target, max(1, round(speed * ARM_SDK_SPEED_MAX / 100)), _async=True), asynchronous_send=True)
+            self.motion_reply(self.mc.send_angles(target, max(1, round(speed * ARM_JOINT_SDK_SPEED_MAX / 100)), _async=True), asynchronous_send=True)
         elif kind == 'coords':
-            self.motion_reply(self.mc.send_coords(target, max(1, round(speed * ARM_SDK_SPEED_MAX / 100)), _async=True), asynchronous_send=True)
+            self.motion_reply(self.mc.send_coords(target, max(1, round(speed * ARM_CARTESIAN_SDK_SPEED_MAX / 100)), _async=True), asynchronous_send=True)
         else:
             self.gripper_reply(self.mc.set_pro_gripper_speed(speed))
             self.cancelled()
