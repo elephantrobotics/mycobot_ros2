@@ -10,7 +10,7 @@ import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from pro630_model import ARM_JOINTS
+from pro630_model import ARM_JOINTS, KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
 from mycobotpro630_gazeboros2.srv import Pro630Rpc
 
 
@@ -112,12 +112,13 @@ class PublicPro630Client:
             # The public bridge is already sampling. Do not queue another RPC
             # waiting for a new packet behind slow tool/status queries.
             with self._condition:
-                deadline = time.monotonic() + .5
+                deadline = time.monotonic() + KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
                 while self._latest is None and not self._closed and time.monotonic() < deadline:
                     self._condition.wait(max(0., deadline - time.monotonic()))
                 sample = self._latest
-                if sample is None or time.monotonic() - sample.monotonic > .5:
-                    raise RuntimeError('Public six-axis feedback is missing or older than 0.5 s')
+                if sample is None or time.monotonic() - sample.monotonic > KEYBOARD_ARM_FEEDBACK_MAX_AGE_S:
+                    raise RuntimeError('Public six-axis feedback is missing or older than '
+                                       f'{KEYBOARD_ARM_FEEDBACK_MAX_AGE_S:g} s')
                 self._stamps['arm'] = [sample.monotonic, sample.wall_time]
                 return list(sample.angles)
         packet = self._rpc('get_angles', [self._rpc_sequence])
