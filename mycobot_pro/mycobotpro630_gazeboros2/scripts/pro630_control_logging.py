@@ -51,11 +51,16 @@ class ControlLog:
             self._states.pop(channel, None)
 
 
-def command_details(kind, target, speed):
+def command_details(kind, target, speed, *, joint_frame=None):
     units = {'joints': 'deg', 'coords': 'mm/deg', 'gripper': 'normalized 0..1',
              'Execute': 'rad; gripper normalized 0..1',
-             'Force Execute': 'rad; gripper normalized 0..1'}
-    return f'{kind} requested: target={target} ({units.get(kind, "none")}), speed={speed}%.'
+             'Force Execute': 'rad; gripper normalized 0..1',
+             'Random target loaded': 'rad; gripper normalized 0..1',
+             'Model zero target loaded': 'rad; gripper normalized 0..1'}
+    unit = units.get(kind, 'none')
+    if joint_frame is not None:
+        unit = f'{joint_frame}; {unit}'
+    return f'{kind} requested: target={target} ({unit}), speed={speed}%.'
 
 
 def track_speed(spin, log):

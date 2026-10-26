@@ -18,7 +18,13 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
     QPushButton)
 
 from pro630_control_logging import ControlLog, command_details, track_speed
+from pro630_number_display import PositiveZeroDisplay, format_fixed
+from pro630_joint_display import model_to_hardware, hardware_to_model, display_limits
 from pro630_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
+
+
+class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
+    pass
 
 
 class GuiTransport(Node):
@@ -82,7 +88,7 @@ class ControlWindow(QMainWindow):
         self.joint_inputs, self.coord_inputs = [], []
         self.joint_feedback, self.coord_feedback = [], []
         for col, title, names, unit, inputs, feedback in (
-                (0, 'Joint targets / measured angles', [f'Joint {i}' for i in range(1, 7)], '°', self.joint_inputs, self.joint_feedback),
+                (0, 'Hardware joint targets / measured angles', [f'Joint {i}' for i in range(1, 7)], '°', self.joint_inputs, self.joint_feedback),
                 (1, 'Cartesian targets / measured pose', ['X', 'Y', 'Z', 'RX', 'RY', 'RZ'], None, self.coord_inputs, self.coord_feedback)):
             group, inner = QGroupBox(title), QGridLayout()
             group.setLayout(inner)
@@ -90,12 +96,12 @@ class ControlWindow(QMainWindow):
             inner.addWidget(QLabel('Target'), 0, 1)
             inner.addWidget(QLabel('Measured'), 0, 2)
             for i, name in enumerate(names):
-                spin = QDoubleSpinBox()
+                spin = DisplaySpinBox()
                 spin.setDecimals(2)
                 spin.setSingleStep(1.)
                 if col == 0:
                     lo, hi = JOINT_LIMITS_RAD[i]
-                    spin.setRange(math.degrees(lo), math.degrees(hi))
+                    spin.setRange(*display_limits((math.degrees(lo), math.degrees(hi)), i, 2))
                 else:
                     spin.setRange(-5000., 5000.) if i < 3 else spin.setRange(-180., 180.)
                 spin.setSuffix(' ' + (unit or ('mm' if i < 3 else '°')))
@@ -123,10 +129,7 @@ class ControlWindow(QMainWindow):
         track_speed(self.speed, self.log)
         options.addWidget(self.speed)
         options.addStretch()
-        self.clear_button = QPushButton('Clear Errors')
-        self.clear_button.clicked.connect(lambda: self.send('clear_errors', []))
-        options.addWidget(self.clear_button)
-        self.command_buttons = [self.joints_button, self.coords_button, self.clear_button]
+        self.command_buttons = [self.joints_button, self.coords_button]
         if node.with_gripper:
             group, gripper = QGroupBox('Gripper'), QGridLayout()
             group.setLayout(gripper)
@@ -171,13 +174,16 @@ class ControlWindow(QMainWindow):
         self.send('gripper', [self.gripper_target.value() / 100.])
 
     def send(self, kind, target):
-        self.log.event(command_details(kind, target, self.speed.value()))
+        self.log.event(command_details(kind, target, self.speed.value(),
+                                       joint_frame='hardware angles' if kind == 'joints' else None))
         if self.pending:
             self.log.event("Command not submitted: waiting for command acknowledgement.", "warning")
             return
         self.pending, self.pending_since = True, time.monotonic()
         self.command_id = uuid.uuid4().hex
         self.log.event(f"Command submitted: kind={kind}, id={self.command_id}.")
+        if kind == 'joints':
+            target = [hardware_to_model(value, i) for i, value in enumerate(target)]
         self.node.command_pub.publish(String(data=json.dumps({'id': self.command_id, 'kind': kind, 'target': target,
             'speed': self.speed.value()})))
         for button in self.command_buttons:
@@ -191,7 +197,7 @@ class ControlWindow(QMainWindow):
     def refresh(self):
         if self.node.with_gripper:
             measured = self.node.measured_gripper()
-            self.gripper_feedback.setText('—' if measured is None else f'{measured:.0f}')
+            self.gripper_feedback.setText('—' if measured is None else format_fixed(measured, 0))
         with self.node.lock:
             data, received = self.node.snapshot, self.node.received
         ready = False
@@ -202,10 +208,14 @@ class ControlWindow(QMainWindow):
                                              (self.coord_feedback, data['coords'], True)):
                 if values is not None:
                     for i, (label, value) in enumerate(zip(labels, values)):
-                        label.setText(f'{value:.2f} ' + ('mm' if cartesian and i < 3 else '°'))
+                        if not cartesian:
+                            value = model_to_hardware(value, i)
+                        label.setText(format_fixed(value, 2) + ' ' + ('mm' if cartesian and i < 3 else '°'))
             if not self.seeded and data['angles'] is not None and data['coords'] is not None and age <= 1.:
                 for controls, values in ((self.joint_inputs, data['angles']), (self.coord_inputs, data['coords'])):
-                    for control, value in zip(controls, values):
+                    for i, (control, value) in enumerate(zip(controls, values)):
+                        if controls is self.joint_inputs:
+                            value = model_to_hardware(value, i)
                         control.setValue(value)
                 self.seeded = True
             if self.pending and data.get('command_id') == self.command_id:

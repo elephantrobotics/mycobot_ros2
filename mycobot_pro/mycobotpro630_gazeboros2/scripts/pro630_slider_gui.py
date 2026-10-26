@@ -34,6 +34,8 @@ from python_qt_binding.QtWidgets import (
 
 
 from pro630_control_logging import ControlLog, command_details, track_speed
+from pro630_number_display import PositiveZeroDisplay, format_fixed
+from pro630_joint_display import model_to_hardware, hardware_to_model, display_limits
 from pro630_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
 COMMAND_JOINTS = joints(True)
 RAD_DISPLAY_DECIMALS = 4
@@ -41,6 +43,10 @@ RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
 GRIPPER_DISPLAY_DECIMALS = 2
 JOINT_DISPLAY_DECIMALS = [RAD_DISPLAY_DECIMALS] * 6 + [GRIPPER_DISPLAY_DECIMALS]
 JOINT_SLIDER_SCALES = [10 ** decimals for decimals in JOINT_DISPLAY_DECIMALS]
+
+
+class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
+    pass
 
 
 class SliderGuiNode(Node):
@@ -173,6 +179,9 @@ class Pro630SliderWindow(QMainWindow):
         self.sliders = []
         self.target_boxes = []
         self.actual_labels = []
+        self._model_targets = [None] * len(self.node.command_joints)
+        self.angle_frame = ('Hardware angles' if self.node.environment == 'real'
+                            else 'Equivalent hardware angles')
 
         self.setWindowTitle("Pro630 Confirmed Slider Control")
         self.resize(980, 430)
@@ -181,7 +190,7 @@ class Pro630SliderWindow(QMainWindow):
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
 
-        joint_group = QGroupBox("Joint Targets")
+        joint_group = QGroupBox(f"Joint Targets — {self.angle_frame}")
         grid = QGridLayout(joint_group)
         grid.addWidget(QLabel("Joint"), 0, 0)
         grid.addWidget(QLabel("Target (rad)"), 0, 1)
@@ -190,12 +199,10 @@ class Pro630SliderWindow(QMainWindow):
 
         labels = ["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5", "Joint 6", "Gripper"]
         for row, (label, limits) in enumerate(zip(labels, self.node.joint_limits), start=1):
-            minimum, maximum = limits
             decimals = JOINT_DISPLAY_DECIMALS[row - 1]
             scale = JOINT_SLIDER_SCALES[row - 1]
-            minimum = math.ceil(minimum * scale) / scale
-            maximum = math.floor(maximum * scale) / scale
-            target_box = QDoubleSpinBox()
+            minimum, maximum = display_limits(limits, row - 1, decimals, radians=True)
+            target_box = DisplaySpinBox()
             target_box.setDecimals(decimals)
             target_box.setRange(minimum, maximum)
             target_box.setSingleStep(0.01)
@@ -221,7 +228,9 @@ class Pro630SliderWindow(QMainWindow):
                     round(value * scale)
                 )
             )
-            target_box.valueChanged.connect(self._target_edited)
+            target_box.valueChanged.connect(
+                lambda value, index=row - 1: self._target_edited(index, value)
+            )
 
             grid.addWidget(QLabel(label), row, 0)
             grid.addWidget(target_box, row, 1)
@@ -280,9 +289,32 @@ class Pro630SliderWindow(QMainWindow):
         self.refresh_timer.timeout.connect(self._refresh)
         self.refresh_timer.start(100)
 
-    def _target_edited(self, _value):
+    def _target_edited(self, index, _value):
+        self._model_targets[index] = None
         if self.target_initialized:
             self.user_edited_target = True
+
+    def _load_model_targets(self, positions):
+        """Keep loaded model targets exact despite display rounding/offsets."""
+        for index, (box, slider, value, limits) in enumerate(zip(
+                self.target_boxes, self.sliders, positions, self.node.joint_limits)):
+            value = min(max(value, limits[0]), limits[1])
+            box.blockSignals(True)
+            slider.blockSignals(True)
+            try:
+                box.setValue(model_to_hardware(value, index, radians=True))
+                slider.setValue(round(box.value() * JOINT_SLIDER_SCALES[index]))
+                self._model_targets[index] = value
+            finally:
+                box.blockSignals(False)
+                slider.blockSignals(False)
+
+    def _log_target(self, kind):
+        # Describe the visible targets; ROS still carries model-frame radians.
+        target = [float(format_fixed(box.value(), JOINT_DISPLAY_DECIMALS[i]))
+                  for i, box in enumerate(self.target_boxes)]
+        self.log.event(command_details(kind, target, self.speed_box.value(),
+                                       joint_frame=self.angle_frame.lower()))
 
     def _refresh(self):
         actual, actual_time, state_is_finite, status, revision = self.node.snapshot(include_status_revision=True)
@@ -297,17 +329,12 @@ class Pro630SliderWindow(QMainWindow):
                 label.setText(
                     "NaN"
                     if not math.isfinite(value)
-                    else f"{value:.{JOINT_DISPLAY_DECIMALS[index]}f}"
+                    else format_fixed(model_to_hardware(value, index, radians=True),
+                                      JOINT_DISPLAY_DECIMALS[index])
                 )
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True
-            for index, (box, slider, value) in enumerate(zip(self.target_boxes, self.sliders, actual)):
-                box.blockSignals(True)
-                slider.blockSignals(True)
-                box.setValue(value)
-                slider.setValue(round(box.value() * JOINT_SLIDER_SCALES[index]))
-                box.blockSignals(False)
-                slider.blockSignals(False)
+            self._load_model_targets(actual)
             self.user_edited_target = False
 
         can_execute = feedback_ok and not self.node.command_busy()
@@ -343,7 +370,7 @@ class Pro630SliderWindow(QMainWindow):
 
     def _execute(self):
         positions = self._target_positions_rad()
-        self.log.event(command_details("Execute", positions, self.speed_box.value()))
+        self._log_target("Execute")
         previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, self.speed_box.value()):
             self.log.event("Execute not submitted: a command is already pending or busy.", "warning")
@@ -386,7 +413,7 @@ class Pro630SliderWindow(QMainWindow):
 
         positions = self._target_positions_rad()
         forced_speed = self.speed_box.value()
-        self.log.event(command_details("Force Execute", positions, forced_speed))
+        self._log_target("Force Execute")
         previous_status = self.node.snapshot(include_status_revision=True)[3:]
         if not self.node.execute(positions, forced_speed, force_collision=True):
             self.log.event("Force Execute not submitted: a command is already pending or busy.", "warning")
@@ -403,33 +430,40 @@ class Pro630SliderWindow(QMainWindow):
 
     def _randomize_target(self):
         """Generate a target locally; motion still requires Execute."""
-        for box, limits in zip(self.target_boxes[:6], self.node.joint_limits[:6]):
-            box.setValue(random.uniform(*limits))
+        positions = []
+        for limits in self.node.joint_limits[:6]:
+            # Preserve the old model-frame randomization and four-place grid.
+            lower = math.ceil(limits[0] * RAD_SLIDER_SCALE) / RAD_SLIDER_SCALE
+            upper = math.floor(limits[1] * RAD_SLIDER_SCALE) / RAD_SLIDER_SCALE
+            positions.append(min(max(round(random.uniform(*limits), RAD_DISPLAY_DECIMALS), lower), upper))
         # Match the integer 0..100 opening accepted by the gripper interface.
         if self.node.with_gripper:
-            self.target_boxes[-1].setValue(random.randint(0, 100) / 100.0)
+            positions.append(random.randint(0, 100) / 100.0)
+        self._load_model_targets(positions)
         self.user_edited_target = True
-        self.log.event(f"Target loaded (rad; gripper normalized 0..1): {self._target_positions_rad()}.")
+        self._log_target("Random target loaded")
         self._set_status(
             "Random target generated. Review it, then press Execute to validate and move."
         )
 
     def _zero_target(self):
         """Load the all-zero target locally; motion still requires Execute."""
-        for box in self.target_boxes:
-            box.setValue(0.0)
+        self._load_model_targets([0.0] * len(self.target_boxes))
         self.user_edited_target = True
-        self.log.event(f"Target loaded (rad; gripper normalized 0..1): {self._target_positions_rad()}.")
+        self._log_target("Model zero target loaded")
         self._set_status(
-            "Zero target loaded. Press Execute to validate and return to zero."
+            "Model zero target loaded. Press Execute to validate and return to model zero."
         )
 
     def _target_positions_rad(self):
         """Read radian targets and clamp display rounding to exact URDF limits."""
-        positions = [
-            min(max(box.value(), lower), upper)
-            for box, (lower, upper) in zip(self.target_boxes, self.node.joint_limits)
-        ]
+        positions = []
+        for index, (box, (lower, upper)) in enumerate(zip(self.target_boxes, self.node.joint_limits)):
+            box.interpretText()
+            value = self._model_targets[index]
+            if value is None:
+                value = hardware_to_model(box.value(), index, radians=True)
+            positions.append(min(max(value, lower), upper))
         if self.node.with_gripper:
             positions[-1] = round(positions[-1] * 100) / 100.0
         return positions

@@ -125,9 +125,6 @@ class Pro630Client(_VendorClient):
                         reply = text.split(':', 1)[1].strip()
                         if method == 'get_robot_state' and len(reply) < 64 and '\n' not in text:
                             continue
-                        if method == 'read_next_error' and not reply and (
-                                '\n' in text or not select.select([self.tcp_client], [], [], .05)[0]):
-                            break
                         if reply in ('-', '+'):
                             continue
                         if (method in ('force_GetGripperAngle', 'force_GetSpeed')
@@ -140,14 +137,14 @@ class Pro630Client(_VendorClient):
                 if ':' not in text:
                     raise RuntimeError(f'Malformed Pro630 response: {text!r}')
                 reply = text.split(':', 1)[1].strip()
-                if (not reply and method != 'read_next_error') or '\n' in reply or '\r' in reply:
+                if not reply or '\n' in reply or '\r' in reply:
                     raise RuntimeError(f'Invalid Pro630 response: {reply!r}')
                 if motion:
                     self._motion_reply['received'] = True
                 if (motion and (reply == '-1' or any(reason in reply.lower() for reason in (
                         'singular', 'no solution', 'no coordinate solution', 'no cartesian solution', 'no inverse',
-                        'exceed', 'out of range', 'not enabled', 'disabled', 'collision')))) or (method != 'read_next_error' and any(
-                        word in reply.lower() for word in ('error', 'failed', 'exception'))):
+                        'exceed', 'out of range', 'not enabled', 'disabled', 'collision')))) or any(
+                        word in reply.lower() for word in ('error', 'failed', 'exception')):
                     message = self._describe_rejection(reply)
                     if motion:
                         self._motion_reply['error'] = message
@@ -227,13 +224,6 @@ class Pro630Client(_VendorClient):
         if type(status) is not int or status not in (0, 1, 2, 3):
             raise RuntimeError('Invalid Pro630 gripper status')
         return status
-
-    def clear_error_information(self):
-        # Same SDK read_next_error operation, bounded instead of its endless loop.
-        for _ in range(64):
-            if self.send_command('read_next_error()') == '':
-                return 1
-        raise RuntimeError('Controller error queue did not clear')
 
     def sample_time(self, kind):
         return self._stamps.get(kind)
