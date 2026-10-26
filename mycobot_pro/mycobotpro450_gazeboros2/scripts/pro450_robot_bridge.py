@@ -22,6 +22,7 @@ from pro450_session_support import LIMITS_DEG, read_initial_snapshot
 from pro450_broker_support import FeatureLease
 from pro450_real_mirror import RealPoseBuffer
 from pro450_configuration import configure_node
+from pro450_control_logging import emit_log
 
 
 GRIPPER_SAMPLE_PERIOD = .1
@@ -51,6 +52,7 @@ class RobotBridge(Node):
         self.frame = None
         self.environment_ready = False
         self.environment_seen = 0.
+        self._feedback_error_log_times = {}
         try:
             self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20., ownership_timeout=0)
             # Startup sends no motion; only Cartesian error 36 may be cleared once.
@@ -71,12 +73,27 @@ class RobotBridge(Node):
                                 callback_group=ReentrantCallbackGroup())
             self.create_timer(.02, self.render)
             self.create_timer(.2, self.publish_snapshot)
+            self.create_timer(.2, self.check_transport)
             self.worker = threading.Thread(target=self.sample_loop, daemon=True)
             self.worker.start()
             self.get_logger().info('Public robot connection acquired; continuous tracking active. No startup motion sent.')
         except Exception:
             self.close()
             raise
+
+    def check_transport(self):
+        if self.sdk is not None:
+            reason = self.sdk.get_transport_error()
+            if reason:
+                raise RuntimeError(f'{reason}; restart the public environment after checking the connection')
+
+    def log_feedback_error(self, kind, exc):
+        now = time.monotonic()
+        fatal = bool(self.sdk.get_transport_error())
+        if fatal or now - self._feedback_error_log_times.get(kind, float('-inf')) >= 5.:
+            self._feedback_error_log_times[kind] = now
+            emit_log(self.get_logger(), f'{kind} feedback failed: {exc}',
+                     'error' if fatal else 'warning')
 
     def environment_state(self, msg):
         try:
@@ -101,7 +118,7 @@ class RobotBridge(Node):
         return False
 
     def sample_loop(self):
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set() and not self.sdk._closed.is_set():
             if self.lease.expired():
                 try:
                     with self.hardware_lock:
@@ -132,9 +149,12 @@ class RobotBridge(Node):
                             self.arm_active = False
             except Exception as exc:
                 error = str(exc)
+                self.log_feedback_error('Arm', exc)
             with self.cache_condition:
                 self.packet = {'sequence': self.packet['sequence'] + 1, 'value': value, 'error': error}
                 self.cache_condition.notify_all()
+            if self.sdk._closed.is_set():
+                return
             # Publish the arm packet before a possibly slow gripper query.
             if self.with_gripper and time.monotonic() >= self.next_gripper:
                 with self.hardware_lock:
@@ -143,8 +163,9 @@ class RobotBridge(Node):
                         updated = False
                         try:
                             updated = self.update_gripper(self.sdk.get_pro_gripper_angle())
-                        except Exception:
-                            pass  # Preserve the last measured opening and timestamp.
+                        except Exception as exc:
+                            # Preserve the last measured opening and timestamp.
+                            self.log_feedback_error('Gripper', exc)
                         # Schedule from query start; do not add another full
                         # sample period after each successful SDK response.
                         self.next_gripper = (max(started + GRIPPER_SAMPLE_PERIOD,
@@ -298,17 +319,44 @@ class RobotBridge(Node):
         self.snapshot_pub.publish(msg)
 
     def close(self):
+        clean = True
         self.stop_event.set()
         if self.worker is not None:
-            self.worker.join(timeout=1.)
+            try:
+                self.worker.join(timeout=1.)
+            except Exception as exc:
+                clean = False
+                self.get_logger().error(f'Shutdown sampler cleanup failed: {exc}')
         if self.sdk is not None:
             try:
                 with self.hardware_lock:
                     if self.lease.token is not None:
-                        self.release_owner(self.lease.token)
+                        if self.sdk._closed.is_set():
+                            clean = False
+                            self.get_logger().error(
+                                'Shutdown stop/hold not confirmed: transport is closed. '
+                                + (self.sdk.get_transport_error() or 'No transport failure detail available.'))
+                        else:
+                            try:
+                                self.release_owner(self.lease.token)
+                            except Exception as exc:
+                                clean = False
+                                self.get_logger().error(f'Shutdown stop/hold failed: {exc}')
+                        if self.lease.token is not None:
+                            try:
+                                self.lease.clear(self.lease.token)
+                            except Exception as exc:
+                                clean = False
+                                self.get_logger().error(f'Shutdown feature lease cleanup failed: {exc}')
             finally:
-                self.sdk.close()
-                self.sdk = None
+                try:
+                    self.sdk.close()
+                except Exception as exc:
+                    clean = False
+                    self.get_logger().error(f'Shutdown connection cleanup failed: {exc}')
+                finally:
+                    self.sdk = None
+        return clean
 
 
 def main():
@@ -334,7 +382,11 @@ def main():
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
         executor.shutdown(timeout_sec=1.)
         if node is not None:
-            node.close(); node.destroy_node()
+            try:
+                if not node.close():
+                    code = 1
+            finally:
+                node.destroy_node()
         rclpy.try_shutdown()
     raise SystemExit(code)
 

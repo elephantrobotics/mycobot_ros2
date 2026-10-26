@@ -34,6 +34,7 @@ from python_qt_binding.QtWidgets import (
 
 
 from pro450_control_logging import ControlLog, command_details, track_speed
+from pro450_number_display import PositiveZeroDisplay, format_fixed
 from pro450_configuration import ARM_JOINTS, GRIPPER_JOINT, JOINT_LIMITS_RAD, joints, configure_node
 COMMAND_JOINTS = joints(True)
 RAD_DISPLAY_DECIMALS = 4
@@ -41,6 +42,10 @@ RAD_SLIDER_SCALE = 10 ** RAD_DISPLAY_DECIMALS
 GRIPPER_DISPLAY_DECIMALS = 2
 JOINT_DISPLAY_DECIMALS = [RAD_DISPLAY_DECIMALS] * 6 + [GRIPPER_DISPLAY_DECIMALS]
 JOINT_SLIDER_SCALES = [10 ** decimals for decimals in JOINT_DISPLAY_DECIMALS]
+
+
+class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
+    pass
 
 
 class SliderGuiNode(Node):
@@ -194,7 +199,7 @@ class Pro450SliderWindow(QMainWindow):
             minimum, maximum = limits
             decimals = JOINT_DISPLAY_DECIMALS[row - 1]
             scale = JOINT_SLIDER_SCALES[row - 1]
-            target_box = QDoubleSpinBox()
+            target_box = DisplaySpinBox()
             target_box.setRange(minimum, maximum)
             target_box.setDecimals(decimals)
             target_box.setSingleStep(0.01)
@@ -296,7 +301,7 @@ class Pro450SliderWindow(QMainWindow):
                 label.setText(
                     "NaN"
                     if not math.isfinite(value)
-                    else f"{value:.{JOINT_DISPLAY_DECIMALS[index]}f}"
+                    else format_fixed(value, JOINT_DISPLAY_DECIMALS[index])
                 )
         if feedback_ok and not self.target_initialized:
             self.target_initialized = True

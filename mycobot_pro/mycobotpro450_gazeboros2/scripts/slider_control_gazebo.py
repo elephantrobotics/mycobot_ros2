@@ -42,7 +42,7 @@ MAX_TRAJECTORY_DURATION = 600.0
 SPLINE_PEAK_VELOCITY_FACTOR = 1.5
 REAL_POSE_TOLERANCE_RAD = 0.05
 WAYPOINT_ARM_TOLERANCE_RAD = math.radians(0.5)
-WAYPOINT_GRIPPER_TOLERANCE = 0.02
+WAYPOINT_GRIPPER_TOLERANCE = 0.05
 # Distance from the MoveIt-checked joint-space line that stops the real arm.
 LINE_DEVIATION_LIMIT_RAD = math.radians(1.0)
 GRIPPER_FOLLOW_STEP = 5
@@ -606,7 +606,8 @@ class SliderControl(CollisionCheck, Node):
                     except Exception:
                         measured = None
                     if (measured is not None and
-                            abs(measured[6] - grip_goal) <= WAYPOINT_GRIPPER_TOLERANCE):
+                            # Include integer-opening boundaries despite float rounding.
+                            abs(measured[6] - grip_goal) <= WAYPOINT_GRIPPER_TOLERANCE + 1e-12):
                         return True
                 if time.monotonic() >= deadline:
                     raise RuntimeError("timed out waiting for the real robot to arrive")

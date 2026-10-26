@@ -18,7 +18,12 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
     QPushButton)
 
 from pro450_control_logging import ControlLog, command_details, track_speed
+from pro450_number_display import PositiveZeroDisplay, format_fixed
 from pro450_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
+
+
+class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
+    pass
 
 
 class GuiTransport(Node):
@@ -90,7 +95,7 @@ class ControlWindow(QMainWindow):
             inner.addWidget(QLabel('Target'), 0, 1)
             inner.addWidget(QLabel('Measured'), 0, 2)
             for i, name in enumerate(names):
-                spin = QDoubleSpinBox()
+                spin = DisplaySpinBox()
                 spin.setDecimals(2)
                 spin.setSingleStep(1.)
                 if col == 0:
@@ -191,7 +196,7 @@ class ControlWindow(QMainWindow):
     def refresh(self):
         if self.node.with_gripper:
             measured = self.node.measured_gripper()
-            self.gripper_feedback.setText('—' if measured is None else f'{measured:.0f}')
+            self.gripper_feedback.setText('—' if measured is None else format_fixed(measured, 0))
         with self.node.lock:
             data, received = self.node.snapshot, self.node.received
         ready = False
@@ -202,7 +207,7 @@ class ControlWindow(QMainWindow):
                                              (self.coord_feedback, data['coords'], True)):
                 if values is not None:
                     for i, (label, value) in enumerate(zip(labels, values)):
-                        label.setText(f'{value:.2f} ' + ('mm' if cartesian and i < 3 else '°'))
+                        label.setText(format_fixed(value, 2) + ' ' + ('mm' if cartesian and i < 3 else '°'))
             if not self.seeded and data['angles'] is not None and data['coords'] is not None and age <= 1.:
                 for controls, values in ((self.joint_inputs, data['angles']), (self.coord_inputs, data['coords'])):
                     for control, value in zip(controls, values):

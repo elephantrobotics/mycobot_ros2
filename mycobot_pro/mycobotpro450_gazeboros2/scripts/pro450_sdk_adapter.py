@@ -19,6 +19,10 @@ except ImportError:
 ANGLES, MOVING, STOP, TOOL, ARRIVED = 0x20, 0x2B, 0x29, 0xB5, 0x5B
 
 
+class TransportClosedError(RuntimeError):
+    """A confirmed socket failure; ordinary receive polling is not a failure."""
+
+
 class SocketSendErrorLogFilter(logging.Filter):
     """Rate-limit repeated broken-pipe logs without changing SDK exceptions."""
     def __init__(self, interval=5.0, clock=time.monotonic):
@@ -78,15 +82,17 @@ class RobotConnectionLease:
     def close(self):
         if self.handle is None:
             return
-        if os.name == 'nt':
-            import msvcrt
-            self.handle.seek(0)
-            msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
-        self.handle.close()
-        self.handle = None
+        handle, self.handle = self.handle, None
+        try:
+            if os.name == 'nt':
+                import msvcrt
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
 
 
 class ResponseList(list):
@@ -164,14 +170,18 @@ class Pro450Client(_VendorClient):
             with self.lock:
                 if not isinstance(self.read_command, ResponseList):
                     self.read_command = ResponseList()
-        except Exception:
-            self.close()
+        except Exception as exc:
+            try:
+                self.close()
+            except Exception as cleanup_exc:
+                raise RuntimeError(f'{exc}; connection cleanup failed: {cleanup_exc}') from exc
             raise
 
     def _adapter_init(self, feedback_hz=10.0):
         self._api_lock = threading.RLock()
         self._feedback_lock = threading.RLock()
         self._closed = threading.Event()
+        self._transport_error = None
         self._pending = {}
         self._last_reply = {}
         self._latest_angle = None
@@ -185,6 +195,35 @@ class Pro450Client(_VendorClient):
         self.invalid_frames = 0
         self.feedback_error = ''
         self._motion_reply = None
+
+    def get_transport_error(self):
+        """Return the first fatal socket error without another SDK query."""
+        with self._feedback_lock:
+            return self._transport_error
+
+    def _record_transport_failure(self, operation, exc):
+        with self._feedback_lock:
+            if self._transport_error is None:
+                pending = ','.join(f'0x{genre:02X}' for genre in self._pending)
+                prefix = bytes(getattr(self, 'buffer', b'')[:256])
+                self._transport_error = (
+                    f'Pro450 transport failed during {operation}: '
+                    f'{type(exc).__name__}: {exc}; pending=[{pending}]; reply_prefix={prefix!r}')
+            reason = self._transport_error
+            self.feedback_error = reason
+            self._closed.set()
+        event = getattr(self, 'event', None)
+        if event is not None:
+            event.set()
+        # Do not join the receiver while a vendor API holds its response locks.
+        # The public owner performs final resource/lease cleanup on shutdown.
+        sock = getattr(self, 'sock', None)
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        return reason
 
     def set_angle_callback(self, callback):
         with self._feedback_lock:
@@ -206,18 +245,22 @@ class Pro450Client(_VendorClient):
         guard = nullcontext() if genre == STOP and kwargs.get('_async') else self._api_lock
         with guard:
             if self._closed.is_set():
-                raise RuntimeError('Pro450 connection closed')
+                raise TransportClosedError(self.get_transport_error() or 'Pro450 connection closed')
             if genre == ANGLES:
                 delay = self._next_angles - time.monotonic()
                 if delay > 0 and self._closed.wait(delay):
-                    raise RuntimeError('Pro450 connection closed')
+                    raise TransportClosedError(self.get_transport_error() or 'Pro450 connection closed')
                 self._next_angles = time.monotonic() + self._angle_period
             self._clean_response(genre)
             with self._feedback_lock:
                 self._pending[genre] = {'sent': None, 'register': None}
                 self._last_reply.pop(genre, None)
             try:
-                return super()._mesg(genre, *args, **kwargs)
+                result = super()._mesg(genre, *args, **kwargs)
+                reason = self.get_transport_error()
+                if reason:
+                    raise TransportClosedError(reason)
+                return result
             finally:
                 with self.lock_out:
                     with self.lock:
@@ -235,6 +278,8 @@ class Pro450Client(_VendorClient):
             return None if self._motion_reply is None else dict(self._motion_reply)
 
     def _send_command(self, genre, real_command):
+        if self._closed.is_set():
+            raise TransportClosedError(self.get_transport_error() or 'Pro450 connection closed')
         raw = self._flatten(real_command)
         with self._feedback_lock:
             if genre in (0x22, 0x25):  # SEND_ANGLES / SEND_COORDS
@@ -246,7 +291,11 @@ class Pro450Client(_VendorClient):
         # The caller already holds the vendor lock.
         self.write_command[:] = [g for g in self.write_command if g != genre]
         self.write_command.append(genre)
-        self._write(raw, method='socket')
+        try:
+            self._write(raw, method='socket')
+        except OSError as exc:
+            raise TransportClosedError(
+                self._record_transport_failure(f'send command 0x{genre:02X}', exc)) from exc
 
     def _parse_frames(self, buffer):
         frames = []
@@ -333,13 +382,18 @@ class Pro450Client(_VendorClient):
             if not isinstance(self.read_command, ResponseList):
                 self.read_command = ResponseList()
         self.buffer = bytearray()
-        self.sock.settimeout(0.1)
+        try:
+            self.sock.settimeout(0.1)
+        except OSError as exc:
+            if not self._closed.is_set():
+                self._record_transport_failure('receiver setup', exc)
+            return
         while not self._closed.is_set():
             try:
                 raw = self.sock.recv(4096)
                 if not raw:
-                    self.feedback_error = 'Pro450 peer disconnected'
-                    self.event.set()
+                    if not self._closed.is_set():
+                        self._record_transport_failure('receive', ConnectionError('Pro450 peer disconnected'))
                     break
                 mono, wall = time.monotonic(), time.time()
                 self.buffer.extend(raw)
@@ -349,8 +403,7 @@ class Pro450Client(_VendorClient):
                 continue
             except OSError as exc:
                 if not self._closed.is_set():
-                    self.feedback_error = str(exc)
-                    self.event.set()
+                    self._record_transport_failure('receive', exc)
                 break
 
     def diagnostics(self):
@@ -361,25 +414,48 @@ class Pro450Client(_VendorClient):
             sample = self._latest_angle
             return {'queued_responses': count, 'discarded_responses': dropped,
                     'invalid_frames': self.invalid_frames, 'feedback_error': self.feedback_error,
+                    'transport_error': self._transport_error,
                     'angle_age_s': None if sample is None else time.monotonic() - sample.monotonic}
 
     def close(self):
         self._closed.set()
+        errors = []
         self.set_angle_callback(None)
+        event = getattr(self, 'event', None)
+        if event is not None:
+            event.set()
         sock = getattr(self, 'sock', None)
         if sock is not None:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
-            sock.close()
+            except Exception as exc:
+                errors.append(f'socket shutdown failed: {exc}')
+            try:
+                sock.close()
+            except Exception as exc:
+                errors.append(f'socket close failed: {exc}')
         thread = getattr(self, 'read_threading', None)
         if thread is not None and thread is not threading.current_thread():
-            thread.join(timeout=1.0)
+            try:
+                thread.join(timeout=1.0)
+                if thread.is_alive():
+                    errors.append('receiver did not exit within 1 s')
+            except Exception as exc:
+                errors.append(f'receiver cleanup failed: {exc}')
         log_filter = getattr(self, '_socket_log_filter', None)
         if log_filter is not None:
-            self.log.removeFilter(log_filter)
             self._socket_log_filter = None
+            try:
+                self.log.removeFilter(log_filter)
+            except Exception as exc:
+                errors.append(f'log filter cleanup failed: {exc}')
         if self._lease is not None:
-            self._lease.close()
-            self._lease = None
+            lease, self._lease = self._lease, None
+            try:
+                lease.close()
+            except Exception as exc:
+                errors.append(f'connection lease cleanup failed: {exc}')
+        if errors:
+            raise RuntimeError('; '.join(errors))
