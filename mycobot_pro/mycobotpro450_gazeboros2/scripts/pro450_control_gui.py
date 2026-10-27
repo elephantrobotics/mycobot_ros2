@@ -102,7 +102,10 @@ class ControlWindow(QMainWindow):
                     lo, hi = JOINT_LIMITS_RAD[i]
                     spin.setRange(math.degrees(lo), math.degrees(hi))
                 else:
-                    spin.setRange(-5000., 5000.) if i < 3 else spin.setRange(-180., 180.)
+                    if i < 3:
+                        spin.setRange(*((-474., 474.), (-474., 474.), (0., 677.))[i])
+                    else:
+                        spin.setRange(-180., 180.)
                 spin.setSuffix(' ' + (unit or ('mm' if i < 3 else '°')))
                 spin.setMinimumWidth(130)
                 value = QLabel('—')

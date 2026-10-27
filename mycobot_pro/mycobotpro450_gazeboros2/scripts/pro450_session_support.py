@@ -40,18 +40,13 @@ class EnvironmentLatch:
 
 
 def read_initial_snapshot(sdk, clock=time.monotonic, sleep=time.sleep, with_gripper=True):
-    """Acquire a stable pose, clearing Cartesian error 36 once if necessary."""
+    """Clear errors once, then acquire a stable pose without motion/enable."""
     if sdk.is_power_on() != 1:
         raise RuntimeError('Pro450 is not powered; automatic power-on is forbidden')
+    # Exactly one clear call per public real startup, including no-error starts.
+    # Persistent faults still reject startup on the following error read.
+    sdk.clear_error_information()
     error = sdk.get_error_information()
-    if error == 36:
-        # Clear only this Cartesian error, without power/enable or motion calls.
-        # A fresh error read, rather than a write acknowledgement, confirms it.
-        reply = sdk.clear_error_information()
-        error = sdk.get_error_information()
-        if type(error) is not int or error != 0:
-            raise RuntimeError(f'Failed to clear Pro450 error 36 '
-                               f'(clear reply={reply!r}, error reply={error!r})')
     if error not in (0, None):
         raise RuntimeError(f'Pro450 reports error {error}')
     samples = []
@@ -124,7 +119,7 @@ def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10
     return result['value']
 
 
-def control_commands(feature, environment, executable_directory, python, show_force_execute=False, with_gripper=True):
+def control_commands(feature, environment, executable_directory, python, with_gripper=True):
     """Explicit process allowlist: no Gazebo, MoveIt or additional SDK owner."""
     from pathlib import Path
     root = Path(executable_directory)
@@ -139,15 +134,15 @@ def control_commands(feature, environment, executable_directory, python, show_fo
             'mode': environment, 'use_sim_time': 'true'}),
             command('pro450_slider_gui.py', {
                 'environment': environment,
-                'show_force_execute': 'true' if show_force_execute else 'false',
                 'use_sim_time': 'false' if environment == 'real' else 'true'})]
     if feature == 'gui':
         return [command('pro450_gui_backend.py', {'use_sim_time': 'false'}),
                 command('pro450_control_gui.py', {'use_sim_time': 'false'})]
     if feature == 'keyboard':
+        if environment != 'real':
+            raise ValueError('Cartesian keyboard control requires the real environment')
         return [command('teleop_keyboard_gazebo.py', {
-            'mode': environment, 'use_sim_time': 'false',
-            'real_hold_enabled': 'true', 'real_gripper_hold_enabled': 'true'})]
+            'mode': 'real', 'use_sim_time': 'false'})]
     if feature == 'drag':
         if environment != 'real':
             raise ValueError('Drag following requires the real environment')

@@ -47,7 +47,7 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES scripts/pro450_configuration.py scripts/pro450_hold_profile.py scripts/pro450_real_keyboard.py
+install(FILES scripts/pro450_configuration.py scripts/pro450_real_keyboard.py
   scripts/pro450_session_support.py
   scripts/pro450_drag_support.py
   scripts/pro450_public_client.py
@@ -58,6 +58,9 @@ install(FILES scripts/pro450_configuration.py scripts/pro450_hold_profile.py scr
   scripts/pro450_collision_check.py
   scripts/pro450_control_logging.py
   scripts/pro450_number_display.py
+  scripts/pro450_startup_ground.py
+  scripts/pro450_tool_reference.py
+  scripts/pro450_cartesian_keyboard.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

@@ -114,9 +114,6 @@ class SliderControl(CollisionCheck, Node):
         self.create_subscription(
             JointState, "/pro450/slider_targets", self._target_cb, 10
         )
-        self.create_subscription(
-            JointState, "/pro450/slider_force_targets", self._force_target_cb, 10
-        )
         self.create_subscription(Empty, "/pro450/slider_stop", self._stop_cb, 10)
 
         self.validity_client = self.create_client(
@@ -321,17 +318,9 @@ class SliderControl(CollisionCheck, Node):
     def _target_cb(self, msg):
         if self.mode == 2 and not self._real_motion_enabled:
             return
-        self._handle_target(msg, force_collision=False)
+        self._handle_target(msg)
 
-    def _force_target_cb(self, msg):
-        if self.mode != 1:
-            self._publish_status(
-                "Rejected: collision override is disabled in Real Robot + Gazebo mode.", level="warning"
-            )
-            return
-        self._handle_target(msg, force_collision=True)
-
-    def _handle_target(self, msg, force_collision):
+    def _handle_target(self, msg):
         if "teleop_keyboard_gazebo" in self.get_node_names():
             self._publish_status("Rejected: keyboard controller is running.", level="warning")
             return
@@ -398,23 +387,17 @@ class SliderControl(CollisionCheck, Node):
 
         threading.Thread(
             target=self._validate_and_execute,
-            args=(current, target, speed_scale, force_collision),
+            args=(current, target, speed_scale),
             daemon=True,
         ).start()
 
-    def _validate_and_execute(self, current, target, speed_scale, force_collision):
+    def _validate_and_execute(self, current, target, speed_scale):
         try:
-            if force_collision:
-                self._publish_status(
-                    "WARNING: simulation-only collision override active; "
-                    "MoveIt collision validation is being skipped.", level="warning"
-                )
-            else:
-                self._publish_status("Validating interpolated path for collisions...")
-                valid, reason = self._path_is_valid(current, target)
-                if not valid:
-                    self._publish_status(f"Rejected: {reason}", level="warning")
-                    return
+            self._publish_status("Validating interpolated path for collisions...")
+            valid, reason = self._path_is_valid(current, target)
+            if not valid:
+                self._publish_status(f"Rejected: {reason}", level="warning")
+                return
 
             duration = self._trajectory_duration(current, target, speed_scale)
             if self._stop_requested:
@@ -423,9 +406,8 @@ class SliderControl(CollisionCheck, Node):
 
             self._publish_trajectory(target, duration)
 
-            execution_kind = "FORCE SIMULATION" if force_collision else "Executing"
             self._publish_status(
-                f"{execution_kind} at {speed_scale * 100:.0f}% speed; "
+                f"Executing at {speed_scale * 100:.0f}% speed; "
                 f"planned duration {duration:.2f} s."
             )
             if self._stop_event.wait(duration):

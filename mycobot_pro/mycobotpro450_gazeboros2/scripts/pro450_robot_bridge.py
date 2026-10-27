@@ -23,6 +23,7 @@ from pro450_broker_support import FeatureLease
 from pro450_real_mirror import RealPoseBuffer
 from pro450_configuration import configure_node
 from pro450_control_logging import emit_log
+from pro450_tool_reference import ToolReferenceContext
 
 
 GRIPPER_SAMPLE_PERIOD = .1
@@ -35,6 +36,7 @@ class RobotBridge(Node):
         super().__init__('pro450_robot_bridge')
         configure_node(self)
         self.sdk = None
+        self.tool_reference = None
         self.hardware_lock = threading.RLock()
         self.cache_condition = threading.Condition()
         self.stop_event = threading.Event()
@@ -55,7 +57,9 @@ class RobotBridge(Node):
         self._feedback_error_log_times = {}
         try:
             self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20., ownership_timeout=0)
-            # Startup sends no motion; only Cartesian error 36 may be cleared once.
+            self.tool_reference = ToolReferenceContext(self.sdk)
+            # Startup clears errors once but sends no motion or motor-enable calls.
+            self.get_logger().info('Startup: clearing controller errors once before stable pose acquisition.')
             self.initial_pose = read_initial_snapshot(self.sdk, with_gripper=self.with_gripper)
             self.gripper = self.initial_pose[6] if self.with_gripper else None
             self.stamps = {kind: self.sdk.sample_time(kind) for kind in (('arm', 'gripper') if self.with_gripper else ('arm',))}
@@ -186,6 +190,8 @@ class RobotBridge(Node):
             self.sdk.set_pro_gripper_angle(int(round(opening)))
             self.gripper_active = False
             self.update_gripper(opening)
+        if self.lease.feature in ('gui', 'keyboard') and self.tool_reference is not None:
+            self.tool_reference.restore()
         self.lease.clear(token)
 
     def rpc(self, req, res):
@@ -205,7 +211,26 @@ class RobotBridge(Node):
                 with self.hardware_lock:
                     if not self.environment_ready or time.monotonic() - self.environment_seen > 2.:
                         raise RuntimeError('Public environment is not ready for a control feature')
+                    # Reconcile any failed setup rollback before another feature
+                    # can acquire the controller's global tool settings.
+                    if self.lease.token is None and self.tool_reference is not None:
+                        self.tool_reference.restore()
+                    already_owned = self.lease.token == req.token
+                    if already_owned and self.lease.feature != args[0]:
+                        raise RuntimeError('Control feature does not match the existing owner')
                     self.lease.claim(req.token, args[0])
+                    if not already_owned and (args[0] == 'keyboard' or (args[0] == 'gui' and self.with_gripper)):
+                        try:
+                            self.tool_reference.apply(with_gripper=self.with_gripper,
+                                reference_frame=0 if args[0] == 'keyboard' else None,
+                                interpolation=args[0] == 'keyboard')
+                            self.lease.touch(req.token)
+                            self.get_logger().info(
+                                f'{args[0]} coordinate settings ready; ' +
+                                ('tool TCP Z=165 mm.' if self.with_gripper else 'flange control.'))
+                        except Exception:
+                            self.lease.clear(req.token)
+                            raise
                     self.mirror.clear()
                 result = True
             elif method == 'get_angles':
@@ -231,8 +256,8 @@ class RobotBridge(Node):
                             raise ValueError('Drag mode may only enable or disable the default gripper')
                         # Record ownership before writes so loss of a reply or
                         # GUI process cannot orphan a command in the robot.
-                        if self.lease.feature == 'gui':
-                            if method in ('send_angles', 'send_coords'):
+                        if self.lease.feature in ('gui', 'keyboard'):
+                            if method in ('send_angles', 'send_coords', 'jog_coord'):
                                 self.arm_active, self.arm_goal = True, None
                             elif method == 'set_pro_gripper_angle':
                                 self.gripper_active = True
@@ -246,12 +271,9 @@ class RobotBridge(Node):
                             self.update_gripper(result)
                         elif method == 'set_pro_gripper_angle' and result == 1:
                             self.gripper_active = True
-                        elif method in ('send_angles', 'send_angle', 'jog_angle'):
+                        elif method in ('send_angles', 'jog_coord'):
                             self.arm_active = True
                             self.arm_goal = list(args[0]) if method == 'send_angles' else None
-                            if method == 'send_angle' and self.frame:
-                                self.arm_goal = [math.degrees(v) for v in self.frame[2][:6]]
-                                self.arm_goal[int(args[0])-1] = args[1]
                         elif method == 'stop':
                             if result not in (0, 1):
                                 raise RuntimeError(f'Robot STOP failed: {result!r}')
@@ -330,12 +352,23 @@ class RobotBridge(Node):
         if self.sdk is not None:
             try:
                 with self.hardware_lock:
+                    if (self.lease.token is None and self.tool_reference is not None
+                            and self.tool_reference.saved is not None):
+                        try:
+                            if self.sdk._closed.is_set():
+                                raise RuntimeError('transport is closed')
+                            self.tool_reference.restore()
+                        except Exception as exc:
+                            clean = False
+                            self.get_logger().error(f'Control tool reference restoration failed: {exc}')
                     if self.lease.token is not None:
                         if self.sdk._closed.is_set():
                             clean = False
                             self.get_logger().error(
                                 'Shutdown stop/hold not confirmed: transport is closed. '
                                 + (self.sdk.get_transport_error() or 'No transport failure detail available.'))
+                            if self.tool_reference is not None and self.tool_reference.saved is not None:
+                                self.get_logger().error('Control tool reference restoration not confirmed: transport is closed.')
                         else:
                             try:
                                 self.release_owner(self.lease.token)

@@ -24,7 +24,6 @@ from python_qt_binding.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QSlider,
     QSpinBox,
@@ -55,16 +54,11 @@ class SliderGuiNode(Node):
         super().__init__("pro450_slider_gui")
         configure_node(self)
         self.declare_parameter("environment", "simulation")
-        self.declare_parameter("show_force_execute", False)
-        self.show_force_execute = self.get_parameter("show_force_execute").value
         self.environment = str(self.get_parameter("environment").value).strip().lower()
         if self.environment not in ("simulation", "real"):
             raise ValueError("environment must be simulation or real")
         self.target_pub = self.create_publisher(
             JointState, "/pro450/slider_targets", 10
-        )
-        self.force_target_pub = self.create_publisher(
-            JointState, "/pro450/slider_force_targets", 10
         )
         self.stop_pub = self.create_publisher(Empty, "/pro450/slider_stop", 10)
         feedback_topic = (
@@ -137,9 +131,7 @@ class SliderGuiNode(Node):
             return values + (self._status_revision,) if include_status_revision else values
 
 
-    def execute(self, positions_rad, speed_percent, force_collision=False):
-        if force_collision and self.environment != "simulation":
-            return False
+    def execute(self, positions_rad, speed_percent):
         with self._lock:
             if self._command_pending or self._command_busy:
                 return False
@@ -154,9 +146,8 @@ class SliderGuiNode(Node):
         # the requested 1..100 percent speed scale without a custom message.
         speed_rad_s = max(0.01, min(1.0, speed_percent / 100.0))
         msg.velocity = [speed_rad_s] * len(self.command_joints)
-        publisher = self.force_target_pub if force_collision else self.target_pub
         try:
-            publisher.publish(msg)
+            self.target_pub.publish(msg)
         except Exception:
             with self._lock:
                 self._command_pending = False
@@ -203,6 +194,13 @@ class Pro450SliderWindow(QMainWindow):
             target_box.setRange(minimum, maximum)
             target_box.setDecimals(decimals)
             target_box.setSingleStep(0.01)
+            target_box.setReadOnly(True)
+            target_box.setButtonSymbols(QDoubleSpinBox.NoButtons)
+            target_box.setFocusPolicy(Qt.NoFocus)
+            target_box.setFrame(False)
+            target_box.setStyleSheet(
+                "QDoubleSpinBox, QLineEdit { background: transparent; border: none; padding: 0px; }"
+            )
 
             slider = QSlider(Qt.Horizontal)
             slider.setFixedWidth(560)
@@ -214,6 +212,9 @@ class Pro450SliderWindow(QMainWindow):
 
             actual_label = QLabel("--")
             actual_label.setFixedWidth(100)
+            target_box.setFixedWidth(100)
+            target_box.setFont(actual_label.font())
+            target_box.setAlignment(actual_label.alignment())
 
             slider.valueChanged.connect(
                 lambda value, box=target_box, scale=scale: box.setValue(
@@ -259,15 +260,6 @@ class Pro450SliderWindow(QMainWindow):
         self.execute_button.setEnabled(False)
         self.execute_button.clicked.connect(self._execute)
         controls.addWidget(self.execute_button)
-
-        self.force_execute_button = QPushButton("Force Execute (Sim Only)")
-        self.force_execute_button.setEnabled(self.node.environment != "simulation")
-        self.force_execute_button.setStyleSheet(
-            "font-weight: bold; color: #7a3e00; background: #ffd180;"
-        )
-        self.force_execute_button.clicked.connect(self._force_execute)
-        controls.addWidget(self.force_execute_button)
-        self.force_execute_button.setVisible(self.node.show_force_execute)
 
         self.stop_button = QPushButton("STOP")
         self.stop_button.setStyleSheet("font-weight: bold; color: white; background: #b00020;")
@@ -316,7 +308,6 @@ class Pro450SliderWindow(QMainWindow):
 
         can_execute = feedback_ok and not self.node.command_busy()
         self.execute_button.setEnabled(can_execute)
-        self.force_execute_button.setEnabled(self.node.environment != "simulation" or can_execute)
         if not feedback_ok:
             self.last_status = None
             self._set_status(
@@ -353,56 +344,9 @@ class Pro450SliderWindow(QMainWindow):
             self.log.event("Execute not submitted: a command is already pending or busy.", "warning")
             return
         self.execute_button.setEnabled(False)
-        self.force_execute_button.setEnabled(self.node.environment != "simulation")
         # Capture before publish so even an immediate reply is rendered.
         self.last_status, self.last_status_revision = previous_status
         self._set_status("Command submitted; waiting for validation...")
-        self.user_edited_target = False
-
-    def _force_execute(self):
-        self.log.event("Force Execute requested.")
-        if self.node.environment != "simulation":
-            text = ("Force Execute is available only in Simulation mode.\n"
-                    "This action is disabled in Real Robot mode. No motion command has been sent.")
-            self.log.event(text, 'warning')
-            QMessageBox.warning(self, "Force Execute Unavailable", text)
-            return
-        if self.node.command_busy():
-            self.log.event("Force Execute not submitted: a command is already pending or busy.", "warning")
-            return
-        text = (
-            "This bypasses MoveIt collision rejection and is allowed only in "
-            "Gazebo simulation mode. Motion uses the speed selected in the slider window. "
-            "Joint limits, finite feedback, and STOP remain active. Gazebo physical self-contact is "
-            "disabled, so intersecting robot links will not stop the motion.\n\n"
-            "Execute this target anyway?"
-        )
-        self.log.event(text, "warning")
-        answer = QMessageBox.warning(
-            self, "Simulation Collision Override", text,
-            QMessageBox.Yes | QMessageBox.Cancel,
-            QMessageBox.Cancel,
-        )
-        if answer != QMessageBox.Yes:
-            self.log.event("Force Execute cancelled; no command submitted.")
-            return
-        self.log.event("Force Execute confirmed.")
-
-        positions = self._target_positions_rad()
-        forced_speed = self.speed_box.value()
-        self.log.event(command_details("Force Execute", positions, forced_speed))
-        previous_status = self.node.snapshot(include_status_revision=True)[3:]
-        if not self.node.execute(positions, forced_speed, force_collision=True):
-            self.log.event("Force Execute not submitted: a command is already pending or busy.", "warning")
-            return
-        self.execute_button.setEnabled(False)
-        self.force_execute_button.setEnabled(False)
-        # Capture before publish so even an immediate reply is rendered.
-        self.last_status, self.last_status_revision = previous_status
-        self._set_status(
-            f"FORCE simulation command submitted at {forced_speed}% maximum; "
-            "collision validation and physical self-contact will be bypassed."
-        )
         self.user_edited_target = False
 
     def _randomize_target(self):

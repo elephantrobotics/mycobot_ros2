@@ -268,6 +268,8 @@ class GuiBackend(CollisionCheck, Node):
     def execute(self, command):
         self.cancelled()
         kind, target, speed = command['kind'], command['target'], command['speed']
+        if kind == 'coords' and target[2] < 0:
+            raise CommandRejected('Target Z must be at least 0 mm.')
         if kind == 'clear_errors':
             self.mc.clear_error_information()
             self.cancelled()

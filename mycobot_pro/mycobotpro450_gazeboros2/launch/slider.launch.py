@@ -372,6 +372,7 @@ def _build_environment(context):
         name="pro450_pose_gate",
         output="screen",
         parameters=[
+            moveit_config.robot_description,
             {
                 "output_file": ParameterValue(real_snapshot_file, value_type=str),
                 "with_gripper": with_gripper,
@@ -451,6 +452,6 @@ def _build_environment(context):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument("with_gripper", default_value="true", choices=["true", "false"]),
+        DeclareLaunchArgument("with_gripper", default_value="false", choices=["true", "false"]),
         OpaqueFunction(function=_build_environment),
     ])

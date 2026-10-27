@@ -25,6 +25,8 @@ class DragFollow(Node):
         self.sdk = None
         self.worker = None
         self.stop_event = threading.Event()
+        self._closing = False
+        self._clear_errors_on_exit = False
         try:
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
@@ -46,6 +48,7 @@ class DragFollow(Node):
             self.sdk.set_angle_callback(self._sample)
             self.worker = threading.Thread(target=self._read_loop, daemon=True)
             self.worker.start()
+            self._clear_errors_on_exit = True
         except Exception:
             self.close()
             raise
@@ -76,13 +79,26 @@ class DragFollow(Node):
         return enabled, pending, message, True
 
     def close(self):
+        if self._closing:
+            return
+        self._closing = True
         self.stop_event.set()
         if self.sdk is not None:
-            self.sdk.close()
-            self.sdk = None
+            try:
+                if self._clear_errors_on_exit:
+                    self.log.event('Exit error clear requested.')
+                    try:
+                        result = self.sdk.clear_error_information()
+                        self.log.event(f'Exit error clear returned {result!r}.',
+                                       'info' if type(result) is int and result in (0, 1) else 'warning')
+                    except Exception as exc:
+                        self.log.event(f'Exit error clear failed: {exc}', 'error')
+            finally:
+                self.sdk.close()
+                self.sdk = None
         if self.worker is not None:
             self.worker.join(timeout=1.0)
-        # No automatic enable, disable, STOP, motion or gripper write on exit.
+        # Only clear errors: no enable, disable, STOP, motion or gripper write.
         self.log.state('closing', True, 'Drag following closed; motor enable states are preserved.')
 
 

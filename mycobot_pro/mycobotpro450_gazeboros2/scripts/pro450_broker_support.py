@@ -9,9 +9,9 @@ WRITES = {
             'get_coords', 'get_pro_gripper_status', 'send_coords', 'is_in_position',
             'clear_error_information', 'get_motion_status'},
     'slider': {'send_angles', 'set_pro_gripper_angle', 'set_pro_gripper_speed', 'stop'},
-    'keyboard': {'send_angle', 'jog_angle', 'set_fresh_mode', 'set_pro_gripper_angle',
+    'keyboard': {'jog_coord', 'get_coords', 'set_pro_gripper_angle',
                  'set_pro_gripper_speed', 'stop'},
-    'drag': {'set_motor_enabled', 'set_pro_gripper_enabled'},
+    'drag': {'set_motor_enabled', 'set_pro_gripper_enabled', 'clear_error_information'},
 }
 
 

@@ -53,8 +53,7 @@ class ControlLog:
 
 def command_details(kind, target, speed):
     units = {'joints': 'deg', 'coords': 'mm/deg', 'gripper': 'normalized 0..1',
-             'Execute': 'rad; gripper normalized 0..1',
-             'Force Execute': 'rad; gripper normalized 0..1'}
+             'Execute': 'rad; gripper normalized 0..1'}
     return f'{kind} requested: target={target} ({units.get(kind, "none")}), speed={speed}%.'
 
 
