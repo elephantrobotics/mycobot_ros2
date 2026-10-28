@@ -53,7 +53,7 @@ ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gri
 - 真机环境：启动时会读取一次真机姿态快照，并映射到 Gazebo 环境中。使用前需确认机械臂、末端、夹爪的固件版本为最新，并确保机械臂和夹爪通信正常。
 - 纯仿真环境：默认从零位开始。
 
-如果坐标控制期间机械臂本体陷入水平面以下，则调用以下指令强制拉起公共环境：
+如果坐标控制期间机械臂本体陷入水平面以下，则调用以下指令临时强制拉起公共环境：
 
 ```bash
 # 真机环境 带夹爪
@@ -63,8 +63,9 @@ ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gri
 ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gripper:=false allow_collision:=true
 ```
 
-- 启动后，角度控制会被拒绝。需使用坐标控制器（键盘控制 或 GUI 控制）沿 Z 轴上移，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
+- 启动后的初始阶段，角度控制会被拒绝。需使用坐标控制器（键盘控制或 GUI 控制）沿 Z 轴上移，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
 - `allow_collision:=true` 仅用于应急：坐标运动导致机械臂本体低于水平面的特殊情况。该参数默认为 `false`，且仅支持真机，即 `environment:=real`。
+- 该模式仅临时用于坐标运动导致机械臂本体陷入水平面以下的特殊情况。脱离异常区域后，请切换回正常公共环境使用机械臂。
 - 本工程的坐标运动仅限制末端不陷入水平面以下。具体见键盘控制的操作说明。
 
 ## 滑块与随机目标
@@ -133,6 +134,7 @@ ros2 launch mycobotpro450_gazeboros2 drag_follow_gazebo.launch.py
 - 启动成功后，会拉起用于`拖动跟随`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
 - `M`：控制六轴进入或退出零力拖动模式，并控制夹爪使能或失能。六轴进入零力拖动模式后，听到机械臂发出两声咔咔声，再托住机械臂手动拖动；夹爪失能后可手动掰动。Gazebo 公共环境中的机械臂跟随真机运动。再次按下 `M`，锁紧六轴和夹爪。
 - `Q`：关闭窗口退出。
+- 拖动跟随期间，如果关节超限，LED 光圈会变为蓝色。此时仍可正常失能关节并运动。退出拖动跟随界面前，请将机械臂运动到零位附近，并确认关节未超限。程序退出时会自动清错。
 
 ## GUI 控制
 
