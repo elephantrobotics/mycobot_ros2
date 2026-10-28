@@ -110,7 +110,7 @@ class StartupGroundCheck:
         if not self.geometry:
             raise ValueError('No non-base collision geometry available for startup floor check')
 
-    def check(self, positions):
+    def check(self, positions, allow_collision=False):
         transforms, joint_values = {'world': IDENTITY}, {}
 
         def value(joint, visiting):
@@ -169,7 +169,7 @@ class StartupGroundCheck:
                 raise ValueError(f'Non-finite collision height on {name}')
             minimum = min(minimum, (height, name))
         height, name = minimum
-        if height < -1e-9:
+        if height < -1e-9 and not allow_collision:
             raise RuntimeError(
                 'Startup rejected: the robot pose is below the base ground plane. '
                 'Move it above the base ground plane before restarting. '

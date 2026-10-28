@@ -85,6 +85,8 @@ class SliderControl(CollisionCheck, Node):
         if mode_name not in ("simulation", "real"):
             raise ValueError("mode must be either 'simulation' or 'real'.")
         self.mode = 2 if mode_name == "real" else 1
+        if self.allow_collision and self.mode != 2:
+            raise ValueError("allow_collision is supported only by the real environment")
         self.startup_stable_samples = max(
             2, int(self.get_parameter("startup_stable_samples").value)
         )
@@ -227,7 +229,7 @@ class SliderControl(CollisionCheck, Node):
                 f"Connecting to Pro450 @ {self.pro450_ip}:{self.pro450_port}"
             )
             self.mc = Pro450Client(self.pro450_ip, self.pro450_port,
-                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider", with_gripper=self.with_gripper)
+                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider", with_gripper=self.with_gripper, allow_collision=self.allow_collision)
             power_state = self.mc.is_power_on()
             if power_state != 1:
                 raise RuntimeError(
@@ -393,7 +395,8 @@ class SliderControl(CollisionCheck, Node):
 
     def _validate_and_execute(self, current, target, speed_scale):
         try:
-            self._publish_status("Validating interpolated path for collisions...")
+            self._publish_status("Collision checks bypassed (allow_collision=true)." if self.allow_collision
+                                 else "Validating interpolated path for collisions...")
             valid, reason = self._path_is_valid(current, target)
             if not valid:
                 self._publish_status(f"Rejected: {reason}", level="warning")
@@ -608,7 +611,8 @@ class SliderControl(CollisionCheck, Node):
 
         def validate():
             try:
-                self._publish_status("Validating interpolated path for collisions...")
+                self._publish_status("Collision checks bypassed (allow_collision=true)." if self.allow_collision
+                                 else "Validating interpolated path for collisions...")
                 valid, reason = self._path_is_valid(current, target)
                 result['value'] = valid, reason
             except Exception as exc:

@@ -18,8 +18,10 @@ DEFAULT_HOME_POSE_DEG = (0., -10., -123., 45., 0., 0.)
 
 
 class CartesianKeyboardTransport:
-    def __init__(self, sdk, with_gripper=True, clock=time.monotonic, report=None):
+    def __init__(self, sdk, with_gripper=True, clock=time.monotonic, report=None, allow_collision=False):
         self.sdk, self.with_gripper, self.clock = sdk, with_gripper, clock
+        from pro450_configuration import collision_policy
+        self.allow_collision = collision_policy(allow_collision)
         self.report = report or (lambda text: None)
         self.lock = threading.RLock()
         self.shutdown = threading.Event()
@@ -273,7 +275,7 @@ class CartesianKeyboardTransport:
             # latency is added to every 50 ms period. Calls never overlap.
             self.next_feedback = started + COORD_POLL_PERIOD
             was_low = self.low_z
-            self.low_z = values[2] <= LOW_Z_MM
+            self.low_z = not self.allow_collision and values[2] <= LOW_Z_MM
             entered = self.low_z and not was_low
             if entered:
                 # Latch the entry, not every low sample: M may subsequently

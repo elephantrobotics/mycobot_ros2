@@ -228,7 +228,8 @@ class RobotBridge(Node):
             if not self.with_gripper and 'gripper' in method:
                 raise RuntimeError('Gripper operations are unavailable in the arm-only environment')
             if method == 'get_capabilities':
-                result = {'with_gripper': self.with_gripper, 'joints': self.command_joints}
+                result = {'with_gripper': self.with_gripper, 'joints': self.command_joints,
+                          'allow_collision': self.allow_collision}
             elif method == 'heartbeat':
                 self.lease.touch(req.token)
                 result = True
@@ -244,7 +245,7 @@ class RobotBridge(Node):
                     if already_owned and self.lease.feature != args[0]:
                         raise RuntimeError('Control feature does not match the existing owner')
                     self.lease.claim(req.token, args[0])
-                    if not already_owned and (args[0] == 'keyboard' or (args[0] == 'gui' and self.with_gripper)):
+                    if not already_owned and args[0] in ('keyboard', 'gui'):
                         try:
                             self.tool_reference.apply(with_gripper=self.with_gripper,
                                 reference_frame=0 if args[0] == 'keyboard' else None,

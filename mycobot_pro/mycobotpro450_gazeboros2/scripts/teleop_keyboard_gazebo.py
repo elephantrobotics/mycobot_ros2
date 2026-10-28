@@ -32,10 +32,11 @@ class TeleopKeyboard(Node):
         self._closing = False
         self._clear_errors_on_exit = False
         try:
-            self.mc = PublicPro450Client(feature='keyboard', with_gripper=self.with_gripper)
+            self.mc = PublicPro450Client(feature='keyboard', with_gripper=self.with_gripper, allow_collision=self.allow_collision)
             self._clear_errors_on_exit = True
             self._clear_lifecycle_errors('Startup')
-            self.real_transport = CartesianKeyboardTransport(self.mc, self.with_gripper, report=self.log.event)
+            self.real_transport = CartesianKeyboardTransport(self.mc, self.with_gripper, report=self.log.event,
+                                                              allow_collision=self.allow_collision)
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
             self._real_thread.start()
             self.log.event('Cartesian keyboard ready: base frame; controls locked. Press M to unlock.')

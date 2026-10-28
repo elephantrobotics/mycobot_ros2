@@ -101,9 +101,14 @@ class Pro450PoseGate(Node):
                 return
 
         try:
-            height, link = self.ground_check.check(dict(zip(self.command_joints, positions)))
-            self.get_logger().info(
-                f'Initial ground check passed: minimum Z={height * 1000.:.3f} mm ({link}).')
+            height, link = self.ground_check.check(
+                dict(zip(self.command_joints, positions)), allow_collision=self.allow_collision)
+            if height < -1e-9:
+                self.get_logger().warning(
+                    f'Initial ground collision accepted (allow_collision=true): minimum Z={height * 1000.:.3f} mm ({link}).')
+            else:
+                self.get_logger().info(
+                    f'Initial ground check passed: minimum Z={height * 1000.:.3f} mm ({link}).')
             self._write_yaml_atomically(positions)
         except (RuntimeError, ValueError, KeyError) as exc:
             self.failure_reason = str(exc)

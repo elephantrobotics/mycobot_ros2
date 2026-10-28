@@ -6,7 +6,7 @@ import subprocess
 import threading
 import time
 
-from pro450_configuration import ARM_JOINTS, LIMITS_DEG, joints, require_flag
+from pro450_configuration import ARM_JOINTS, LIMITS_DEG, joints, require_flag, collision_policy
 JOINTS = joints(True)
 
 
@@ -22,6 +22,11 @@ class EnvironmentLatch:
         if state.get('environment') != self.environment:
             raise RuntimeError('Control and environment modes do not match')
         require_flag(state.get('with_gripper'))
+        policy = collision_policy(state.get('allow_collision', False))
+        if policy and self.environment != 'real':
+            raise ValueError('allow_collision is supported only by the real environment')
+        if self.state is not None and policy != self.state.get('allow_collision', False):
+            raise RuntimeError('Collision policy changed; restart the control launch')
         if self.state is not None and state['with_gripper'] != self.state['with_gripper']:
             raise RuntimeError('Installation profile changed; restart the control launch')
         session = state.get('session_id')
@@ -119,12 +124,16 @@ def read_initial_gripper(sdk, clock=time.monotonic, sleep=time.sleep, timeout=10
     return result['value']
 
 
-def control_commands(feature, environment, executable_directory, python, with_gripper=True):
+def control_commands(feature, environment, executable_directory, python, with_gripper=True, allow_collision=False):
     """Explicit process allowlist: no Gazebo, MoveIt or additional SDK owner."""
     from pathlib import Path
     root = Path(executable_directory)
+    policy = collision_policy(allow_collision)
+    if policy and environment != 'real':
+        raise ValueError('allow_collision is supported only by the real environment')
     def command(script, parameters):
-        parameters = dict(parameters, with_gripper='true' if require_flag(with_gripper) else 'false')
+        parameters = dict(parameters, with_gripper='true' if require_flag(with_gripper) else 'false',
+                          allow_collision='true' if policy else 'false')
         args = [python, '-B', str(root / script), '--ros-args']
         for name, value in parameters.items():
             args.extend(['-p', f'{name}:={value}'])

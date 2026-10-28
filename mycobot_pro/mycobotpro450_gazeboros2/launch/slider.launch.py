@@ -333,6 +333,9 @@ def build_simulation_stack(
 
 def _build_environment(context):
     with_gripper = LaunchConfiguration("with_gripper").perform(context) == "true"
+    allow_collision = LaunchConfiguration("allow_collision").perform(context) == "true"
+    if allow_collision and LaunchConfiguration("environment", default="simulation").perform(context) != "real":
+        raise RuntimeError("allow_collision is supported only with environment:=real")
     temporary = tempfile.TemporaryDirectory(prefix="pro450_environment_")
     directory = temporary.name
     controller_file = os.path.join(directory, "controllers.yaml")
@@ -374,6 +377,7 @@ def _build_environment(context):
         parameters=[
             moveit_config.robot_description,
             {
+                "allow_collision": allow_collision,
                 "output_file": ParameterValue(real_snapshot_file, value_type=str),
                 "with_gripper": with_gripper,
                 "timeout_sec": ParameterValue(LaunchConfiguration("real_snapshot_timeout_sec"), value_type=float),
@@ -383,7 +387,7 @@ def _build_environment(context):
     )
     robot_bridge = Node(
         package='mycobotpro450_gazeboros2', executable='pro450_robot_bridge.py',
-        output='screen', parameters=[{'use_sim_time': False, 'with_gripper': with_gripper}],
+        output='screen', parameters=[{'use_sim_time': False, 'with_gripper': with_gripper, 'allow_collision': allow_collision}],
         condition=IfCondition(PythonExpression(["'", environment, "' == 'real'"])),
     )
     start_real_stack_after_snapshot = RegisterEventHandler(
@@ -440,6 +444,7 @@ def _build_environment(context):
                     "environment": environment,
                     "session_id": session_id,
                     "with_gripper": with_gripper,
+                    "allow_collision": allow_collision,
                 }],
             ),
             pose_gate,
@@ -453,5 +458,7 @@ def _build_environment(context):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("with_gripper", default_value="false", choices=["true", "false"]),
+        DeclareLaunchArgument("allow_collision", default_value="false", choices=["true", "false"],
+                              description="Real mode only: bypass project collision and ground checks."),
         OpaqueFunction(function=_build_environment),
     ])

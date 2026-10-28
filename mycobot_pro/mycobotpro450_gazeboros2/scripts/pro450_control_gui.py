@@ -22,6 +22,9 @@ from pro450_number_display import PositiveZeroDisplay, format_fixed
 from pro450_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
 
 
+HOME_JOINTS_DEG = (0., -10., -123., 45., 0., 0.)
+
+
 class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
     pass
 
@@ -103,7 +106,8 @@ class ControlWindow(QMainWindow):
                     spin.setRange(math.degrees(lo), math.degrees(hi))
                 else:
                     if i < 3:
-                        spin.setRange(*((-474., 474.), (-474., 474.), (0., 677.))[i])
+                        spin.setRange(*((-474., 474.), (-474., 474.),
+                                        (-180. if node.allow_collision else 0., 677.))[i])
                     else:
                         spin.setRange(-180., 180.)
                 spin.setSuffix(' ' + (unit or ('mm' if i < 3 else '°')))
@@ -131,10 +135,13 @@ class ControlWindow(QMainWindow):
         track_speed(self.speed, self.log)
         options.addWidget(self.speed)
         options.addStretch()
+        self.home_button = QPushButton('Home')
+        self.home_button.clicked.connect(self.send_home)
+        options.addWidget(self.home_button)
         self.clear_button = QPushButton('Clear Errors')
         self.clear_button.clicked.connect(lambda: self.send('clear_errors', []))
         options.addWidget(self.clear_button)
-        self.command_buttons = [self.joints_button, self.coords_button, self.clear_button]
+        self.command_buttons = [self.joints_button, self.coords_button, self.home_button, self.clear_button]
         if node.with_gripper:
             group, gripper = QGroupBox('Gripper'), QGridLayout()
             group.setLayout(gripper)
@@ -172,6 +179,10 @@ class ControlWindow(QMainWindow):
         for control in inputs:
             control.interpretText()
         self.send(kind, [control.value() for control in inputs])
+
+    def send_home(self):
+        self.log.event('Home requested.')
+        self.send('joints', list(HOME_JOINTS_DEG))
 
     def send_gripper(self):
         self.gripper_target.interpretText()

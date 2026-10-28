@@ -30,7 +30,7 @@ class DragFollow(Node):
         try:
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
-            self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20.0, ownership_timeout=0, feature="drag", with_gripper=self.with_gripper)
+            self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20.0, ownership_timeout=0, feature="drag", with_gripper=self.with_gripper, allow_collision=self.allow_collision)
             self.log.event('Startup error clear requested.')
             result = self.sdk.clear_error_information()
             self.log.event(f'Startup error clear returned {result!r}.',

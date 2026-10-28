@@ -18,7 +18,7 @@ class PublicPro450Client:
     public_feedback = True
 
     def __init__(self, ip=None, netport=None, debug=False, feedback_hz=10.,
-                 ownership_timeout=15., feature='slider', with_gripper=True):
+                 ownership_timeout=15., feature='slider', with_gripper=True, allow_collision=False):
         self.owner_token = uuid.uuid4().hex
         self.feature = feature
         self._call_lock = threading.Lock()
@@ -45,12 +45,15 @@ class PublicPro450Client:
         try:
             if not self.client.wait_for_service(timeout_sec=5.):
                 raise RuntimeError('Public robot service unavailable; start slider.launch.py environment:=real')
-            from pro450_configuration import joints, require_flag
+            from pro450_configuration import joints, require_flag, collision_policy
             self.with_gripper = require_flag(with_gripper)
+            self.allow_collision = collision_policy(allow_collision)
             capabilities = self._rpc('get_capabilities')
             if (capabilities.get('with_gripper') is not self.with_gripper or
                     capabilities.get('joints') != joints(self.with_gripper)):
                 raise RuntimeError('Public robot installation profile does not match this feature')
+            if collision_policy(capabilities.get('allow_collision', False)) is not self.allow_collision:
+                raise RuntimeError('Public collision policy does not match this feature; restart the control launch')
             claim = self._rpc('claim', [feature])
             if feature == 'keyboard':
                 self._keyboard_generation = claim['generation']

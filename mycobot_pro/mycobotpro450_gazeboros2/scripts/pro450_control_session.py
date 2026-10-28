@@ -57,9 +57,12 @@ class ControlSession(Node):
     def _start_controls(self):
         if {'slider_control_gazebo', 'teleop_keyboard_gazebo', 'pro450_slider_gui', 'pro450_drag_follow', 'pro450_gui_backend', 'pro450_control_gui'} & set(self.get_node_names()):
             raise RuntimeError('A control process is already running; close it before starting this function')
+        if self.latch.state.get('allow_collision') is True:
+            self.get_logger().warning(f'{self.feature}: allow_collision=true; project collision and ground checks are bypassed.')
         directory = Path(get_package_prefix(PACKAGE)) / 'lib' / PACKAGE
         for command in control_commands(self.feature, self.environment, directory, sys.executable,
-                                        with_gripper=self.latch.state['with_gripper']):
+                                        with_gripper=self.latch.state['with_gripper'],
+                                        allow_collision=self.latch.state.get('allow_collision', False)):
             self.children.append(subprocess.Popen(command, start_new_session=True))
         self.get_logger().info(f'{self.feature}: public environment ready; control programs started.')
 
