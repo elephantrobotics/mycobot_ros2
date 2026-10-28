@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Real-only Pro450 native Cartesian keyboard jog. No MoveIt/collision queries."""
-import os
 import signal
 import sys
 import threading
@@ -11,11 +10,13 @@ from rclpy.node import Node
 from pro450_control_logging import ControlLog
 from pro450_configuration import configure_node
 from pro450_public_client import PublicPro450Client
-from pro450_cartesian_keyboard import CartesianKeyboardTransport, CARTESIAN_AXES, SPEED_GEARS, GRIPPER_SPEED_GEARS
+from pro450_cartesian_keyboard import (
+    CartesianKeyboardTransport, CARTESIAN_AXES, SPEED_GEARS, GRIPPER_SPEED_GEARS,
+)
 
-CARTESIAN_KEYS = {"w": (0, 1), "s": (0, -1), "e": (1, 1), "d": (1, -1),
-                  "r": (2, 1), "f": (2, -1), "t": (3, 1), "g": (3, -1),
-                  "y": (4, 1), "h": (4, -1), "u": (5, 1), "j": (5, -1)}
+CARTESIAN_KEYS = {"w": (0, 1), "s": (0, -1), "a": (1, 1), "d": (1, -1),
+                  "z": (2, -1), "x": (2, 1), "u": (3, 1), "j": (3, -1),
+                  "i": (4, 1), "k": (4, -1), "o": (5, 1), "l": (5, -1)}
 
 
 class TeleopKeyboard(Node):
@@ -29,15 +30,28 @@ class TeleopKeyboard(Node):
         self.log = ControlLog(self.get_logger())
         self.mc = self.real_transport = self._real_thread = None
         self._closing = False
+        self._clear_errors_on_exit = False
         try:
             self.mc = PublicPro450Client(feature='keyboard', with_gripper=self.with_gripper)
-            self.real_transport = CartesianKeyboardTransport(self.mc, self.with_gripper)
+            self._clear_errors_on_exit = True
+            self._clear_lifecycle_errors('Startup')
+            self.real_transport = CartesianKeyboardTransport(self.mc, self.with_gripper, report=self.log.event)
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
             self._real_thread.start()
             self.log.event('Cartesian keyboard ready: base frame; controls locked. Press M to unlock.')
         except Exception:
             self.close()
             raise
+
+    def _clear_lifecycle_errors(self, phase):
+        self.log.event(f'{phase} error clear requested.')
+        self.mc.clear_error_information()
+        error = self.mc.get_error_information()
+        if type(error) is not int or error < 0:
+            raise RuntimeError('SDK controller status unavailable after clearing errors')
+        if error:
+            raise RuntimeError(f'Controller error remains after clearing: {error}')
+        self.log.event(f'{phase}: errors cleared; SDK reports no controller error.')
 
     def arm_real(self):
         return self.real_transport.request_arm()
@@ -58,6 +72,15 @@ class TeleopKeyboard(Node):
 
     def press_hold(self, axis, direction):
         return self.real_transport.request(axis, direction)
+
+    def request_pose(self, name):
+        return self.real_transport.request_pose(name)
+
+    def clear_errors(self):
+        return self.real_transport.request_clear_errors()
+
+    def save_home(self):
+        return self.real_transport.request_save_home()
 
     def release_hold(self):
         self.real_transport.release()
@@ -85,8 +108,16 @@ class TeleopKeyboard(Node):
                     self.log.event(text, level)
         finally:
             if self.mc is not None:
-                self.mc.close()
-                self.mc = None
+                try:
+                    if self._clear_errors_on_exit:
+                        self._clear_errors_on_exit = False
+                        try:
+                            self._clear_lifecycle_errors('Exit')
+                        except Exception as exc:
+                            self.log.event(f'Exit error clear failed: {exc}', 'error')
+                finally:
+                    self.mc.close()
+                    self.mc = None
 
 
 def hold_release_action(still_down):
@@ -139,7 +170,8 @@ class CartesianHoldWindow:
 
     def __init__(self, node):
         from python_qt_binding.QtCore import Qt, QTimer
-        from python_qt_binding.QtWidgets import QLabel, QVBoxLayout, QWidget
+        from python_qt_binding.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget
+        from python_qt_binding.QtGui import QFontDatabase
 
         class Window(QWidget):
             def __init__(self, owner):
@@ -173,31 +205,57 @@ class CartesianHoldWindow:
         self._observed_waiting_generation = 0
         self.key_state = X11KeyState()
         self.window = Window(self)
-        self.window.setWindowTitle("Pro450 Cartesian Hold Control")
+        self.window.setWindowTitle("Mycobot Pro450 Keyboard Control")
         self.window.setFocusPolicy(Qt.StrongFocus)
         layout = QVBoxLayout(self.window)
-        layout.addWidget(QLabel(
-            "Focus this window. Hold W/S: X, E/D: Y, R/F: Z, T/G: RX, Y/H: RY, U/J: RZ.\n" +
-            ("Release to stop. Hold [ or ] to control the gripper.\n"
-             if node.with_gripper else "Release to stop.\n") +
-            "- / +: decrease / increase speed. 1-5: select speed gear.\n"
-            "Space: stop and lock. Q / Ctrl+C: stop and exit. Losing focus stops motion.\n" +
-            "Real Robot: M unlocks control. N stops and locks. Base frame; no collision checking.\n"
-            "TCP Z <= 20 mm: stop and lock. Press M; only R (Z up) is allowed until Z > 20 mm."
-        ))
+        layout.setSpacing(10)
+        layout.addWidget(QLabel("Real | Base | Hold to move, release to stop"))
+        fixed_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        motion_row = QHBoxLayout()
+        for title, text in (
+            ("Movement", "          W  X+\nA  Y+     S  X-     D  Y-\n          Z  Z-     X  Z+"),
+            ("Rotation", "U  RX+   I  RY+   O  RZ+\nJ  RX-   K  RY-   L  RZ-"),
+        ):
+            group = QGroupBox(title)
+            inner = QVBoxLayout(group)
+            label = QLabel(text)
+            label.setFont(fixed_font)
+            inner.addWidget(label)
+            motion_row.addWidget(group)
+        layout.addLayout(motion_row)
+        if node.with_gripper:
+            group = QGroupBox("Gripper")
+            inner = QVBoxLayout(group)
+            inner.addWidget(QLabel("G  Open                         H  Close"))
+            layout.addWidget(group)
+        pose_group = QGroupBox("Pose")
+        pose_layout = QVBoxLayout(pose_group)
+        pose_layout.addWidget(QLabel("1  Go to init pose"))
+        self.home_label = QLabel("2  Go to init home")
+        pose_layout.addWidget(self.home_label)
+        pose_layout.addWidget(QLabel("3  Save current pose as home"))
+        layout.addWidget(pose_group)
+        speed_group = QGroupBox("Speed")
+        speed_layout = QHBoxLayout(speed_group)
+        speed_layout.addWidget(QLabel("- / +"))
+        self.gear_label = QLabel()
         self.speed_label = QLabel()
-        layout.addWidget(self.speed_label)
+        speed_layout.addWidget(self.gear_label)
+        speed_layout.addWidget(self.speed_label)
+        layout.addWidget(speed_group)
         self._refresh_speed_display()
+        control_group = QGroupBox("Control")
+        control_layout = QVBoxLayout(control_group)
+        control_layout.addWidget(QLabel("M  Unlock     N / Space  Stop     C Clear Error     Q / Ctrl+C  Quit"))
+        layout.addWidget(control_group)
         self.key_label = QLabel("Pressed key: None")
         layout.addWidget(self.key_label)
-        gear, speed = self.node.hold_speed_status()
-        self.status = QLabel(
-            f"Gear {gear}: Cartesian SDK speed {speed}%; " +
-            (f"gripper {GRIPPER_SPEED_GEARS[gear - 1]}; " if node.with_gripper else "") +
-            "Controls locked. Press M to unlock.")
+        self.status = QLabel("Locked. Press M.")
+        self.status.setWordWrap(True)
+        self.status.setMinimumHeight(40)
         layout.addWidget(self.status)
         self.log.event(self.status.text())
-        self.window.resize(760, 240)
+        self.window.resize(820, 470)
         self.timer = QTimer(self.window)
         self.timer.setInterval(50)
         self.timer.timeout.connect(self.tick)
@@ -259,10 +317,10 @@ class CartesianHoldWindow:
             ctrl_c
             or
             key in CARTESIAN_KEYS
-            or key in ("1", "2", "3", "4", "5", "+", "=", "-", "_")
+            or key in ("1", "2", "3", "+", "=", "-", "_")
             or event.key() in (self.Qt.Key_Space, self.Qt.Key_Q)
-            or (self.node.with_gripper and key in ("[", "]"))
-            or key in ("m", "n")
+            or (self.node.with_gripper and key in ("g", "h"))
+            or key in ("m", "n", "c")
         )
         if functional_key and not event.isAutoRepeat():
             from python_qt_binding.QtGui import QKeySequence
@@ -280,6 +338,11 @@ class CartesianHoldWindow:
         if ctrl_c:
             self.request_exit("Ctrl+C")
             return
+        if key == "c":
+            result = self.node.clear_errors()
+            self._set_status(result, "warning" if result.startswith("rejected") else "info")
+            self._refresh_key_display()
+            return
         if key in ("m", "n"):
             if key == "m":
                 result = self.node.arm_real()
@@ -290,19 +353,19 @@ class CartesianHoldWindow:
                 self._set_status("STOP requested; real controls locked.", log=False)
             self._refresh_key_display()
             return
-        if key in ("1", "2", "3", "4", "5", "+", "=", "-", "_"):
+        if key in ("+", "=", "-", "_"):
             gear, _ = self.node.hold_speed_status()
-            if key in ("+", "="):
-                gear = min(5, gear + 1)
-            elif key in ("-", "_"):
-                gear = max(1, gear - 1)
-            else:
-                gear = int(key)
-            self.node.set_hold_speed_gear(gear)
-            _, speed = self.node.hold_speed_status()
-            self._set_status(
-                f"Gear {gear}: Cartesian SDK speed {speed}%; " +
-                (f"gripper {GRIPPER_SPEED_GEARS[gear - 1]}." if self.node.with_gripper else ""), log=False)
+            gear = max(1, min(5, gear + (1 if key in ("+", "=") else -1)))
+            self._gear_changed(gear - 1)
+            return
+        if key in ("1", "2", "3"):
+            result = self.node.save_home() if key == "3" else self.node.request_pose("Init" if key == "1" else "Home")
+            if not result.startswith("rejected"):
+                self.release_timer.stop()
+                self.pressed_code = None
+                self.pressed_scan = 0
+            self._set_status(result, "warning" if result.startswith("rejected") else "info")
+            self._refresh_key_display()
             return
         if event.key() == self.Qt.Key_Space:
             self.pressed_code = None
@@ -315,16 +378,16 @@ class CartesianHoldWindow:
             return
         if key in CARTESIAN_KEYS:
             axis, direction = CARTESIAN_KEYS[key]
-        elif key == "[" and self.node.with_gripper:
+        elif key == "g" and self.node.with_gripper:
             axis, direction = 6, 1
-        elif key == "]" and self.node.with_gripper:
+        elif key == "h" and self.node.with_gripper:
             axis, direction = 6, -1
         else:
             return
         self.release_timer.stop()
         result = self.node.press_hold(axis, direction)
         if not result.startswith(("rejected", "waiting")):
-            # A rejected second key must not discard the active R key: its
+            # A rejected second key must not discard the active X key: its
             # eventual KeyRelease still has to stop an upward escape jog.
             self.pressed_code = event.key()
             self.pressed_scan = int(event.nativeScanCode() or 0)
@@ -364,11 +427,17 @@ class CartesianHoldWindow:
             key = next(reversed(list(self.displayed_keys.values())), None)
         self.key_label.setText("Pressed key: " + (key or "None"))
 
+    def _gear_changed(self, index):
+        self.node.set_hold_speed_gear(int(index) + 1)
+        self._refresh_speed_display()
+        self._set_status(self.speed_label.text(), log=False)
+
     def _refresh_speed_display(self):
         gear, speed = self.node.hold_speed_status()
+        self.gear_label.setText(f"Gear: {gear}")
         self.speed_label.setText(
-            f"Current speed — Gear {gear}: Cartesian SDK speed {speed}%" +
-            (f"; gripper {GRIPPER_SPEED_GEARS[gear - 1]}." if self.node.with_gripper else "."))
+            f"Cartesian: {speed}%" +
+            (f"     Gripper: {GRIPPER_SPEED_GEARS[gear - 1]}" if self.node.with_gripper else ""))
 
     def tick(self):
         try:

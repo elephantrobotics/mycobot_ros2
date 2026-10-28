@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import uuid
+from pro450_broker_support import KeyboardStopBarrier
 
 try:
     from pymycobot import Pro450Client as _VendorClient
@@ -17,6 +18,7 @@ except ImportError:
 
 
 ANGLES, MOVING, STOP, TOOL, ARRIVED = 0x20, 0x2B, 0x29, 0xB5, 0x5B
+CONTROL_MODE = 0x1F
 
 
 class TransportClosedError(RuntimeError):
@@ -178,6 +180,7 @@ class Pro450Client(_VendorClient):
             raise
 
     def _adapter_init(self, feedback_hz=10.0):
+        self.keyboard_stop_barrier = KeyboardStopBarrier()
         self._api_lock = threading.RLock()
         self._feedback_lock = threading.RLock()
         self._closed = threading.Event()
@@ -272,12 +275,23 @@ class Pro450Client(_VendorClient):
                         self.read_command.discard(genre)
                         self.write_command[:] = [g for g in self.write_command if g != genre]
 
+    def get_control_mode(self):
+        # The vendor getter omits has_reply. An ACK is not a mode value;
+        # wait for the actual 0/1 data response before confirming a switch.
+        return self._mesg(CONTROL_MODE, has_reply=True)
+
     def get_motion_status(self):
         """Read cached motion replies; never send a robot command."""
         with self._feedback_lock:
             return None if self._motion_reply is None else dict(self._motion_reply)
 
     def _send_command(self, genre, real_command):
+        # Native calls may wait for _api_lock or do a fresh-mode query before
+        # writing. Recheck the keyboard ticket at the final socket-write gate.
+        with self.keyboard_stop_barrier.write():
+            return self._send_checked_command(genre, real_command)
+
+    def _send_checked_command(self, genre, real_command):
         if self._closed.is_set():
             raise TransportClosedError(self.get_transport_error() or 'Pro450 connection closed')
         raw = self._flatten(real_command)

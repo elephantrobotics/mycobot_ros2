@@ -1,8 +1,11 @@
-"""Single SDK caller for native Cartesian jog; no joint targets or collision API."""
+"""Cartesian jog/pose worker with independent priority arm STOP requests."""
 from collections import deque
+from contextlib import nullcontext
 import math
 import threading
 import time
+from pro450_configuration import LIMITS_DEG
+from pro450_broker_support import KeyboardCommandCancelled
 
 
 CARTESIAN_AXES = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'Gripper')
@@ -10,16 +13,23 @@ SPEED_GEARS = (6, 12, 18, 24, 30)  # Native SDK percentages, not physical units.
 GRIPPER_SPEED_GEARS = (4, 8, 12, 16, 20)
 LOW_Z_MM = 20.0  # Base-frame TCP height, including the installed tool offset.
 COORD_POLL_PERIOD = 1.0 / 20.0
+INIT_POSE_DEG = (0., 0., 0., 0., 0., 0.)
+DEFAULT_HOME_POSE_DEG = (0., -10., -123., 45., 0., 0.)
 
 
 class CartesianKeyboardTransport:
-    def __init__(self, sdk, with_gripper=True, clock=time.monotonic):
+    def __init__(self, sdk, with_gripper=True, clock=time.monotonic, report=None):
         self.sdk, self.with_gripper, self.clock = sdk, with_gripper, clock
+        self.report = report or (lambda text: None)
         self.lock = threading.RLock()
         self.shutdown = threading.Event()
         self.armed = False
         self.gear = 2
         self.desired = self.active = None
+        self.home_pose = DEFAULT_HOME_POSE_DEG
+        self.pose_request = self.pose_active = None
+        self.save_home_requested = False
+        self.clear_errors_requested = False
         self.epoch = 0
         self.last_keepalive = self.clock()
         self.last_feedback = float('-inf')
@@ -30,6 +40,10 @@ class CartesianKeyboardTransport:
         self.stop_pending = self.force_stop = False
         self.waiting_generation = 0
         self.notices = deque()
+        self.priority_enabled = callable(getattr(sdk, 'priority_stop', None))
+        self.stop_requested = self.stop_completed = 0
+        self.priority_error = None
+        self.priority_exit = threading.Event()
 
     def notice(self, text, level='info'):
         with self.lock:
@@ -41,12 +55,52 @@ class CartesianKeyboardTransport:
             self.notices.clear()
             return result
 
+    def _queue_priority_stop(self, force=False):
+        # Called under self.lock. The normal worker may be blocked in a query.
+        if self.priority_enabled and (force or self.pose_active is not None or
+                                     (self.active is not None and self.active[0] < 6)):
+            self.stop_requested += 1
+
+    def _priority_loop(self):
+        while not self.priority_exit.is_set():
+            with self.lock:
+                if (self.armed and (self.active is not None or self.pose_active is not None)
+                        and self.clock() - self.last_keepalive > .5):
+                    self.stop()
+                    self.waiting_generation += 1
+                    self.notice('Keyboard input heartbeat lost; controls locked.', 'warning')
+                sequence = self.stop_requested
+                pending = sequence > self.stop_completed
+            if pending:
+                try:
+                    self.accepted(self.sdk.priority_stop(), stop=True)
+                    with self.lock:
+                        # A gripper requires a measured-opening hold in the normal worker.
+                        if self.active is None or self.active[0] < 6:
+                            self.active = None
+                        self.pose_active = None
+                        if sequence == self.stop_requested:
+                            self.force_stop = False
+                            self.stop_pending = self.active is not None
+                        self.notice('STOP sent.')
+                except Exception as exc:
+                    with self.lock:
+                        self.priority_error = exc
+                finally:
+                    with self.lock:
+                        self.stop_completed = sequence
+            self.priority_exit.wait(.01)
+
     def request_arm(self):
         with self.lock:
+            self._queue_priority_stop()
             self.armed = False
             self.arm_requested = True
             self.stop_pending = True
             self.desired = None
+            self.pose_request = None
+            self.save_home_requested = False
+            self.clear_errors_requested = False
             self.epoch += 1
         return 'Control unlock requested.'
 
@@ -57,23 +111,89 @@ class CartesianKeyboardTransport:
             if not self.armed:
                 return 'rejected: controls locked; press M to unlock'
             if self.low_z and (axis, direction) != (2, 1):
-                return 'rejected: TCP Z is at or below 20 mm; only R (Z up) is allowed'
+                return 'rejected: only X is allowed'
+            if (self.pose_request is not None or self.pose_active is not None or
+                    self.save_home_requested or self.clear_errors_requested):
+                return 'rejected: a pose command is in progress'
             self.desired = (axis, direction, self.speed_for_axis(axis))
             self.last_keepalive = self.clock()
             self.epoch += 1
         return 'requested: native SDK jog'
 
+    def request_pose(self, name):
+        with self.lock:
+            if name not in ('Init', 'Home'):
+                return 'rejected: invalid pose command'
+            if not self.armed:
+                return 'rejected: controls locked; press M to unlock'
+            if self.low_z:
+                return 'rejected: only X is allowed'
+            if not self.idle():
+                return 'rejected: stop the current command before requesting a pose'
+            target = INIT_POSE_DEG if name == 'Init' else self.home_pose
+            self.pose_request = (name, tuple(target), SPEED_GEARS[self.gear - 1])
+            self.last_keepalive = self.clock()
+            self.epoch += 1
+        return f'requested: {name} pose'
+
+    def request_save_home(self):
+        with self.lock:
+            if not self.idle() or self.arm_requested:
+                return 'rejected: stop the current command before saving Home'
+            self.save_home_requested = True
+            self.epoch += 1
+        return 'Home save requested.'
+
+    def request_clear_errors(self):
+        with self.lock:
+            if not self.idle() or self.arm_requested:
+                return 'rejected: stop the current command before clearing errors'
+            self.clear_errors_requested = True
+            self.epoch += 1
+        return 'Clear errors requested.'
+
+    def _clear_errors(self):
+        with self.lock:
+            if not self.clear_errors_requested or self.shutdown.is_set():
+                return
+            epoch = self.epoch
+        try:
+            self.sdk.clear_error_information()
+            with self.lock:
+                if epoch != self.epoch or self.shutdown.is_set():
+                    return
+            self._read_error()
+            with self.lock:
+                if epoch == self.epoch and not self.shutdown.is_set():
+                    self.notice('Errors cleared: SDK reports no controller error.')
+        finally:
+            with self.lock:
+                if epoch == self.epoch:
+                    self.clear_errors_requested = False
+
+    def home_snapshot(self):
+        with self.lock:
+            return tuple(self.home_pose)
+
     def release(self):
         with self.lock:
+            self._queue_priority_stop()
             self.desired = None
+            self.pose_request = None
+            self.save_home_requested = False
+            self.clear_errors_requested = False
             self.stop_pending = True
             self.epoch += 1
 
     def stop(self):
         with self.lock:
+            self._queue_priority_stop(force=True)
             self.armed = False
             self.arm_requested = False
             self.desired = None
+            self.pose_request = None
+            self.save_home_requested = False
+            self.clear_errors_requested = False
             self.stop_pending = self.force_stop = True
             self.epoch += 1
 
@@ -94,7 +214,9 @@ class CartesianKeyboardTransport:
 
     def idle(self):
         with self.lock:
-            return self.active is None and self.desired is None
+            return (self.active is None and self.desired is None and self.pose_request is None
+                    and self.pose_active is None and not self.save_home_requested
+                    and not self.clear_errors_requested)
 
     @staticmethod
     def accepted(result, gripper=False, stop=False):
@@ -106,30 +228,37 @@ class CartesianKeyboardTransport:
     def _stop_active(self, force=False):
         with self.lock:
             active = self.active
+            pose_active = self.pose_active
         if active is not None and active[0] == 6:
             opening = self.sdk.get_pro_gripper_angle()
             if type(opening) not in (int, float) or not math.isfinite(opening) or not 0 <= opening <= 100:
                 raise RuntimeError('Cannot hold gripper: valid measured opening unavailable')
             self.accepted(self.sdk.set_pro_gripper_angle(int(round(opening))), gripper=True)
             self.notice('Gripper hold sent.')
-        elif active is not None or force:
+        elif active is not None or pose_active is not None or force:
             self.accepted(self.sdk.stop(deceleration=0, _async=True), stop=True)
             self.notice('STOP sent.')
         with self.lock:
             self.active = None
+            self.pose_active = None
 
     def _fault(self, exc):
         with self.lock:
             self.armed = False
             self.arm_requested = False
             self.desired = None
+            self.pose_request = None
+            self.save_home_requested = False
+            self.clear_errors_requested = False
             self.epoch += 1
             self.waiting_generation += 1
         try:
             self._stop_active()
         except Exception as stop_error:
             self.notice(f'STOP/hold failed: {stop_error}', 'error')
-        self.notice(f'Control fault (locked): {exc}. Press M to retry after recovery.', 'error')
+        reason = str(exc)
+        hint = '' if reason in ('Controller error 33', 'Motion rejected: singular position') else ' C: clear error; M: retry unlock.'
+        self.notice(f'Control fault (locked): {reason}.{hint}', 'error')
 
     def _read_coords(self):
         started = self.clock()
@@ -152,12 +281,14 @@ class CartesianKeyboardTransport:
                 self.armed = False
                 self.arm_requested = False
                 self.desired = None
+                self.pose_request = None
+                self.save_home_requested = False
+                self.clear_errors_requested = False
                 self.epoch += 1
                 self.waiting_generation += 1
-                self.notice('TCP Z is at or below 20 mm; controls locked. Press M, then hold R (Z up).', 'warning')
+                self.notice('Locked. Press M.', 'warning')
             elif was_low and not self.low_z:
-                self.notice('TCP Z is above 20 mm; all motion keys are available.' if self.armed
-                            else 'TCP Z is above 20 mm; controls remain locked. Press M to unlock.')
+                self.notice('All motion keys available.' if self.armed else 'Locked. Press M.')
         if entered:
             self._stop_active()
 
@@ -170,46 +301,114 @@ class CartesianKeyboardTransport:
                 raise RuntimeError('Motion rejected: singular position')
             raise RuntimeError(f'Controller error {error}')
 
-    def cycle(self):
+    @staticmethod
+    def _angles(values):
+        if (not isinstance(values, (list, tuple)) or len(values) != 6 or
+                any(type(v) not in (int, float) or not math.isfinite(v) or not lo <= v <= hi
+                    for v, (lo, hi) in zip(values, LIMITS_DEG))):
+            raise RuntimeError('Fresh six-axis joint feedback unavailable')
+        return tuple(float(v) for v in values)
+
+    def _save_home(self):
         with self.lock:
-            stop, force = self.stop_pending, self.force_stop
-            self.stop_pending = self.force_stop = False
-            arm, epoch = self.arm_requested, self.epoch
-            self.arm_requested = False
-        if stop:
-            self._stop_active(force)
-        if arm:
-            self._read_coords()
-            self._read_error()
-            with self.lock:
-                if epoch == self.epoch and not self.shutdown.is_set():
-                    self.armed = True
-                    self.notice('Controls unlocked: only R (Z up) is allowed until TCP Z is above 20 mm.'
-                                if self.low_z else 'Controls unlocked. Hold a coordinate key to jog.')
-        else:
-            # Read height before dispatch, so a newly observed low-zone entry
-            # cancels an already queued command before any new SDK jog write.
-            now = self.clock()
-            if now >= self.next_feedback:
-                self.next_feedback = now + COORD_POLL_PERIOD
-                try:
-                    self._read_coords()
-                except Exception:
-                    if self.armed and self.clock() - self.last_feedback > .5:
-                        raise
-        with self.lock:
-            if self.desired is not None and self.clock() - self.last_keepalive > .5:
-                self.desired = None
-                self.armed = False
-                self.epoch += 1
-                self.waiting_generation += 1
-                self.notice('Keyboard input heartbeat lost; controls locked.', 'warning')
-            desired = self.desired if self.armed else None
+            if not self.save_home_requested:
+                return
             epoch = self.epoch
-            active = self.active
-        if active is not None and active != desired:
+        try:
+            target = self._angles(self.sdk.get_angles())
+            with self.lock:
+                if epoch == self.epoch and self.save_home_requested and not self.shutdown.is_set():
+                    self.home_pose = target
+                    self.report(f'Home pose saved (deg): {list(target)}; session only.')
+                    self.notice('Home saved for this session.')
+        except Exception as exc:
+            self._fault(f'Home pose not saved: {exc}')
+        finally:
+            with self.lock:
+                if epoch == self.epoch:
+                    self.save_home_requested = False
+
+    def _motion_context(self):
+        factory = getattr(self.sdk, 'keyboard_motion', None)
+        return factory() if callable(factory) else nullcontext()
+
+    def _start_pose(self):
+        with self._motion_context():
+            self._start_pose_command()
+
+    def _start_pose_command(self):
+        with self.lock:
+            command = self.pose_request
+            if command is None or not self.armed or self.low_z or self.shutdown.is_set():
+                return
+            epoch = self.epoch
+        name, target, speed = command
+        measured = self._angles(self.sdk.get_angles())
+        with self.lock:
+            if epoch != self.epoch or self.shutdown.is_set():
+                return
+            self.pose_request = None
+            now = self.clock()
+            self.pose_active = dict(name=name, target=target,
+                                    deadline=now+600., next_check=now+.25,
+                                    measured=measured, progress_at=now)
+        self.accepted(self.sdk.send_angles(list(target), speed, _async=True))
+        self.report(f'{name} pose requested (deg): {list(target)}; SDK speed {speed}%.')
+        self.notice(f'{name} pose sent.')
+        with self.lock:
+            obsolete = epoch != self.epoch or self.shutdown.is_set()
+        if obsolete:
             self._stop_active()
-        if desired is not None:
+
+    def _monitor_pose(self):
+        with self.lock:
+            pose, epoch = self.pose_active, self.epoch
+            if pose is None:
+                return
+            now = self.clock()
+            if now > pose['deadline']:
+                raise RuntimeError(f"{pose['name']} pose timed out waiting for arrival")
+            if now < pose['next_check']:
+                return
+            pose['next_check'] = now+.2
+        measured = self._angles(self.sdk.get_angles())
+        if max(abs(a-b) for a,b in zip(measured, pose['measured'])) >= .05:
+            pose['measured'], pose['progress_at'] = measured, now
+        arrived = max(abs(a-b) for a,b in zip(measured, pose['target'])) <= .5
+        if 'idle_confirmed_at' in pose:
+            stamp = self.sdk.sample_time('arm')
+            if (not isinstance(stamp, (list, tuple)) or not stamp or
+                    type(stamp[0]) not in (int, float) or not math.isfinite(stamp[0]) or
+                    self.clock() - stamp[0] > .5):
+                raise RuntimeError('Fresh six-axis joint feedback unavailable after idle confirmation')
+            if stamp[0] <= pose['idle_confirmed_at']:
+                return
+            with self.lock:
+                if epoch != self.epoch or self.pose_active is not pose or self.shutdown.is_set():
+                    return
+                if not arrived:
+                    raise RuntimeError(f"{pose['name']} pose not completed: target not reached")
+                self.pose_active = None
+                self.notice(f"{pose['name']} pose complete: measured joint angles confirmed.")
+            return
+        if arrived or now - pose['progress_at'] >= 3.:
+            moving = self.sdk.is_moving()
+            if type(moving) is not int or moving not in (0, 1):
+                raise RuntimeError('SDK pose motion status unavailable')
+            if moving == 0:
+                self._read_error()
+            with self.lock:
+                if epoch != self.epoch or self.pose_active is not pose or self.shutdown.is_set():
+                    return
+                if moving == 0:
+                    # Angles read before the blocking status queries cannot confirm arrival.
+                    pose['idle_confirmed_at'] = self.clock()
+                    pose['next_check'] = self.clock() + .05
+                elif not arrived:
+                    pose['progress_at'] = now
+
+    def _dispatch_desired(self, desired, epoch):
+        with self._motion_context():
             with self.lock:
                 if epoch != self.epoch or self.shutdown.is_set():
                     return
@@ -237,21 +436,86 @@ class CartesianKeyboardTransport:
             if obsolete:
                 self._stop_active()
                 return
+
+    def cycle(self):
+        with self.lock:
+            if self.stop_requested > self.stop_completed:
+                return
+            if self.priority_error is not None:
+                error, self.priority_error = self.priority_error, None
+                raise RuntimeError(f'Priority STOP failed: {error}')
+            stop, force = self.stop_pending, self.force_stop
+            self.stop_pending = self.force_stop = False
+            arm, epoch = self.arm_requested, self.epoch
+            self.arm_requested = False
+        if stop:
+            self._stop_active(force)
+        if arm:
+            self._read_coords()
+            self._read_error()
+            with self.lock:
+                if epoch == self.epoch and not self.shutdown.is_set():
+                    self.armed = True
+                    self.notice('Unlocked: X only.' if self.low_z else 'Unlocked.')
+        else:
+            # Read height before dispatch, so a newly observed low-zone entry
+            # cancels an already queued command before any new SDK jog write.
+            now = self.clock()
+            if now >= self.next_feedback:
+                self.next_feedback = now + COORD_POLL_PERIOD
+                try:
+                    self._read_coords()
+                except Exception:
+                    if self.armed and self.clock() - self.last_feedback > .5:
+                        raise
+        with self.lock:
+            if (self.desired is not None or self.pose_request is not None or self.pose_active is not None) and self.clock() - self.last_keepalive > .5:
+                self.desired = None
+                self.pose_request = None
+                self.armed = False
+                self.epoch += 1
+                self.waiting_generation += 1
+                self.notice('Keyboard input heartbeat lost; controls locked.', 'warning')
+            desired = self.desired if self.armed else None
+            epoch = self.epoch
+            active = self.active
+            stop_pose = self.pose_active is not None and not self.armed
+        if active is not None and active != desired:
+            self._stop_active()
+        if stop_pose:
+            self._stop_active()
+        if desired is not None:
+            self._dispatch_desired(desired, epoch)
+        self._clear_errors()
+        self._save_home()
+        self._start_pose()
+        self._monitor_pose()
         now = self.clock()
-        if self.active is not None and now >= self.next_error:
+        if (self.active is not None or self.pose_active is not None) and now >= self.next_error:
             self.next_error = now + .5
             self._read_error()
 
     def run(self):
+        priority = None
+        if self.priority_enabled:
+            priority = threading.Thread(target=self._priority_loop, daemon=True)
+            priority.start()
         try:
             while not self.shutdown.is_set():
                 try:
                     self.cycle()
+                except KeyboardCommandCancelled:
+                    # A deliberate STOP cancelling an old write is not a controller fault.
+                    self.stop()
+                    self.notice('Command cancelled by STOP.', 'warning')
                 except Exception as exc:
                     self._fault(exc)
                 # A fixed 20 ms tick would round 50 ms polling up to 60 ms.
                 self.shutdown.wait(min(.02, max(.001, self.next_feedback - self.clock())))
         finally:
+            self.priority_exit.set()
+            if priority is not None:
+                priority.join(timeout=2.)
             try:
                 self._stop_active(force=True)
             except Exception as exc:

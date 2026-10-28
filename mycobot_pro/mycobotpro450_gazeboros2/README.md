@@ -42,10 +42,10 @@ ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gri
 如果机械臂选择末端没有myGripper F100 力控夹爪，则调用以下指令拉起公共环境：
 
 ```bash
-# 纯仿真环境 带夹爪
+# 纯仿真环境 不带夹爪
 ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=simulation with_gripper:=false
 
-# 真机环境 带夹爪
+# 真机环境 不带夹爪
 ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gripper:=false
 ```
 
@@ -63,33 +63,46 @@ ros2 launch mycobotpro450_gazeboros2 slider_control_gazebo.launch.py environment
 ```
 
 - 启动成功后，会拉起用于`滑块和随机数操作`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
+- 移动滑块、生成随机目标、回零生成关节角度后，均需点击 `Execute` 按钮，机械臂才会运动。
+- `Stop` 按钮用于停止正在运动的机械臂。
 - `environment` 参数需要与公共环境一致。检测到路径碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
-- Force Execute 测试按钮默认隐藏，仅在启动滑块功能时显式设置 `show_force_execute:=true` 才显示。其功能为即使检测到碰撞也执行，且仅在纯仿真环境下开放。
 
 ## 键盘控制
 
 公共环境就绪后，另开终端：
 
 ```bash
-ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py environment:=real
-# 纯仿真时使用 environment:=simulation
+ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py
 ```
 
 - 启动成功后，会拉起用于`键盘控制`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
+- 装有 myGripper F100 力控夹爪时，该控制器进行坐标运动的末端会自动延伸至夹爪末端。
 
-真机模式下：
-
-- `M`：解锁控制
-- `N` 或 `Space`：停止并锁定
-- `Q`：关闭窗口退出
+仅支持真机。
 
 聚焦窗口后：
 
-- 按住 `w` / `s`、`e` / `d`、`r` / `f`、`t` / `g`、`y` / `h`、`u` / `j` 控制六轴
-- 按住 `[` / `]` 控制夹爪，无夹爪时没有该功能
-- 松键停止，失焦停止
-- `1`–`5` 切换速度档位，`-` / `+` 调整档位
-- 界面持续显示当前设定速度
+- `M`：解锁控制
+- `N` 或 `Space`：停止并锁定
+- `C`：清除奇异位姿导致的报错
+- `Q`：关闭窗口并退出
+- 按住 `w` / `s`、`a` / `d`、`z` / `x` 分别控制位置 X、Y、Z；按住 `u` / `j`、`i` / `k`、`o` / `l` 分别控制姿态角 RX、RY、RZ
+- 按住 `g` / `h` 控制夹爪开合，未安装夹爪时无此功能
+- `1`：回到机械臂零位
+- `2`：回到坐标控制 Home 位
+- `3`：自定义坐标控制 Home 位，将当前位置设置为坐标运动 Home 位，下次启动键盘控制时需重新设置
+- 松开按键即停止，窗口失焦即停止
+- 108 键布局下，主键盘区的 `-`（`_`）、`+`（`=`），以及小键盘区的 `-` / `+`，均可切换速度档位
+- 坐标控制进入奇异位姿时，机械臂 link6 的 LED 光圈变为蓝色，Qt 界面底部显示 `Motion rejected: singular position`。需先按 `C` 清除错误，再按 `M` 解锁，此时允许键盘控制运动。建议按 `2` 回到坐标控制 Home 位，否则在该位姿下继续运动容易再次进入奇异位姿。
+- 执行零位运动后也会进入奇异位姿，需依次按 `C`、`M` 进入坐标控制 Home 位，才能恢复功能。
+- 控制期间不允许运动到水平面以下。末端距地面 20 mm 时会触发保护机制，需先长按 `X` 向上运动并脱离触发区域，才能继续其他运动按键；此时仍可调整速度档位。
+- 本工程的保护机制仅限制末端，不能保证机械臂本体不与地面碰撞，操作时需谨慎。
+- 按键控制不区分大小写。
+- 界面持续显示可操作按键、当前设定速度、速度档位、当前有效按键、提示信息等。
+
+错误码 33 的特殊情况：
+
+- 若抛出错误码 33，表示无法求得连续的直线运动解。LED 光圈可能先变为蓝色，再闪一下红色，随后恢复绿色，Qt 界面底部显示 `Controller error 33`。此时需先按 `C` 清除错误，再按 `M` 解锁，随后允许键盘控制运动。建议按 `2` 回到坐标控制 Home 位，否则在该位姿下继续运动容易再次抛出错误码，甚至导致机械臂重启。
 
 ## 拖动跟随
 

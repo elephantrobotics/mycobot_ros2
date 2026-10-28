@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real-only combined arm/gripper enable switching and measured pose mirroring."""
+"""Real-only torque/position mode switching and measured pose mirroring."""
 import math
 import signal
 import sys
@@ -9,7 +9,7 @@ import time
 import rclpy
 from rclpy.node import Node
 
-from pro450_drag_support import DragState, set_drag_enabled
+from pro450_drag_support import DragState, enable_drag_motors, set_control_mode_checked
 from pro450_public_client import PublicPro450Client as Pro450Client
 from pro450_session_support import read_initial_gripper
 from pro450_configuration import configure_node
@@ -31,14 +31,21 @@ class DragFollow(Node):
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
             self.sdk = Pro450Client('192.168.0.232', 4500, feedback_hz=20.0, ownership_timeout=0, feature="drag", with_gripper=self.with_gripper)
+            self.log.event('Startup error clear requested.')
+            result = self.sdk.clear_error_information()
+            self.log.event(f'Startup error clear returned {result!r}.',
+                           'info' if type(result) is int and result in (0, 1) else 'warning')
             if not self.get_parameter('startup_enabled').value:
                 if self.sdk.is_moving() != 0:
                     raise RuntimeError('Stop robot motion before starting drag following')
                 self.log.event('Startup motor enable requested.')
-                set_drag_enabled(self.sdk, True, self.with_gripper)
+                enable_drag_motors(self.sdk, self.with_gripper)
                 self.log.event('Startup motor enable acknowledged.')
             else:
                 self.log.event('Startup motor enable was completed by the control session.')
+            self.log.event('Startup position mode requested.')
+            set_control_mode_checked(self.sdk, 0)
+            self.log.event('Startup position mode confirmed.')
             if self.with_gripper:
                 self.gripper = float(self.get_parameter('initial_gripper').value)
                 if not math.isfinite(self.gripper) or not 0 <= self.gripper <= 1:
@@ -57,7 +64,7 @@ class DragFollow(Node):
         self.state.observe(sample.angles, sample.monotonic, sample.wall_time)
 
     def _read_loop(self):
-        # One SDK caller: motor switches and angle queries cannot race or build a queue.
+        # One SDK caller: mode switches and angle queries cannot build a queue.
         while not self.stop_event.is_set():
             try:
                 self.state.apply_request()
@@ -73,16 +80,22 @@ class DragFollow(Node):
 
 
     def render(self):
-        enabled, pending, message, sample = self.state.snapshot()
+        mode, pending, message, sample = self.state.snapshot()
         if sample is None or time.monotonic() - sample[0] > .5:
-            return enabled, pending, message, False
-        return enabled, pending, message, True
+            return mode, pending, message, False
+        return mode, pending, message, True
 
     def close(self):
         if self._closing:
             return
         self._closing = True
         self.stop_event.set()
+        if hasattr(self, 'state'):
+            self.state.cancel_pending()
+        if self.worker is not None:
+            self.worker.join(timeout=1.0)
+            if self.worker.is_alive():
+                self.log.event('Drag worker is still finishing; further mode-switch steps are cancelled.', 'warning')
         if self.sdk is not None:
             try:
                 if self._clear_errors_on_exit:
@@ -96,10 +109,8 @@ class DragFollow(Node):
             finally:
                 self.sdk.close()
                 self.sdk = None
-        if self.worker is not None:
-            self.worker.join(timeout=1.0)
-        # Only clear errors: no enable, disable, STOP, motion or gripper write.
-        self.log.state('closing', True, 'Drag following closed; motor enable states are preserved.')
+        # Only clear errors: do not implicitly switch mode or motor enable on exit.
+        self.log.state('closing', True, 'Drag following closed; control mode and motor enable states are preserved.')
 
 
 def main():
@@ -149,7 +160,7 @@ def main():
             super().focusOutEvent(event)
 
         def closeEvent(self, event):
-            node.log.event('Drag follow window closed; motor enable states are preserved.')
+            node.log.event('Drag follow window closed; control mode and motor enable states are preserved.')
             self._clear_keys('window closed')
             super().closeEvent(event)
 
@@ -162,11 +173,10 @@ def main():
         layout.addWidget(QLabel(
             ('All six arm joints and the gripper are enabled once at startup.\n' if node.with_gripper else
              'All six arm joints are enabled once at startup.\n') +
-            ('M: release / lock all six arm joints and the gripper together. Q: close this window.\n' if node.with_gripper else
-             'M: release / lock all six arm joints. Q: close this window.\n') +
-            'When disabled, support the arm and drag it by hand. Gazebo follows the measured pose.\n' +
-            ('Closing this window preserves arm and gripper enable states.' if node.with_gripper else
-             'Closing this window preserves arm enable state.')))
+            'M: switch between torque (zero-force drag) and position mode. Q: close this window.\n' +
+            ('The gripper is released in torque mode and enabled in position mode.\n' if node.with_gripper else '') +
+            'Drag the arm by hand in torque mode. Gazebo follows the measured pose.\n' +
+            'Closing this window preserves the current control mode and motor enable states.'))
         status = QLabel('Waiting for joint feedback...')
         layout.addWidget(status)
         window.resize(720, 190)
