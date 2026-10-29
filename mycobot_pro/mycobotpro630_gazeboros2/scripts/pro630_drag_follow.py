@@ -31,7 +31,7 @@ class DragFollow(Node):
         try:
             if {'slider_control_gazebo', 'teleop_keyboard_gazebo'} & set(self.get_node_names()):
                 raise RuntimeError('Close the existing robot controller before starting drag following')
-            self.sdk = Pro630Client(DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT, feedback_hz=20.0, ownership_timeout=0, feature="drag", with_gripper=self.with_gripper)
+            self.sdk = Pro630Client(DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT, feedback_hz=20.0, ownership_timeout=0, feature="drag", with_gripper=self.with_gripper, allow_collision=self.allow_collision)
             if not self.get_parameter('startup_enabled').value:
                 if self.sdk.is_moving() != 0:
                     raise RuntimeError('Stop robot motion before starting drag following')
@@ -165,17 +165,11 @@ def main():
         window.setWindowTitle('Pro630 Drag Follow Control')
         window.setFocusPolicy(Qt.StrongFocus)
         layout = QVBoxLayout(window)
-        layout.addWidget(QLabel(
-            ('All six arm joints and the gripper are enabled once at startup.\n' if node.with_gripper else
-             'All six arm joints are enabled once at startup.\n') +
-            ('M: release / lock all six arm joints and the gripper together. Q: close this window.\n' if node.with_gripper else
-             'M: release / lock all six arm joints. Q: close this window.\n') +
-            'When disabled, support the arm and drag it by hand. Gazebo follows the measured pose.\n' +
-            ('Closing this window exits arm free-move; the gripper enable state is preserved.' if node.with_gripper else
-             'Closing this window exits arm free-move.')))
+        layout.addWidget(QLabel('M  Release / Lock     Q  Quit'))
+        layout.addWidget(QLabel('Support the arm while released. Exit returns to position mode.'))
         status = QLabel('Waiting for joint feedback...')
         layout.addWidget(status)
-        window.resize(720, 190)
+        window.resize(600, 150)
         timer = QTimer(window)
 
         def tick():

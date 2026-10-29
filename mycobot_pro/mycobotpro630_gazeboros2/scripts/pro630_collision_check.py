@@ -17,6 +17,9 @@ class CollisionCheck:
     """Requires a validity client, active joints, cancellation flag and depth trend tolerance."""
 
     def _path_is_valid(self, current, target):
+        if getattr(self, 'allow_collision', False):
+            return ((False, 'STOP requested.') if self._stop_requested
+                    else (True, 'Collision checks bypassed (allow_collision=true).'))
 
         if not self.validity_client.wait_for_service(timeout_sec=2.0):
             return False, "MoveIt /check_state_validity service is unavailable."

@@ -241,7 +241,7 @@ class SliderControl(CollisionCheck, Node):
                 f"Connecting to Pro630 @ {self.pro630_ip}:{self.pro630_port}"
             )
             self.mc = Pro630Client(self.pro630_ip, self.pro630_port,
-                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider", with_gripper=self.with_gripper)
+                                   feedback_hz=float(self.get_parameter("feedback_hz").value), feature="slider", with_gripper=self.with_gripper, allow_collision=self.allow_collision)
             power_state = self.mc.is_power_on()
             if power_state != 1:
                 raise RuntimeError(

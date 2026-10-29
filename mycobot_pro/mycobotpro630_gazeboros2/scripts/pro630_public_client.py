@@ -4,13 +4,14 @@ import math
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from types import SimpleNamespace
+from pro630_model import ARM_JOINTS, KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from pro630_model import ARM_JOINTS, KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
 from mycobotpro630_gazeboros2.srv import Pro630Rpc
 
 
@@ -18,10 +19,14 @@ class PublicPro630Client:
     public_feedback = True
 
     def __init__(self, ip=None, netport=None, debug=False, feedback_hz=10.,
-                 ownership_timeout=15., feature='slider', with_gripper=True):
+                 ownership_timeout=15., feature='slider', with_gripper=True, allow_collision=False):
         self.owner_token = uuid.uuid4().hex
         self.feature = feature
         self._call_lock = threading.Lock()
+        self._stop_lock = threading.Lock()
+        self._generation_lock = threading.Lock()
+        self._keyboard_generation = 0
+        self._angle_sample = threading.local()
         self._condition = threading.Condition()
         self._callback = None
         self._latest = None
@@ -41,13 +46,18 @@ class PublicPro630Client:
         try:
             if not self.client.wait_for_service(timeout_sec=5.):
                 raise RuntimeError('Public robot service unavailable; start slider.launch.py environment:=real')
-            from pro630_configuration import joints, require_flag
+            from pro630_configuration import joints, require_flag, collision_policy
             self.with_gripper = require_flag(with_gripper)
+            self.allow_collision = collision_policy(allow_collision)
             capabilities = self._rpc('get_capabilities')
             if (capabilities.get('with_gripper') is not self.with_gripper or
                     capabilities.get('joints') != joints(self.with_gripper)):
                 raise RuntimeError('Public robot installation profile does not match this feature')
-            self._rpc('claim', [feature])
+            if collision_policy(capabilities.get('allow_collision', False)) is not self.allow_collision:
+                raise RuntimeError('Public collision policy does not match this feature; restart the control launch')
+            claim = self._rpc('claim', [feature])
+            if feature == 'keyboard':
+                self._keyboard_generation = claim['generation']
             self._claimed = True
             self.node.create_timer(.5, self._heartbeat)
         except Exception:
@@ -55,6 +65,12 @@ class PublicPro630Client:
             raise
 
     def _request(self, method, args=(), kwargs=None):
+        from pro630_broker_support import KEYBOARD_MOTION_METHODS
+        kwargs = dict(kwargs or {})
+        if self.feature == 'keyboard' and method in KEYBOARD_MOTION_METHODS:
+            with self._generation_lock:
+                kwargs['_keyboard_generation'] = getattr(
+                    self._angle_sample, 'motion_generation', self._keyboard_generation)
         req = Pro630Rpc.Request()
         req.token, req.method = self.owner_token, method
         req.args_json = json.dumps(list(args), allow_nan=False)
@@ -62,22 +78,57 @@ class PublicPro630Client:
         return req
 
     def _rpc(self, method, args=(), kwargs=None):
-        with self._call_lock:
+        # STOP must not queue behind a coordinate/status future.
+        guard = self._stop_lock if method == 'keyboard_stop' else self._call_lock
+        request = self._request(method, args, kwargs)
+        with guard:
             if self._closed:
                 raise RuntimeError('Feature proxy closed')
             completed = threading.Event()
-            future = self.client.call_async(self._request(method, args, kwargs))
+            future = self.client.call_async(request)
             future.add_done_callback(lambda _: completed.set())
             from pro630_broker_support import READS
-            timeout = 1.0 if self.feature == 'keyboard' and method in READS else 15.0
+            timeout = 8.0 if self.feature == 'keyboard' else 15.0
             if not completed.wait(timeout):
                 future.cancel()
                 raise RuntimeError(f'Public robot request timed out: {method}')
             response = future.result()
             if response is None or not response.success:
+                from pro630_broker_support import KEYBOARD_CANCELLED, KeyboardCommandCancelled
+                if response is not None and response.error == KEYBOARD_CANCELLED:
+                    raise KeyboardCommandCancelled()
                 raise RuntimeError(response.error if response is not None else 'Public robot service failed')
             self._stamps.update(json.loads(response.stamps_json))
             return json.loads(response.result_json)
+
+    @contextmanager
+    def keyboard_motion(self):
+        # Snapshot before the transport's epoch check. A STOP between that
+        # check and RPC construction must still invalidate the old command.
+        with self._generation_lock:
+            generation = self._keyboard_generation
+        previous = getattr(self._angle_sample, 'motion_generation', None)
+        self._angle_sample.motion_generation = generation
+        try:
+            yield
+        finally:
+            if previous is None:
+                del self._angle_sample.motion_generation
+            else:
+                self._angle_sample.motion_generation = previous
+
+    def priority_stop(self):
+        if self.feature != 'keyboard':
+            raise RuntimeError('Priority STOP is reserved for keyboard control')
+        packet = self._rpc('keyboard_stop')
+        with self._generation_lock:
+            self._keyboard_generation = max(self._keyboard_generation, packet['generation'])
+        return packet['result']
+
+    def stop(self, *args, **kwargs):
+        if self.feature == 'keyboard':
+            return self.priority_stop()
+        return self._rpc('stop', args, kwargs)
 
     def _heartbeat(self):
         if not self._claimed or self._closed:
@@ -109,17 +160,14 @@ class PublicPro630Client:
 
     def get_angles(self):
         if self.feature == 'keyboard':
-            # The public bridge is already sampling. Do not queue another RPC
-            # waiting for a new packet behind slow tool/status queries.
+            # Pose save/arrival checks consume the public 20 Hz angle cache,
+            # rather than adding SDK queries beside Cartesian Z monitoring.
             with self._condition:
-                deadline = time.monotonic() + KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
-                while self._latest is None and not self._closed and time.monotonic() < deadline:
-                    self._condition.wait(max(0., deadline - time.monotonic()))
                 sample = self._latest
                 if sample is None or time.monotonic() - sample.monotonic > KEYBOARD_ARM_FEEDBACK_MAX_AGE_S:
-                    raise RuntimeError('Public six-axis feedback is missing or older than '
-                                       f'{KEYBOARD_ARM_FEEDBACK_MAX_AGE_S:g} s')
-                self._stamps['arm'] = [sample.monotonic, sample.wall_time]
+                    raise RuntimeError('Public six-axis feedback is missing or older than 1.0 s')
+                self._angle_sample.stamp = [sample.monotonic, sample.wall_time]
+                self._stamps['arm'] = self._angle_sample.stamp
                 return list(sample.angles)
         packet = self._rpc('get_angles', [self._rpc_sequence])
         self._rpc_sequence = packet['sequence']
@@ -128,6 +176,8 @@ class PublicPro630Client:
         return packet['value']
 
     def sample_time(self, kind):
+        if self.feature == 'keyboard' and kind == 'arm':
+            return getattr(self._angle_sample, 'stamp', None)
         return self._stamps.get(kind)
 
     def set_angle_callback(self, callback):

@@ -181,7 +181,7 @@
         <dynamics damping="1.0" friction="0.1" />
     </joint>
     <joint name="joint6_to_joint5" type="revolute">
-        <axis xyz="-1 0 0" />
+        <axis xyz="1 0 0" />
         <limit effort="1000.0" lower="-3.03" upper="3.0368" velocity="3.14" />
         <parent link="link5" />
         <child link="link6" />

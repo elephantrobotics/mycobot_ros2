@@ -31,7 +31,7 @@ class ControlSession(Node):
         self.environment = self.get_parameter('environment').value
         if self.feature not in ('slider', 'keyboard', 'drag', 'gui') or self.environment not in ('simulation', 'real'):
             raise ValueError('Invalid feature or environment')
-        if self.feature in ('drag', 'gui') and self.environment != 'real':
+        if self.feature in ('drag', 'gui', 'keyboard') and self.environment != 'real':
             raise ValueError(f'{self.feature} requires the real environment')
         self.latch = EnvironmentLatch(self.environment)
         self.failure = None
@@ -58,10 +58,13 @@ class ControlSession(Node):
     def _start_controls(self):
         if {'slider_control_gazebo', 'teleop_keyboard_gazebo', 'pro630_slider_gui', 'pro630_drag_follow', 'pro630_gui_backend', 'pro630_control_gui'} & set(self.get_node_names()):
             raise RuntimeError('A control process is already running; close it before starting this function')
+        if self.latch.state.get('allow_collision') is True:
+            self.get_logger().warning(f'{self.feature}: allow_collision=true; collision and ground checks are bypassed.')
         directory = Path(get_package_prefix(PACKAGE)) / 'lib' / PACKAGE
         for command in control_commands(self.feature, self.environment, directory, sys.executable,
                                         show_force_execute=self.get_parameter('show_force_execute').value,
-                                        with_gripper=self.latch.state['with_gripper']):
+                                        with_gripper=self.latch.state['with_gripper'],
+                                        allow_collision=self.latch.state.get('allow_collision', False)):
             self.children.append(subprocess.Popen(command, start_new_session=True))
         self.get_logger().info(f'{self.feature}: public environment ready; control programs started.')
 
