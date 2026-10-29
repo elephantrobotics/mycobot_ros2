@@ -55,7 +55,7 @@ class GuiBackend(CollisionCheck, Node):
         self.worker = None
         # This proxy claims the already-running real public bridge; it never
         # constructs an SDK connection or powers/enables any motor.
-        self.mc = PublicPro630Client(feature='gui', with_gripper=self.with_gripper)
+        self.mc = PublicPro630Client(feature='gui', with_gripper=self.with_gripper, allow_collision=self.allow_collision)
         self.validity_client = self.create_client(GetStateValidity, '/check_state_validity')
         self.collision_depth_tolerance_m = DEFAULT_COLLISION_DEPTH_TOLERANCE_M
         self._joint_pose_reader = RealPoseReader(
@@ -175,6 +175,9 @@ class GuiBackend(CollisionCheck, Node):
         if any(not lo <= value <= hi for value, (lo, hi) in zip(arm, self.joint_limits[:6])):
             raise CommandRejected('Joint target exceeds its limits.')
         current = self._joint_preflight_pose()
+        if self.allow_collision:
+            self.status("Collision checks bypassed (allow_collision=true).")
+            return
         # Reuse the slider's full path checks, including its collision-exit rules.
         # Never move the gripper as a side effect of a six-axis GUI command.
         for _ in range(3):
@@ -247,6 +250,8 @@ class GuiBackend(CollisionCheck, Node):
     def execute(self, command):
         self.cancelled()
         kind, target, speed = command['kind'], command['target'], command['speed']
+        if kind == 'coords' and target[2] < 0 and not self.allow_collision:
+            raise CommandRejected('Target Z must be at least 0 mm.')
         previous_coords = None
         coordinate_jump = False
         if kind == 'coords':

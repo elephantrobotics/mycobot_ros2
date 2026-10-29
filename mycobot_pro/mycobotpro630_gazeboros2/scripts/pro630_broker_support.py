@@ -1,6 +1,70 @@
 """Exclusive feature leases and a closed SDK method allowlist."""
 import threading
 import time
+from contextlib import contextmanager
+
+KEYBOARD_MOTION_METHODS = {'jog_coord', 'send_angles', 'set_pro_gripper_angle', 'set_pro_gripper_speed'}
+KEYBOARD_CANCELLED = 'Keyboard command cancelled by STOP.'
+
+
+class KeyboardCommandCancelled(RuntimeError):
+    def __init__(self):
+        super().__init__(KEYBOARD_CANCELLED)
+
+
+class KeyboardStopBarrier:
+    """Invalidate queued keyboard writes; hold the gate only during actual writes."""
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.generation = 0
+        self.stopping = False
+        self.local = threading.local()
+
+    def check(self, generation):
+        if type(generation) is not int:
+            raise ValueError('Keyboard motion generation is required')
+        if generation != self.generation:
+            raise KeyboardCommandCancelled()
+        if self.stopping:
+            raise RuntimeError('STOP has not been confirmed.')
+
+    @contextmanager
+    def guard(self, generation):
+        with self.lock:
+            self.check(generation)
+            yield
+
+    @contextmanager
+    def command(self, generation):
+        with self.guard(generation):
+            pass
+        previous = getattr(self.local, 'generation', None)
+        self.local.generation = generation
+        try:
+            yield
+            with self.guard(generation):
+                pass
+        finally:
+            self.local.generation = previous
+
+    @contextmanager
+    def write(self):
+        with self.lock:
+            generation = getattr(self.local, 'generation', None)
+            if generation is not None:
+                self.check(generation)
+            yield
+
+    def begin_stop(self):
+        with self.lock:
+            self.generation += 1
+            self.stopping = True
+            return self.generation
+
+    def finish_stop(self, generation):
+        with self.lock:
+            if generation == self.generation:
+                self.stopping = False
 
 READS = {'get_angles', 'is_power_on', 'is_moving', 'get_error_information',
          'get_pro_gripper_angle', 'get_pro_gripper_speed'}
@@ -9,8 +73,8 @@ WRITES = {
             'get_coords', 'get_pro_gripper_status', 'send_coords', 'is_in_position',
             'get_motion_status'},
     'slider': {'send_angles', 'set_pro_gripper_angle', 'set_pro_gripper_speed', 'stop'},
-    'keyboard': {'send_angle', 'jog_angle', 'set_pro_gripper_angle',
-                 'set_pro_gripper_speed', 'stop'},
+    'keyboard': {'jog_coord', 'get_coords', 'send_angles', 'set_pro_gripper_angle',
+                 'set_pro_gripper_speed', 'stop', 'keyboard_stop'},
     'drag': {'set_motor_enabled', 'set_pro_gripper_enabled'},
 }
 

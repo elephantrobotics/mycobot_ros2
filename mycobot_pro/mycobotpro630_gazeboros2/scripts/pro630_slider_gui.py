@@ -206,6 +206,11 @@ class Pro630SliderWindow(QMainWindow):
             target_box.setDecimals(decimals)
             target_box.setRange(minimum, maximum)
             target_box.setSingleStep(0.01)
+            target_box.setReadOnly(True)
+            target_box.setButtonSymbols(QDoubleSpinBox.NoButtons)
+            target_box.setFocusPolicy(Qt.NoFocus)
+            target_box.setFrame(False)
+            target_box.setStyleSheet("QDoubleSpinBox, QLineEdit { background: transparent; border: none; padding: 0px; }")
 
             slider = QSlider(Qt.Horizontal)
             slider.setFixedWidth(560)

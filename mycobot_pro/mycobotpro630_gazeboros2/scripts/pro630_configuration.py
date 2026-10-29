@@ -12,6 +12,12 @@ def require_flag(value):
     return value
 
 
+def collision_policy(value):
+    if type(value) is not bool:
+        raise ValueError('Missing or invalid allow_collision capability; restart the matching public environment')
+    return value
+
+
 def joints(with_gripper):
     return ARM_JOINTS + ([GRIPPER_JOINT] if require_flag(with_gripper) else [])
 
@@ -39,6 +45,8 @@ def geometry_xml(path, with_gripper=True):
 def configure_node(node):
     node.declare_parameter('with_gripper', True)
     node.with_gripper = require_flag(node.get_parameter('with_gripper').value)
+    node.declare_parameter('allow_collision', False)
+    node.allow_collision = collision_policy(node.get_parameter('allow_collision').value)
     node.command_joints = joints(node.with_gripper)
     node.joint_limits = JOINT_LIMITS_RAD[:len(node.command_joints)]
 

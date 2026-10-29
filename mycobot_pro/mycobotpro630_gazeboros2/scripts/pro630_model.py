@@ -12,6 +12,10 @@ JOINT_LIMITS_RAD = [(-3.14, 3.14159), (-3.14159, 3.14159), (-2.61, 2.618), (-2.9
 LIMITS_DEG = [(math.degrees(lo), math.degrees(hi)) for lo, hi in JOINT_LIMITS_RAD[:6]]
 MAX_VELOCITY_RAD_S = [3.14] * 6 + [1.0]
 HARDWARE_OFFSETS_DEG = (0.0, 90.0, 0.0, 90.0, 0.0, 0.0)
+# Default Home offsets are relative to the URDF/model zero pose.
+HOME_MODEL_ANGLES_DEG = (0., 10., 123., -45., -90., 0.)
+HOME_HARDWARE_ANGLES_DEG = tuple(
+    angle - offset for angle, offset in zip(HOME_MODEL_ANGLES_DEG, HARDWARE_OFFSETS_DEG))
 DEFAULT_PRO630_IP = '192.168.1.159'
 DEFAULT_PRO630_PORT = 5001
 GRIPPER_ID = 14

@@ -23,6 +23,9 @@ from pro630_joint_display import model_to_hardware, hardware_to_model, display_l
 from pro630_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
 
 
+from pro630_model import HOME_HARDWARE_ANGLES_DEG as HOME_JOINTS_DEG
+
+
 class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
     pass
 
@@ -103,7 +106,7 @@ class ControlWindow(QMainWindow):
                     lo, hi = JOINT_LIMITS_RAD[i]
                     spin.setRange(*display_limits((math.degrees(lo), math.degrees(hi)), i, 2))
                 else:
-                    spin.setRange(-5000., 5000.) if i < 3 else spin.setRange(-180., 180.)
+                    spin.setRange(0. if i == 2 and not node.allow_collision else -5000., 5000.) if i < 3 else spin.setRange(-180., 180.)
                 spin.setSuffix(' ' + (unit or ('mm' if i < 3 else '°')))
                 spin.setMinimumWidth(130)
                 value = QLabel('—')
@@ -129,7 +132,10 @@ class ControlWindow(QMainWindow):
         track_speed(self.speed, self.log)
         options.addWidget(self.speed)
         options.addStretch()
-        self.command_buttons = [self.joints_button, self.coords_button]
+        self.home_button = QPushButton('Home')
+        self.home_button.clicked.connect(self.send_home)
+        options.addWidget(self.home_button)
+        self.command_buttons = [self.joints_button, self.coords_button, self.home_button]
         if node.with_gripper:
             group, gripper = QGroupBox('Gripper'), QGridLayout()
             group.setLayout(gripper)
@@ -167,6 +173,10 @@ class ControlWindow(QMainWindow):
         for control in inputs:
             control.interpretText()
         self.send(kind, [control.value() for control in inputs])
+
+    def send_home(self):
+        self.log.event('Home requested.')
+        self.send('joints', list(HOME_JOINTS_DEG))
 
     def send_gripper(self):
         self.gripper_target.interpretText()

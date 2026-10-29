@@ -48,7 +48,8 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES scripts/pro630_configuration.py scripts/pro630_model.py scripts/pro630_hold_profile.py scripts/pro630_real_keyboard.py
+install(FILES scripts/pro630_configuration.py scripts/pro630_model.py scripts/pro630_real_keyboard.py
+  scripts/pro630_cartesian_keyboard.py scripts/pro630_startup_ground.py scripts/pro630_tool_reference.py
   scripts/pro630_session_support.py
   scripts/pro630_drag_support.py
   scripts/pro630_public_client.py

@@ -5,11 +5,13 @@ import math
 import signal
 import threading
 import time
+from contextlib import nullcontext
 
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.logging import get_logger
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from builtin_interfaces.msg import Duration, Time
 from sensor_msgs.msg import JointState
@@ -19,9 +21,11 @@ from mycobotpro630_gazeboros2.srv import Pro630Rpc
 
 from pro630_sdk_adapter import Pro630Client
 from pro630_session_support import LIMITS_DEG, read_initial_snapshot
-from pro630_broker_support import FeatureLease
+from pro630_broker_support import FeatureLease, KEYBOARD_MOTION_METHODS
 from pro630_real_mirror import RealPoseBuffer
 from pro630_configuration import configure_node
+from pro630_control_logging import ControlLog, emit_log
+from pro630_tool_reference import ToolReferenceContext
 from pro630_model import DEFAULT_PRO630_IP, DEFAULT_PRO630_PORT
 
 
@@ -35,7 +39,9 @@ class RobotBridge(Node):
         super().__init__('pro630_robot_bridge')
         configure_node(self)
         self.sdk = None
+        self.tool_reference = None
         self.hardware_lock = threading.RLock()
+        self.keyboard_stop_lock = threading.Lock()
         self.cache_condition = threading.Condition()
         self.stop_event = threading.Event()
         self.lease = FeatureLease()
@@ -52,15 +58,15 @@ class RobotBridge(Node):
         self.frame = None
         self.environment_ready = False
         self.environment_seen = 0.
-        self._last_lease_error_log = float('-inf')
         self._feedback_error_log_times = {}
+        self.transport_log = ControlLog(self.get_logger())
         try:
             self.declare_parameter('pro630_ip', DEFAULT_PRO630_IP)
             self.declare_parameter('pro630_port', DEFAULT_PRO630_PORT)
             self.sdk = Pro630Client(self.get_parameter('pro630_ip').value,
                                    int(self.get_parameter('pro630_port').value),
                                    feedback_hz=20., ownership_timeout=0)
-            # Startup is strictly read-only; feature launches are not needed for the snapshot.
+            self.tool_reference = ToolReferenceContext(self.sdk)
             self.initial_pose = read_initial_snapshot(self.sdk, with_gripper=self.with_gripper)
             self.gripper = self.initial_pose[6] if self.with_gripper else None
             self.stamps = {kind: self.sdk.sample_time(kind) for kind in (('arm', 'gripper') if self.with_gripper else ('arm',))}
@@ -86,21 +92,25 @@ class RobotBridge(Node):
             self.close()
             raise
 
+    def log_transport_error(self, reason):
+        # Sampling and the executor can observe the same closed socket together.
+        self.transport_log.state('transport', reason, f'Robot connection lost: {reason}', 'error')
+
     def check_transport(self):
         if self.sdk is not None and self.sdk._closed.is_set():
             reason = self.sdk.get_transport_error() or 'Pro630 transport closed'
+            self.log_transport_error(reason)
             raise RuntimeError(f'{reason}; restart the public environment after checking the connection')
 
     def log_feedback_error(self, kind, exc):
         now = time.monotonic()
-        fatal = self.sdk._closed.is_set()
-        # The sampler stops after a fatal failure; temporary errors are throttled.
-        if fatal or now - self._feedback_error_log_times.get(kind, float('-inf')) >= 5.:
+        reason = self.sdk.get_transport_error()
+        if reason:
+            self.log_transport_error(reason)
+            return
+        if now - self._feedback_error_log_times.get(kind, float('-inf')) >= 5.:
             self._feedback_error_log_times[kind] = now
-            logger = self.get_logger()
-            message = f'{kind} feedback failed: {exc}'
-            (logger.error if fatal else logger.warning)(message)
-
+            emit_log(self.get_logger(), f'{kind} feedback failed: {exc}', 'warning')
 
     def environment_state(self, msg):
         try:
@@ -132,10 +142,8 @@ class RobotBridge(Node):
                         if self.lease.expired():
                             self.release_owner(self.lease.token)
                 except Exception as exc:
-                    now = time.monotonic()
-                    if now - self._last_lease_error_log >= 5.:
-                        self.get_logger().error(f'Expired feature stop failed: {exc}')
-                        self._last_lease_error_log = now
+                    self.transport_log.state('lease_release', (self.lease.token, str(exc)),
+                        f'Expired feature stop failed: {exc}', 'error')
             value, error = None, ''
             try:
                 with self.hardware_lock:
@@ -172,8 +180,7 @@ class RobotBridge(Node):
                         started = time.monotonic()
                         updated = False
                         try:
-                            value = self.sdk.get_pro_gripper_angle()
-                            updated = self.update_gripper(value)
+                            updated = self.update_gripper(self.sdk.get_pro_gripper_angle())
                         except Exception as exc:
                             # Preserve the last measured opening and timestamp.
                             self.log_feedback_error('Gripper', exc)
@@ -197,7 +204,25 @@ class RobotBridge(Node):
             self.sdk.set_pro_gripper_angle(int(round(opening)))
             self.gripper_active = False
             self.update_gripper(opening)
+        if self.lease.feature in ('gui', 'keyboard') and self.tool_reference is not None:
+            self.tool_reference.restore()
         self.lease.clear(token)
+        self.transport_log.clear('lease_release')
+
+    def keyboard_stop(self, token):
+        # Invalidate queued motions immediately. Native STOP still serializes
+        # after the in-flight text reply; never interleave an unframed stream.
+        with self.keyboard_stop_lock, self.lease.lock:
+            self.lease.authorize(token, 'keyboard_stop')
+            barrier = self.sdk.keyboard_stop_barrier
+            generation = barrier.begin_stop()
+            result = self.sdk.stop(deceleration=0, _async=True)
+            if result is not None and (type(result) is not int or result not in (0, 1)):
+                raise RuntimeError(f'Robot STOP failed: {result!r}')
+            self.arm_active, self.arm_goal = False, None
+            self.lease.touch(token)
+            barrier.finish_stop(generation)
+            return {'generation': generation, 'result': result}
 
     def rpc(self, req, res):
         try:
@@ -208,7 +233,8 @@ class RobotBridge(Node):
             if not self.with_gripper and 'gripper' in method:
                 raise RuntimeError('Gripper operations are unavailable in the arm-only environment')
             if method == 'get_capabilities':
-                result = {'with_gripper': self.with_gripper, 'joints': self.command_joints}
+                result = {'with_gripper': self.with_gripper, 'joints': self.command_joints,
+                          'allow_collision': self.allow_collision}
             elif method == 'heartbeat':
                 self.lease.touch(req.token)
                 result = True
@@ -216,9 +242,34 @@ class RobotBridge(Node):
                 with self.hardware_lock:
                     if not self.environment_ready or time.monotonic() - self.environment_seen > 2.:
                         raise RuntimeError('Public environment is not ready for a control feature')
+                    # Reconcile any failed setup rollback before another feature
+                    # can acquire the SDK-local tool coordinate context.
+                    if self.lease.token is None and self.tool_reference is not None:
+                        self.tool_reference.restore()
+                    already_owned = self.lease.token == req.token
+                    if already_owned and self.lease.feature != args[0]:
+                        raise RuntimeError('Control feature does not match the existing owner')
                     self.lease.claim(req.token, args[0])
+                    if not already_owned and args[0] in ('keyboard', 'gui'):
+                        try:
+                            self.tool_reference.apply(with_gripper=self.with_gripper)
+                            self.lease.touch(req.token)
+                            self.get_logger().info(
+                                f'{args[0]} coordinate settings ready; ' +
+                                ('SDK tool Z offset=165 mm.' if self.with_gripper else 'flange control.'))
+                        except Exception:
+                            self.lease.clear(req.token)
+                            raise
                     self.mirror.clear()
-                result = True
+                result = ({'generation': self.sdk.keyboard_stop_barrier.generation}
+                          if args[0] == 'keyboard' else True)
+            elif method == 'keyboard_stop' or (method == 'stop' and self.lease.feature == 'keyboard'):
+                if (method == 'keyboard_stop' and (args or kwargs)) or (
+                        method == 'stop' and (args or kwargs != {'deceleration': 0, '_async': True})):
+                    raise ValueError('Invalid keyboard STOP arguments')
+                result = self.keyboard_stop(req.token)
+                if method == 'stop':
+                    result = result['result']
             elif method == 'get_angles':
                 self.lease.authorize(req.token, method)
                 deadline = time.monotonic() + .6
@@ -240,29 +291,36 @@ class RobotBridge(Node):
                         if method == 'set_pro_gripper_enabled' and (
                                 len(args) != 1 or type(args[0]) is not int or args[0] not in (0, 1) or kwargs):
                             raise ValueError('Drag mode may only enable or disable the default gripper')
-                        if self.lease.feature == 'gui':
-                            if method in ('send_angles', 'send_coords'):
-                                self.arm_active, self.arm_goal = True, None
-                            elif method == 'set_pro_gripper_angle':
-                                self.gripper_active = True
-                        result = getattr(self.sdk, method)(*args, **kwargs)
-                        if self.lease.feature == 'gui':
-                            if method == 'is_in_position' and result == 1:
-                                self.arm_active, self.arm_goal = False, None
-                            elif method == 'get_pro_gripper_status' and result in (1, 2, 3):
-                                self.gripper_active = False
-                        if method == 'get_pro_gripper_angle':
-                            self.update_gripper(result)
-                        elif method == 'set_pro_gripper_angle' and result == 1:
-                            self.gripper_active = True
-                        elif method in ('send_angles', 'send_angle', 'jog_angle'):
-                            self.arm_active = True
-                            self.arm_goal = list(args[0]) if method == 'send_angles' else None
-                            if method == 'send_angle' and self.frame:
-                                self.arm_goal = [math.degrees(v) for v in self.frame[2][:6]]
-                                self.arm_goal[int(args[0])-1] = args[1]
-                        elif method == 'stop':
-                            self.arm_active = False
+                        keyboard_motion = self.lease.feature == 'keyboard' and method in KEYBOARD_MOTION_METHODS
+                        generation = kwargs.pop('_keyboard_generation', None) if keyboard_motion else None
+                        barrier = self.sdk.keyboard_stop_barrier
+                        context = barrier.command(generation) if keyboard_motion else nullcontext()
+                        with context:
+                            with barrier.guard(generation) if keyboard_motion else nullcontext():
+                                if self.lease.feature in ('gui', 'keyboard'):
+                                    if method in ('send_angles', 'send_coords', 'jog_coord'):
+                                        self.arm_active, self.arm_goal = True, None
+                                    elif method == 'set_pro_gripper_angle':
+                                        self.gripper_active = True
+                            result = getattr(self.sdk, method)(*args, **kwargs)
+                            with barrier.guard(generation) if keyboard_motion else nullcontext():
+                                if self.lease.feature == 'gui':
+                                    if method == 'is_in_position' and result == 1:
+                                        self.arm_active, self.arm_goal = False, None
+                                    elif method == 'get_pro_gripper_status' and result in (1, 2, 3):
+                                        self.gripper_active = False
+                                if method == 'get_pro_gripper_angle':
+                                    self.update_gripper(result)
+                                elif method == 'set_pro_gripper_angle' and result == 1:
+                                    self.gripper_active = True
+                                elif method in ('send_angles', 'jog_coord'):
+                                    self.arm_active = True
+                                    self.arm_goal = list(args[0]) if method == 'send_angles' else None
+                                elif method == 'stop':
+                                    if result is not None and result not in (0, 1):
+                                        raise RuntimeError(f'Robot STOP failed: {result!r}')
+                                    self.arm_active = False
+                                    self.arm_goal = None
             res.success = True
             res.result_json = json.dumps(result, allow_nan=False)
             res.stamps_json = json.dumps(self.stamps)
@@ -328,25 +386,40 @@ class RobotBridge(Node):
         clean = True
         self.stop_event.set()
         if self.worker is not None:
-            self.worker.join(timeout=1.)
+            try:
+                self.worker.join(timeout=1.)
+            except Exception as exc:
+                clean = False
+                self.get_logger().error(f'Shutdown sampler cleanup failed: {exc}')
         if self.sdk is not None:
             try:
                 with self.hardware_lock:
+                    if (self.lease.token is None and self.tool_reference is not None
+                            and self.tool_reference.saved is not None):
+                        try:
+                            self.tool_reference.restore()
+                        except Exception as exc:
+                            clean = False
+                            self.get_logger().error(f'Control tool reference restoration failed: {exc}')
                     if self.lease.token is not None:
                         if self.sdk._closed.is_set():
                             clean = False
                             self.get_logger().error(
-                                'Shutdown stop/hold not confirmed: transport is closed. '
-                                + (self.sdk.get_transport_error() or 'No transport failure detail available.'))
+                                'Shutdown: robot stop/hold could not be confirmed (connection closed).')
+                            if self.tool_reference is not None and self.tool_reference.saved is not None:
+                                self.tool_reference.restore()
                         else:
                             try:
                                 self.release_owner(self.lease.token)
                             except Exception as exc:
                                 clean = False
                                 self.get_logger().error(f'Shutdown stop/hold failed: {exc}')
-                        # Discard ownership locally on exit even if hardware is unavailable.
                         if self.lease.token is not None:
-                            self.lease.clear(self.lease.token)
+                            try:
+                                self.lease.clear(self.lease.token)
+                            except Exception as exc:
+                                clean = False
+                                self.get_logger().error(f'Shutdown feature lease cleanup failed: {exc}')
             finally:
                 try:
                     self.sdk.close()
@@ -374,7 +447,13 @@ def main():
     except KeyboardInterrupt:
         pass
     except Exception as exc:
-        print(f'Public Pro630 bridge failed: {exc}')
+        reason = node.sdk.get_transport_error() if node is not None and node.sdk is not None else None
+        if reason and str(exc).startswith(reason):
+            node.log_transport_error(reason)
+            message = 'Public robot bridge stopping: connection lost. Check the connection and restart slider.launch.py.'
+        else:
+            message = f'Public Pro630 bridge failed: {exc}'
+        emit_log(node.get_logger() if node is not None else get_logger('pro630_robot_bridge'), message, 'error')
         code = 1
     finally:
         signal.signal(signal.SIGINT, signal.SIG_IGN)

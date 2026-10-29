@@ -13,6 +13,8 @@ import tempfile
 import threading
 import time
 import uuid
+from contextlib import contextmanager
+from pro630_broker_support import KeyboardStopBarrier, KeyboardCommandCancelled
 from pro630_model import (ARM_CARTESIAN_SDK_SPEED_MAX, ARM_JOINT_SDK_SPEED_MAX, DEFAULT_PRO630_IP,
                          DEFAULT_PRO630_PORT, GRIPPER_ID,
                          HARDWARE_OFFSETS_DEG, LIMITS_DEG)
@@ -64,13 +66,59 @@ class TransportClosedError(RuntimeError):
     """The unframed connection cannot be reused after a transport failure."""
 
 
+
+class PriorityApiLock:
+    """Reentrant request/reply lock; pending STOP precedes new requests."""
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.pending = threading.Event()
+        self.pending_lock = threading.Lock()
+        self.pending_count = 0
+        self.local = threading.local()
+
+    def __enter__(self):
+        while True:
+            nested = getattr(self.local, 'depth', 0) > 0
+            priority = getattr(self.local, 'priority', False)
+            if not nested and not priority and self.pending.is_set():
+                time.sleep(.005)
+                continue
+            self.lock.acquire()
+            if nested or priority or not self.pending.is_set():
+                self.local.depth = getattr(self.local, 'depth', 0) + 1
+                return self
+            self.lock.release()
+
+    def __exit__(self, *unused):
+        self.local.depth -= 1
+        self.lock.release()
+
+    @contextmanager
+    def priority(self):
+        with self.pending_lock:
+            self.pending_count += 1
+            self.pending.set()
+        self.local.priority = True
+        try:
+            with self:
+                yield
+        finally:
+            self.local.priority = False
+            with self.pending_lock:
+                self.pending_count -= 1
+                if self.pending_count == 0:
+                    self.pending.clear()
+
+
 class Pro630Client(_VendorClient):
     """Only this module maps feature operations to Pro630 vendor methods."""
     def __init__(self, ip=DEFAULT_PRO630_IP, netport=DEFAULT_PRO630_PORT,
                  debug=False, feedback_hz=20., ownership_timeout=15.):
         if _VendorClient is object:
             raise RuntimeError('pymycobot and numpy are required for real Pro630 mode')
-        self._api_lock = threading.RLock()
+        self._api_lock = PriorityApiLock()
+        self.keyboard_stop_barrier = KeyboardStopBarrier()
+        self._tool_control = False
         self._closed = threading.Event()
         self._transport_error = None
         self._stamps = {}
@@ -97,7 +145,7 @@ class Pro630Client(_VendorClient):
                 raise TransportClosedError(self.get_transport_error() or
                                            'Pro630 connection closed; restart the public environment')
             method = command.split('(', 1)[0]
-            motion = method in ('set_angles', 'set_coords')
+            motion = method in ('set_angles', 'set_coords', 'jog_coord')
             if motion:
                 self._motion_reply = {'received': False, 'error': None}
             data = bytearray()
@@ -108,7 +156,8 @@ class Pro630Client(_VendorClient):
                 timeout = (GRIPPER_ANGLE_TIMEOUT_S if method == 'force_GetGripperAngle'
                            else TCP_TIMEOUT_S)
                 self.tcp_client.settimeout(timeout)
-                self.tcp_client.sendall((command.rstrip('\n') + '\n').encode())
+                with self.keyboard_stop_barrier.write():
+                    self.tcp_client.sendall((command.rstrip('\n') + '\n').encode())
                 while len(data) < 65536:
                     chunk = self.tcp_client.recv(4096)
                     if not chunk:
@@ -152,7 +201,7 @@ class Pro630Client(_VendorClient):
                 self._last_reply = reply
                 self._received = received
                 return reply
-            except ControllerRejected:
+            except (ControllerRejected, KeyboardCommandCancelled):
                 raise
             except (OSError, UnicodeError, RuntimeError) as exc:
                 # Preserve the first failure before later closed-connection reads.
@@ -202,14 +251,29 @@ class Pro630Client(_VendorClient):
         return list(values)
 
     def get_coords(self):
-        # Avoid the vendor's plausible-looking sentinel on malformed feedback.
-        reply = self.send_command('get_coords()')
-        return self._six_finite([float(v.strip()) for v in reply.strip('[]').split(',')])
+        with self._api_lock:
+            reply = self.send_command('get_coords()')
+            raw = self._six_finite([float(v.strip()) for v in reply.strip('[]').split(',')])
+            if self._tool_control:
+                import numpy as np
+                from pymycobot.elephantrobot import flangeToTool
+                raw = flangeToTool(np.array(raw), self.tool_matrix).tolist()[:3] + raw[3:]
+            return self._six_finite(raw)
 
     def send_coords(self, coords, speed, _async=False):
-        # write_coords waits for the text reply, not for motion completion.
-        return super().write_coords(self._six_finite(coords),
-                                    self._speed(speed, ARM_CARTESIAN_SDK_SPEED_MAX))
+        with self._api_lock:
+            target = self._six_finite(coords)
+            if self._tool_control:
+                import numpy as np
+                from pymycobot.elephantrobot import toolToflange
+                target = toolToflange(np.array(target), self.tool_matrix).tolist()[:3] + target[3:]
+            return super().write_coords(target, self._speed(speed, ARM_CARTESIAN_SDK_SPEED_MAX))
+
+    def jog_coord(self, axis, direction, speed, _async=False):
+        if type(axis) is not int or axis not in (1, 2, 3, 4, 5, 6) or type(direction) is not int or direction not in (0, 1):
+            raise ValueError('Coordinate axis must be 1..6 and direction must be 0 or 1')
+        return super().jog_coord(('X', 'Y', 'Z', 'RX', 'RY', 'RZ')[axis-1], 1 if direction else -1,
+                                 self._speed(speed, ARM_CARTESIAN_SDK_SPEED_MAX))
 
     def is_in_position(self, target, mode=0):
         target = self._six_finite(target)
@@ -300,21 +364,9 @@ class Pro630Client(_VendorClient):
             # measured feedback rather than inventing a motion acknowledgment.
             return super().write_angles(raw, self._speed(speed, ARM_JOINT_SDK_SPEED_MAX))
 
-    def send_angle(self, joint, angle, speed, _async=False):
-        if type(joint) is not int or not 1 <= joint <= 6:
-            raise ValueError('Arm joint must be in 1..6')
-        with self._api_lock:
-            values = self.get_angles(); values[joint - 1] = angle
-            return self.send_angles(values, speed, _async=_async)
-
-    def jog_angle(self, joint, direction, speed, _async=False):
-        if type(joint) is not int or not 1 <= joint <= 6 or direction not in (0, 1):
-            raise ValueError('Invalid Pro630 jog joint or direction')
-        return super().jog_angle(f'J{joint}', 1 if direction else -1,
-                                 self._speed(speed, ARM_JOINT_SDK_SPEED_MAX))
-
     def stop(self, deceleration=0, _async=False):
-        return super().task_stop()  # No deceleration selector in Pro630 SDK.
+        with self._api_lock.priority():
+            return super().task_stop()  # Consume the reply before another request.
 
     @staticmethod
     def _gripper_id(gripper_id):

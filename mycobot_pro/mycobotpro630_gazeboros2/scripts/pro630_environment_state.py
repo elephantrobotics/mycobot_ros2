@@ -23,6 +23,10 @@ class EnvironmentState(Node):
         self.declare_parameter('environment', 'simulation')
         self.declare_parameter('session_id', '')
         self.environment = self.get_parameter('environment').value
+        if self.allow_collision and self.environment != 'real':
+            raise ValueError('allow_collision is supported only by the real environment')
+        if self.allow_collision and not announce:
+            self.get_logger().warning('allow_collision=true: project collision and ground checks are disabled for this real environment.')
         self.session = self.get_parameter('session_id').value
         self.announce = announce
         self.verified = False
@@ -102,7 +106,7 @@ class EnvironmentState(Node):
                  and all(c.service_is_ready() for c in self.moveit_clients))
         self.pub.publish(String(data=json.dumps({
             'session_id': self.session, 'environment': self.environment,
-            'with_gripper': self.with_gripper,
+            'with_gripper': self.with_gripper, 'allow_collision': self.allow_collision,
             'verified': self.verified, 'ready': bool(ready),
             'tracking_ready': (self.environment == 'simulation' or
                 (self.real_feedback_time is not None and now - self.real_feedback_time < 1.

@@ -12,11 +12,10 @@ def generate_launch_description():
     session = Node(
         package='mycobotpro630_gazeboros2', executable='pro630_control_session.py',
         name='pro630_keyboard_session', output='screen', parameters=[{
-            'feature': 'keyboard', 'environment': LaunchConfiguration('environment'),
+            'feature': 'keyboard', 'environment': 'real',
             'startup_timeout_sec': ParameterValue(LaunchConfiguration('startup_timeout_sec'), value_type=float),
             'use_sim_time': False}])
     return LaunchDescription([
-        DeclareLaunchArgument('environment', default_value='simulation', choices=['simulation', 'real']),
         DeclareLaunchArgument('startup_timeout_sec', default_value='600.0'),
         RegisterEventHandler(OnProcessExit(target_action=session,
             on_exit=[EmitEvent(event=Shutdown(reason='Keyboard function session ended'))])),
