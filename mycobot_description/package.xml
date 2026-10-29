@@ -7,6 +7,9 @@
   <maintainer email="u2@todo.todo">u2</maintainer>
   <license>BSD</license>
 
+  <buildtool_depend>python3-setuptools</buildtool_depend>
+  <buildtool_depend>python3-packaging</buildtool_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
