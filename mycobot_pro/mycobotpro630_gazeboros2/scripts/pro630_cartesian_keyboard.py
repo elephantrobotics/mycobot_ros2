@@ -14,7 +14,7 @@ SPEED_GEARS = (6, 12, 18, 24, 30)  # Native SDK percentages, not physical units.
 GRIPPER_SPEED_GEARS = (4, 8, 12, 16, 20)
 LOW_Z_MM = 20.0  # Base-frame TCP height, including the installed tool offset.
 COORD_POLL_PERIOD = 1.0 / 20.0
-WORKER_MAX_WAIT_S = 0.020 * 0.80  # First response-tuning step: 20% less scheduler wait.
+WORKER_MAX_WAIT_S = 0.012  # Maximum scheduler wait; coordinate polling stays at 20 Hz.
 INIT_POSE_DEG = (0.,) * 6  # Model zero maps to hardware [0, -90, 0, -90, 0, 0].
 DEFAULT_HOME_POSE_DEG = HOME_MODEL_ANGLES_DEG
 

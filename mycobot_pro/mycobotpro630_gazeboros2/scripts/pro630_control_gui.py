@@ -19,11 +19,12 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
 
 from pro630_control_logging import ControlLog, command_details, track_speed
 from pro630_number_display import PositiveZeroDisplay, format_fixed
-from pro630_joint_display import model_to_hardware, hardware_to_model, display_limits
-from pro630_configuration import configure_node, JOINT_LIMITS_RAD, GRIPPER_JOINT
+from pro630_joint_display import model_to_hardware, hardware_to_model
+from pro630_configuration import configure_node, GRIPPER_JOINT
 
 
-from pro630_model import HOME_HARDWARE_ANGLES_DEG as HOME_JOINTS_DEG
+from pro630_model import (HOME_HARDWARE_ANGLES_DEG as HOME_JOINTS_DEG,
+                         HARDWARE_JOINT_LIMITS_DEG)
 
 
 class DisplaySpinBox(PositiveZeroDisplay, QDoubleSpinBox):
@@ -103,10 +104,15 @@ class ControlWindow(QMainWindow):
                 spin.setDecimals(2)
                 spin.setSingleStep(1.)
                 if col == 0:
-                    lo, hi = JOINT_LIMITS_RAD[i]
-                    spin.setRange(*display_limits((math.degrees(lo), math.degrees(hi)), i, 2))
+                    spin.setRange(*HARDWARE_JOINT_LIMITS_DEG[i])
                 else:
-                    spin.setRange(0. if i == 2 and not node.allow_collision else -5000., 5000.) if i < 3 else spin.setRange(-180., 180.)
+                    # GUI bounds adopted from the SDK Pro630 table; the TCP
+                    # ElephantRobot interface does not enforce these limits.
+                    lo, hi = ((-630., 630.), (-630., 630.), (-425., 835.),
+                              (-180., 180.), (-180., 180.), (-180., 180.))[i]
+                    if i == 2 and not node.allow_collision:
+                        lo = 0.
+                    spin.setRange(lo, hi)
                 spin.setSuffix(' ' + (unit or ('mm' if i < 3 else '°')))
                 spin.setMinimumWidth(130)
                 value = QLabel('—')

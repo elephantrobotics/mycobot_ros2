@@ -29,7 +29,7 @@ source install/setup.bash
 
 ## 前置上电准备
 
-参考[机器上电步骤](https://docs.elephantrobotics.com/docs/pro630-cn/5-BasicApplication/5.2-ApplicationUse.html#11%E7%B3%BB%E7%BB%9F%E4%B8%8A%E7%94%B5)，执行到 `1.1 系统上电` 即可。
+使用本工程前需要参考[前置上电准备](https://docs.elephantrobotics.com/docs/pro630-cn/5-BasicApplication/5.2-ApplicationUse.html#roboflow)，执行完 1.1 系统上电 即可继续使用本工程
 
 ## 公共环境
 
@@ -57,6 +57,20 @@ ros2 launch mycobotpro630_gazeboros2 slider.launch.py environment:=real with_gri
 - 真机环境：启动时会读取一次真机姿态快照，并映射到 Gazebo 环境中。使用前需确认机械臂、末端、夹爪的固件版本为最新，并确保机械臂和夹爪通信正常。
 - 纯仿真环境：默认从零位开始。
 
+如果坐标控制期间机械臂本体陷入水平面以下，则调用以下指令强制拉起公共环境：
+
+```bash
+# 真机环境 带夹爪
+ros2 launch mycobotpro630_gazeboros2 slider.launch.py environment:=real with_gripper:=true allow_collision:=true
+
+# 真机环境 不带夹爪
+ros2 launch mycobotpro630_gazeboros2 slider.launch.py environment:=real with_gripper:=false allow_collision:=true
+```
+
+- 启动后，角度控制会被拒绝。需使用坐标控制器（键盘控制 或 GUI 控制）沿 Z 轴上移，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
+- `allow_collision:=true` 仅用于应急：坐标运动导致机械臂本体低于水平面的特殊情况。该参数默认为 `false`，且仅支持真机，即 `environment:=real`。
+- 本工程的坐标运动仅限制末端不陷入水平面以下。具体见键盘控制的操作说明。
+
 ## 滑块与随机目标
 
 公共环境就绪后，另开终端：
@@ -67,37 +81,48 @@ ros2 launch mycobotpro630_gazeboros2 slider_control_gazebo.launch.py environment
 ```
 
 - 启动成功后，会拉起用于`滑块和随机数操作`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
+- `Randomize Target` 按钮用于生成六轴与夹爪的随机角度。
+- `Zero Target` 按钮用于生成机械臂的零位关节角度。
+- 移动滑块、生成随机目标、回零生成关节角度后，均需点击 `Execute` 按钮，机械臂才会运动。
+- `Stop` 按钮用于停止正在运动的机械臂。
 - `environment` 参数需要与公共环境一致。检测到路径碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
-- 滑块控制逻辑发生变化：移动滑块、随机运动、回零时，需要点击 `Execute` 按钮后才会运动。
-- `Stop` 按键全程可用，点击后机械臂停止运动。
-- Force Execute 测试按钮默认隐藏，仅在启动滑块功能时显式设置 `show_force_execute:=true` 才显示。其功能为即使检测到碰撞也执行，且仅在纯仿真环境下开放。
 
 ## 键盘控制
 
 公共环境就绪后，另开终端：
 
 ```bash
-ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py environment:=real
-# 纯仿真时使用 environment:=simulation
+ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py
 ```
 
 - 启动成功后，会拉起用于`键盘控制`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
+- 装有 myGripper F100 力控夹爪时，该控制器进行坐标运动的末端会自动延伸至夹爪末端。
 
-真机模式下：
-
-- `M`：解锁控制
-- `N` 或 `Space`：停止并锁定
-- `Q`：关闭窗口退出
+仅支持真机。
 
 聚焦窗口后：
 
-- 按住 `w` / `s`、`e` / `d`、`r` / `f`、`t` / `g`、`y` / `h`、`u` / `j` 控制六轴
-- 按住 `[` / `]` 控制夹爪，无夹爪时没有该功能
-- 松键停止，失焦停止
-- `1`–`5` 切换速度档位，`-` / `+` 调整档位
-- 108 键布局下，小键盘区的 `-` / `+`，以及主键盘区的 `-`（`_`）、`+`（`=`），均可用于速度档位调整。
+- `M`：解锁控制
+- `N` 或 `Space`：停止并锁定
+- `C`：清除奇异位姿导致的报错
+- `Q`：关闭窗口并退出
+- 按住 `w` / `s`、`a` / `d`、`z` / `x` 分别控制位置 X、Y、Z；按住 `u` / `j`、`i` / `k`、`o` / `l` 分别控制姿态角 RX、RY、RZ
+- 按住 `g` / `h` 控制夹爪开合，未安装夹爪时无此功能
+- `1`：回到机械臂零位
+- `2`：回到坐标控制 Home 位
+- `3`：自定义坐标控制 Home 位，将当前位置设置为坐标运动 Home 位，下次启动键盘控制时需重新设置
+- 松开按键即停止，窗口失焦即停止
+- 108 键布局下，主键盘区的 `-`（`_`）、`+`（`=`），以及小键盘区的 `-` / `+`，均可切换速度档位
+- 坐标控制进入奇异位姿时，机械臂 link5 的 LED 光圈变为蓝色，Qt 界面底部显示 `Motion rejected: singular position`。需先按 `C` 清除错误，再按 `M` 解锁，此时允许键盘控制运动。建议按 `2` 回到坐标控制 Home 位，否则在该位姿下继续运动容易再次进入奇异位姿。
+- 执行零位运动后也会进入奇异位姿，需依次按 `C`、`M` 进入坐标控制 Home 位，才能恢复功能。
+- 控制期间不允许运动到水平面以下。末端距地面 20 mm 时会触发保护机制，需先长按 `X` 向上运动并脱离触发区域，才能继续其他运动按键；此时仍可调整速度档位。
+- 本工程的保护机制仅限制末端，不能保证机械臂本体不与地面碰撞，操作时需谨慎。
 - 按键控制不区分大小写。
-- 界面持续显示当前设定速度
+- 界面持续显示可操作按键、当前设定速度、速度档位、当前有效按键、提示信息等。
+
+错误码 33 的特殊情况：
+
+- 若抛出错误码 33，表示无法求得连续的直线运动解。LED 光圈可能先变为蓝色，再闪一下红色，随后恢复绿色，Qt 界面底部显示 `Controller error 33`。此时需先按 `C` 清除错误，再按 `M` 解锁，随后允许键盘控制运动。建议按 `2` 回到坐标控制 Home 位，否则在该位姿下继续运动容易再次抛出错误码，甚至导致机械臂重启。
 
 ## 拖动跟随
 
@@ -110,9 +135,9 @@ ros2 launch mycobotpro630_gazeboros2 drag_follow_gazebo.launch.py
 仅支持真机。
 
 - 启动成功后，会拉起用于`拖动跟随`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
-- `M`：控制六轴和夹爪使能 / 失能。六轴失能后，托住机械臂手动拖动；夹爪失能后可手动掰动。Gazebo 公共环境中的机械臂跟随真机运动。再次按下 `M`，锁紧六轴和夹爪。
+- `M`：控制六轴进入或退出零力拖动模式，并控制夹爪使能或失能。六轴进入零力拖动模式后，听到机械臂发出两声咔咔声，再托住机械臂手动拖动；夹爪失能后可手动掰动。Gazebo 公共环境中的机械臂跟随真机运动。再次按下 `M`，锁紧六轴和夹爪。
 - `Q`：关闭窗口退出。
-- 按键控制不区分大小写。
+- 拖动跟随期间，如果关节超限，LED 光圈会变为蓝色。此时仍可正常失能关节并运动。退出拖动跟随界面前，请将机械臂运动到零位附近，并确认关节未超限。程序退出时会自动清错。
 
 ## GUI 控制
 
@@ -125,7 +150,11 @@ ros2 launch mycobotpro630_gazeboros2 gui_control_gazebo.launch.py
 仅支持真机。
 
 - 启动成功后，会拉起用于 `GUI 控制` 的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪。
+- 装有 myGripper F100 力控夹爪时，该控制器进行坐标运动的末端会自动延伸至夹爪末端。
+- 坐标控制需先点击 `Home`，进入坐标控制 Home 位后再开始坐标运动。该按钮也可用于脱离奇异位姿。
 - 输入速度、目标角度或坐标后，点击 `Set Gripper`、`Set Joints` 或 `Set Coordinates`，执行相应运动。
-- 当输入坐标为奇异位置时，机械臂会运动到一半，显示 `Motion rejected: singular position` 后停止运动，link5 的 LED 光圈变成蓝色。
+- `Stop` 按钮用于停止正在运动的机械臂。
+- 当输入坐标为奇异位置时，机械臂会运动到一半，显示 `Motion rejected: singular position` 后停止运动。
+- 进入奇异位姿后，link5 的 LED 光圈变为蓝色并保持。需通过角度控制脱离奇异位姿，才能继续坐标运动；也可直接点击 `Home`，回到坐标控制 Home 位。随后点击 `Clear Errors` 清错，使 LED 光圈恢复绿色。
+- 如果进入奇异位姿后 LED 光圈自动恢复绿色，则无需点击 `Clear Errors` 清错，即可继续运动。坐标运动特殊情况的详细说明参见键盘控制的操作说明。
 - 角度运动的路径检测到碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
-- 630 进入奇异位置时，不会改变 LED 屏颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
