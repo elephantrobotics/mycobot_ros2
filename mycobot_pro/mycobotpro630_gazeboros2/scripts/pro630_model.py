@@ -8,10 +8,14 @@ import math
 ARM_JOINTS = ['joint1_to_base', 'joint2_to_joint1', 'joint3_to_joint2', 'joint4_to_joint3', 'joint5_to_joint4', 'joint6_to_joint5']
 GRIPPER_JOINT = 'gripper_controller'
 COMMAND_JOINTS = ARM_JOINTS + [GRIPPER_JOINT]
-JOINT_LIMITS_RAD = [(-3.14, 3.14159), (-3.14159, 3.14159), (-2.61, 2.618), (-2.967, 2.967), (-2.93, 2.9321), (-3.03, 3.0368)] + [(0.0, 1.0)]
-LIMITS_DEG = [(math.degrees(lo), math.degrees(hi)) for lo, hi in JOINT_LIMITS_RAD[:6]]
-MAX_VELOCITY_RAD_S = [3.14] * 6 + [1.0]
 HARDWARE_OFFSETS_DEG = (0.0, 90.0, 0.0, 90.0, 0.0, 0.0)
+# Official TCP soft limits in hardware angles; URDF uses the offset model frame.
+HARDWARE_JOINT_LIMITS_DEG = ((-180., 180.), (-270., 90.), (-150., 150.),
+                             (-260., 80.), (-168., 168.), (-174., 174.))
+LIMITS_DEG = [(lo + offset, hi + offset)
+              for (lo, hi), offset in zip(HARDWARE_JOINT_LIMITS_DEG, HARDWARE_OFFSETS_DEG)]
+JOINT_LIMITS_RAD = [(math.radians(lo), math.radians(hi)) for lo, hi in LIMITS_DEG] + [(0.0, 1.0)]
+MAX_VELOCITY_RAD_S = [3.14] * 6 + [1.0]
 # Default Home offsets are relative to the URDF/model zero pose.
 HOME_MODEL_ANGLES_DEG = (0., 10., 123., -45., -90., 0.)
 HOME_HARDWARE_ANGLES_DEG = tuple(
