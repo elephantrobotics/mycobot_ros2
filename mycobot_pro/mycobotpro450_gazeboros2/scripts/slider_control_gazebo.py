@@ -395,8 +395,7 @@ class SliderControl(CollisionCheck, Node):
 
     def _validate_and_execute(self, current, target, speed_scale):
         try:
-            self._publish_status("Collision checks bypassed (allow_collision=true)." if self.allow_collision
-                                 else "Validating interpolated path for collisions...")
+            self._publish_status("Validating interpolated path for collisions...")
             valid, reason = self._path_is_valid(current, target)
             if not valid:
                 self._publish_status(f"Rejected: {reason}", level="warning")
@@ -611,8 +610,7 @@ class SliderControl(CollisionCheck, Node):
 
         def validate():
             try:
-                self._publish_status("Collision checks bypassed (allow_collision=true)." if self.allow_collision
-                                 else "Validating interpolated path for collisions...")
+                self._publish_status("Validating interpolated path for collisions...")
                 valid, reason = self._path_is_valid(current, target)
                 result['value'] = valid, reason
             except Exception as exc:
