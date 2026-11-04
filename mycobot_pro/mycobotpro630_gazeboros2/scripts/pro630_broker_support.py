@@ -7,6 +7,10 @@ KEYBOARD_MOTION_METHODS = {'jog_coord', 'send_angles', 'set_pro_gripper_angle', 
 KEYBOARD_CANCELLED = 'Keyboard command cancelled by STOP.'
 
 
+class PublicArmFeedbackUnavailable(RuntimeError):
+    """Keyboard subscription cache has no fresh six-axis sample."""
+
+
 class KeyboardCommandCancelled(RuntimeError):
     def __init__(self):
         super().__init__(KEYBOARD_CANCELLED)

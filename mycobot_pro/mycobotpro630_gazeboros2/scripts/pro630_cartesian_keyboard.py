@@ -6,7 +6,7 @@ import threading
 import time
 from pro630_configuration import LIMITS_DEG
 from pro630_model import HOME_MODEL_ANGLES_DEG, HARDWARE_OFFSETS_DEG, ARM_JOINT_SDK_SPEED_MAX, ARM_CARTESIAN_SDK_SPEED_MAX, KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
-from pro630_broker_support import KeyboardCommandCancelled
+from pro630_broker_support import KeyboardCommandCancelled, PublicArmFeedbackUnavailable
 
 
 CARTESIAN_AXES = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'Gripper')
@@ -251,7 +251,8 @@ class CartesianKeyboardTransport:
         started = self.clock()
         values = self.sdk.get_coords()
         if (not isinstance(values, (list, tuple)) or len(values) != 6 or
-                any(type(v) not in (int, float) or not math.isfinite(v) for v in values)):
+                any(type(v) not in (int, float) or not math.isfinite(v) or not lo <= v <= hi
+                    for v, (lo, hi) in zip(values, LIMITS_DEG))):
             raise RuntimeError('SDK coordinate feedback unavailable')
         with self.lock:
             self.coords = tuple(values)
@@ -325,7 +326,12 @@ class CartesianKeyboardTransport:
                 return
             epoch = self.epoch
         name, target, speed = command
-        measured = self._angles(self.sdk.get_angles())
+        try:
+            measured = self._angles(self.sdk.get_angles())
+        except PublicArmFeedbackUnavailable:
+            # Init/Home targets are known; an absent subscription sample must
+            # not prevent sending them. Save Home still requires fresh angles.
+            measured = None
         with self.lock:
             if epoch != self.epoch or self.shutdown.is_set():
                 return
@@ -353,8 +359,32 @@ class CartesianKeyboardTransport:
             if now < pose['next_check']:
                 return
             pose['next_check'] = now+.2
-        measured = self._angles(self.sdk.get_angles())
-        if max(abs(a-b) for a,b in zip(measured, pose['measured'])) >= .05:
+        try:
+            measured = self._angles(self.sdk.get_angles())
+        except PublicArmFeedbackUnavailable:
+            # Query through the existing public SDK owner, never open another
+            # connection or report completion from stale subscription values.
+            moving = self.sdk.is_moving()
+            if type(moving) is not int or moving not in (0, 1):
+                raise RuntimeError('SDK pose motion status unavailable')
+            if moving:
+                pose.pop('cache_idle_since', None)
+                return
+            self._read_error()
+            arrived = self.sdk.is_in_position(list(pose['target']), 0)
+            if type(arrived) is not int or arrived not in (0, 1):
+                raise RuntimeError('SDK pose target confirmation unavailable')
+            with self.lock:
+                if epoch != self.epoch or self.pose_active is not pose or self.shutdown.is_set():
+                    return
+                if arrived:
+                    self.pose_active = None
+                    self.notice(f"{pose['name']} pose complete: measured joint angles confirmed.")
+                elif now - pose.setdefault('cache_idle_since', now) >= 3.:
+                    raise RuntimeError(f"{pose['name']} pose not completed: target not reached")
+            return
+        pose.pop('cache_idle_since', None)
+        if pose['measured'] is None or max(abs(a-b) for a,b in zip(measured, pose['measured'])) >= .05:
             pose['measured'], pose['progress_at'] = measured, now
         arrived = max(abs(a-b) for a,b in zip(measured, pose['target'])) <= .5
         if 'idle_confirmed_at' in pose:

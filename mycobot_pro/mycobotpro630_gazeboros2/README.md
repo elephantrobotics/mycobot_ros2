@@ -57,7 +57,7 @@ ros2 launch mycobotpro630_gazeboros2 slider.launch.py environment:=real with_gri
 - 真机环境：启动时会读取一次真机姿态快照，并映射到 Gazebo 环境中。使用前需确认机械臂、末端、夹爪的固件版本为最新，并确保机械臂和夹爪通信正常。
 - 纯仿真环境：默认从零位开始。
 
-如果坐标控制期间机械臂本体陷入水平面以下，则调用以下指令强制拉起公共环境：
+如果坐标控制期间机械臂本体陷入水平面以下，则调用以下指令临时强制拉起公共环境：
 
 ```bash
 # 真机环境 带夹爪
@@ -67,8 +67,9 @@ ros2 launch mycobotpro630_gazeboros2 slider.launch.py environment:=real with_gri
 ros2 launch mycobotpro630_gazeboros2 slider.launch.py environment:=real with_gripper:=false allow_collision:=true
 ```
 
-- 启动后，角度控制会被拒绝。需使用坐标控制器（键盘控制 或 GUI 控制）沿 Z 轴上移，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
+- 启动后的初始阶段，角度控制会被拒绝。需使用坐标控制器（键盘控制或 GUI 控制）沿 Z 轴上移，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
 - `allow_collision:=true` 仅用于应急：坐标运动导致机械臂本体低于水平面的特殊情况。该参数默认为 `false`，且仅支持真机，即 `environment:=real`。
+- 该模式仅临时用于坐标运动导致机械臂本体陷入水平面以下的特殊情况。脱离异常区域后，请切换回正常公共环境使用机械臂。
 - 本工程的坐标运动仅限制末端不陷入水平面以下。具体见键盘控制的操作说明。
 
 ## 滑块与随机目标
@@ -96,7 +97,7 @@ ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py
 ```
 
 - 启动成功后，会拉起用于`键盘控制`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
-- 装有 myGripper F100 力控夹爪时，该控制器进行坐标运动的末端会自动延伸至夹爪末端。
+- 装有 myGripper F100 力控夹爪时，机械臂反馈的坐标信息会延伸到夹爪末端，但进行坐标运动的末端参考依然是link6末端。
 
 仅支持真机。
 
@@ -120,9 +121,9 @@ ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py
 - 按键控制不区分大小写。
 - 界面持续显示可操作按键、当前设定速度、速度档位、当前有效按键、提示信息等。
 
-错误码 33 的特殊情况：
+坐标运动导致关节超限时：
 
-- 若抛出错误码 33，表示无法求得连续的直线运动解。LED 光圈可能先变为蓝色，再闪一下红色，随后恢复绿色，Qt 界面底部显示 `Controller error 33`。此时需先按 `C` 清除错误，再按 `M` 解锁，随后允许键盘控制运动。建议按 `2` 回到坐标控制 Home 位，否则在该位姿下继续运动容易再次抛出错误码，甚至导致机械臂重启。
+- 此时机械臂的关节角度运动和坐标运动都会失效。请进入机械臂桌面，使用 RoboFlow 通过关节角度运动脱离超限位置，再回到本工程继续使用机械臂。
 
 ## 拖动跟随
 
@@ -158,3 +159,7 @@ ros2 launch mycobotpro630_gazeboros2 gui_control_gazebo.launch.py
 - 进入奇异位姿后，link5 的 LED 光圈变为蓝色并保持。需通过角度控制脱离奇异位姿，才能继续坐标运动；也可直接点击 `Home`，回到坐标控制 Home 位。随后点击 `Clear Errors` 清错，使 LED 光圈恢复绿色。
 - 如果进入奇异位姿后 LED 光圈自动恢复绿色，则无需点击 `Clear Errors` 清错，即可继续运动。坐标运动特殊情况的详细说明参见键盘控制的操作说明。
 - 角度运动的路径检测到碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
+
+坐标运动导致关节超限时：
+
+- 此时机械臂的关节角度运动和坐标运动都会失效。请进入机械臂桌面，使用 RoboFlow 通过关节角度运动脱离超限位置，再回到本工程继续使用机械臂。

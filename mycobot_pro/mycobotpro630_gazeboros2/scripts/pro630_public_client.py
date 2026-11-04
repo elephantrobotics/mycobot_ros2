@@ -7,6 +7,7 @@ import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 from pro630_model import ARM_JOINTS, KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
+from pro630_broker_support import PublicArmFeedbackUnavailable
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
@@ -165,7 +166,7 @@ class PublicPro630Client:
             with self._condition:
                 sample = self._latest
                 if sample is None or time.monotonic() - sample.monotonic > KEYBOARD_ARM_FEEDBACK_MAX_AGE_S:
-                    raise RuntimeError('Public six-axis feedback is missing or older than 1.0 s')
+                    raise PublicArmFeedbackUnavailable('Public six-axis feedback is missing or older than 1.0 s')
                 self._angle_sample.stamp = [sample.monotonic, sample.wall_time]
                 self._stamps['arm'] = self._angle_sample.stamp
                 return list(sample.angles)
