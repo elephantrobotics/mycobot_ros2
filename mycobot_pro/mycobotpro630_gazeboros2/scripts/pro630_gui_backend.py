@@ -175,9 +175,6 @@ class GuiBackend(CollisionCheck, Node):
         if any(not lo <= value <= hi for value, (lo, hi) in zip(arm, self.joint_limits[:6])):
             raise CommandRejected('Joint target exceeds its limits.')
         current = self._joint_preflight_pose()
-        if self.allow_collision:
-            self.status("Collision checks bypassed (allow_collision=true).")
-            return
         # Reuse the slider's full path checks, including its collision-exit rules.
         # Never move the gripper as a side effect of a six-axis GUI command.
         for _ in range(3):

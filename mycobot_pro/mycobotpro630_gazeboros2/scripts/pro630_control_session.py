@@ -59,7 +59,7 @@ class ControlSession(Node):
         if {'slider_control_gazebo', 'teleop_keyboard_gazebo', 'pro630_slider_gui', 'pro630_drag_follow', 'pro630_gui_backend', 'pro630_control_gui'} & set(self.get_node_names()):
             raise RuntimeError('A control process is already running; close it before starting this function')
         if self.latch.state.get('allow_collision') is True:
-            self.get_logger().warning(f'{self.feature}: allow_collision=true; collision and ground checks are bypassed.')
+            self.get_logger().warning(f'{self.feature}: allow_collision=true; initial ground collision is permitted; joint motion collision checks remain enabled.')
         directory = Path(get_package_prefix(PACKAGE)) / 'lib' / PACKAGE
         for command in control_commands(self.feature, self.environment, directory, sys.executable,
                                         show_force_execute=self.get_parameter('show_force_execute').value,

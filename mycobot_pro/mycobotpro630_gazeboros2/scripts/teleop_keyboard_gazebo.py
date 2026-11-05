@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Real-only Pro630 native Cartesian keyboard jog. No MoveIt/collision queries."""
+"""Real-only Cartesian jog with collision-checked joint Init/Home moves."""
+import math
 import signal
 import sys
 import threading
@@ -7,6 +8,10 @@ import threading
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from moveit_msgs.srv import GetStateValidity
+from pro630_collision_check import CollisionCheck, DEFAULT_COLLISION_DEPTH_TOLERANCE_M
+from pro630_real_keyboard import RealPoseReader
+from pro630_model import KEYBOARD_ARM_FEEDBACK_MAX_AGE_S
 from pro630_control_logging import ControlLog
 from pro630_configuration import configure_node
 from pro630_public_client import PublicPro630Client
@@ -19,7 +24,7 @@ CARTESIAN_KEYS = {"w": (0, 1), "s": (0, -1), "a": (1, 1), "d": (1, -1),
                   "i": (4, 1), "k": (4, -1), "o": (5, 1), "l": (5, -1)}
 
 
-class TeleopKeyboard(Node):
+class TeleopKeyboard(CollisionCheck, Node):
     def __init__(self):
         super().__init__("teleop_keyboard_gazebo")
         configure_node(self)
@@ -30,16 +35,62 @@ class TeleopKeyboard(Node):
         self.log = ControlLog(self.get_logger())
         self.mc = self.real_transport = self._real_thread = None
         self._closing = False
+        self._pose_validation_cancelled = lambda: self._closing
         try:
             self.mc = PublicPro630Client(feature='keyboard', with_gripper=self.with_gripper, allow_collision=self.allow_collision)
+            self.validity_client = self.create_client(GetStateValidity, '/check_state_validity')
+            self.collision_depth_tolerance_m = DEFAULT_COLLISION_DEPTH_TOLERANCE_M
+            self._joint_pose_reader = RealPoseReader(
+                self.mc, self.joint_limits, with_gripper=self.with_gripper,
+                report=self.get_logger().debug, arm_max_age=KEYBOARD_ARM_FEEDBACK_MAX_AGE_S)
             self.real_transport = CartesianKeyboardTransport(self.mc, self.with_gripper, report=self.log.event,
-                                                              allow_collision=self.allow_collision)
+                                                              allow_collision=self.allow_collision,
+                                                              pose_validator=self._validate_pose_path)
             self._real_thread = threading.Thread(target=self.real_transport.run, daemon=True)
             self._real_thread.start()
             self.log.event('Cartesian keyboard ready: base frame; controls locked. Press M to unlock.')
         except Exception:
             self.close()
             raise
+
+    @property
+    def _stop_requested(self):
+        return self._closing or self._pose_validation_cancelled()
+
+    def _validate_pose_path(self, target, cancelled):
+        """Same sampled joint path/escape rules as slider and GUI joint moves."""
+        self._pose_validation_cancelled = cancelled
+        try:
+            arm = [math.radians(value) for value in target]
+            if any(not lo <= value <= hi for value, (lo, hi) in zip(arm, self.joint_limits[:6])):
+                return False, 'Joint target exceeds its limits.'
+            def read_pose():
+                if self._stop_requested:
+                    return None
+                if self.with_gripper:
+                    self._joint_pose_reader.force_gripper_read()
+                pose = self._joint_pose_reader(moving=False)
+                return None if self._stop_requested else pose
+            current = read_pose()
+            for _ in range(3):
+                if current is None:
+                    return False, 'STOP requested.'
+                goal = arm + ([current[6]] if self.with_gripper else [])
+                valid, reason = self._path_is_valid(current, goal)
+                if not valid:
+                    return False, reason
+                confirmed = read_pose()
+                if confirmed is None:
+                    return False, 'STOP requested.'
+                changed = max(abs(a-b) for a, b in zip(current[:6], confirmed[:6])) > .01
+                if self.with_gripper:
+                    changed = changed or abs(current[6] - confirmed[6]) > 1e-6
+                if not changed:
+                    return True, 'valid'
+                current = confirmed
+            return False, 'Start pose keeps changing; release external control and retry.'
+        finally:
+            self._pose_validation_cancelled = lambda: self._closing
 
     def arm_real(self):
         return self.real_transport.request_arm()

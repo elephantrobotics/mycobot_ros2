@@ -26,7 +26,7 @@ class EnvironmentState(Node):
         if self.allow_collision and self.environment != 'real':
             raise ValueError('allow_collision is supported only by the real environment')
         if self.allow_collision and not announce:
-            self.get_logger().warning('allow_collision=true: project collision and ground checks are disabled for this real environment.')
+            self.get_logger().warning('allow_collision=true: initial ground collision is permitted; joint motion collision checks remain enabled.')
         self.session = self.get_parameter('session_id').value
         self.announce = announce
         self.verified = False

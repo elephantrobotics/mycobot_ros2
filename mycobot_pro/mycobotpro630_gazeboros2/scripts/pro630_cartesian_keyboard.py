@@ -20,8 +20,10 @@ DEFAULT_HOME_POSE_DEG = HOME_MODEL_ANGLES_DEG
 
 
 class CartesianKeyboardTransport:
-    def __init__(self, sdk, with_gripper=True, clock=time.monotonic, report=None, allow_collision=False):
+    def __init__(self, sdk, with_gripper=True, clock=time.monotonic, report=None, allow_collision=False,
+                 pose_validator=None):
         self.sdk, self.with_gripper, self.clock = sdk, with_gripper, clock
+        self.pose_validator = pose_validator
         from pro630_configuration import collision_policy
         self.allow_collision = collision_policy(allow_collision)
         self.report = report or (lambda text: None)
@@ -251,8 +253,7 @@ class CartesianKeyboardTransport:
         started = self.clock()
         values = self.sdk.get_coords()
         if (not isinstance(values, (list, tuple)) or len(values) != 6 or
-                any(type(v) not in (int, float) or not math.isfinite(v) or not lo <= v <= hi
-                    for v, (lo, hi) in zip(values, LIMITS_DEG))):
+                any(type(v) not in (int, float) or not math.isfinite(v) for v in values)):
             raise RuntimeError('SDK coordinate feedback unavailable')
         with self.lock:
             self.coords = tuple(values)
@@ -329,11 +330,25 @@ class CartesianKeyboardTransport:
         try:
             measured = self._angles(self.sdk.get_angles())
         except PublicArmFeedbackUnavailable:
-            # Init/Home targets are known; an absent subscription sample must
-            # not prevent sending them. Save Home still requires fresh angles.
+            # The preflight must still obtain a fresh starting pose before
+            # dispatch. Arrival monitoring retains its public-owner fallback.
             measured = None
+        def cancelled():
+            with self.lock:
+                return (epoch != self.epoch or self.shutdown.is_set() or not self.armed
+                        or self.clock() - self.last_keepalive > .5)
+        self.notice(f'{name}: validating joint path for collisions...')
+        valid, reason = ((False, 'Joint collision validation is unavailable.')
+                         if self.pose_validator is None else self.pose_validator(target, cancelled))
         with self.lock:
-            if epoch != self.epoch or self.shutdown.is_set():
+            if cancelled():
+                if epoch == self.epoch and not self.shutdown.is_set():
+                    self.stop()
+                    self.notice('Keyboard input heartbeat lost; controls locked.', 'warning')
+                return
+            if not valid:
+                self.pose_request = None
+                self.notice(f'{name} rejected: {reason}', 'warning')
                 return
             self.pose_request = None
             now = self.clock()

@@ -222,6 +222,9 @@ class Pro630SliderWindow(QMainWindow):
 
             actual_label = QLabel("--")
             actual_label.setFixedWidth(100)
+            target_box.setFixedWidth(100)
+            target_box.setFont(actual_label.font())
+            target_box.setAlignment(actual_label.alignment())
 
             slider.valueChanged.connect(
                 lambda value, box=target_box, scale=scale: box.setValue(

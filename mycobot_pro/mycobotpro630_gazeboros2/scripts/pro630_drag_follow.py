@@ -120,6 +120,54 @@ def main():
         def __init__(self):
             super().__init__()
             self.held_keys = set()
+            self.setWindowTitle('Pro630 Drag Follow Control')
+            self.setFocusPolicy(Qt.StrongFocus)
+            font = self.font()
+            font.setPointSize(11)
+            self.setFont(font)
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(14, 12, 14, 12)
+            layout.setSpacing(8)
+            profile = 'Arm + gripper' if node.with_gripper else 'Arm only'
+            layout.addWidget(QLabel(f'Real | {profile}'))
+            self.mode_label = QLabel()
+            layout.addWidget(self.mode_label)
+            layout.addWidget(QLabel('M  Release / Lock     Q  Quit'))
+            self.key_label = QLabel('Pressed key: None')
+            layout.addWidget(self.key_label)
+            self.status_label = QLabel()
+            self.status_label.setWordWrap(True)
+            layout.addWidget(self.status_label)
+            self.feedback_label = QLabel()
+            layout.addWidget(self.feedback_label)
+            layout.addWidget(QLabel('Support the arm while released. Closing exits arm free-move mode.'))
+            self.update_status(*node.render())
+            self.resize(620, 220)
+
+        def update_status(self, enabled, pending, message, fresh):
+            if pending:
+                title = 'Switching...'
+            elif enabled is True:
+                title = 'Locked'
+            elif enabled is False:
+                title = 'Released (free move)'
+            else:
+                title = 'Not confirmed'
+            self.mode_label.setText('State: ' + title)
+            normal_messages = (
+                'Arm and gripper enabled. Press M to release both.',
+                'Arm and gripper released. Drag by hand. Press M to lock both.',
+                'Arm enabled. Press M to release all six joints.',
+                'Arm released. Drag by hand. Press M to lock all six joints.',
+            )
+            normal = not pending and type(enabled) is bool and message in normal_messages
+            self.status_label.setText('' if normal else message)
+            self.status_label.setVisible(not normal)
+            self.feedback_label.setText('Feedback: live' if fresh else 'Feedback: unavailable')
+
+        def _refresh_keys(self):
+            names = [('M' if key == Qt.Key_M else 'Q') for key in sorted(self.held_keys)]
+            self.key_label.setText('Pressed key: ' + (' + '.join(names) if names else 'None'))
 
         def keyPressEvent(self, event):
             if event.isAutoRepeat():
@@ -137,18 +185,21 @@ def main():
             if key not in self.held_keys:
                 self.held_keys.add(key)
                 node.log.event(f'Key {label} pressed.')
+                self._refresh_keys()
 
         def keyReleaseEvent(self, event):
             if not event.isAutoRepeat() and event.key() in self.held_keys:
                 self.held_keys.remove(event.key())
                 label = 'M' if event.key() == Qt.Key_M else 'Q'
                 node.log.event(f'Key {label} released.')
+                self._refresh_keys()
             super().keyReleaseEvent(event)
 
         def _clear_keys(self, source):
             for key in self.held_keys:
                 node.log.event(f'Key {"M" if key == Qt.Key_M else "Q"} cleared ({source}; synthetic release).')
             self.held_keys.clear()
+            self._refresh_keys()
 
         def focusOutEvent(self, event):
             self._clear_keys('focus lost')
@@ -162,14 +213,6 @@ def main():
     try:
         node = DragFollow()
         window = Window()
-        window.setWindowTitle('Pro630 Drag Follow Control')
-        window.setFocusPolicy(Qt.StrongFocus)
-        layout = QVBoxLayout(window)
-        layout.addWidget(QLabel('M  Release / Lock     Q  Quit'))
-        layout.addWidget(QLabel('Support the arm while released. Exit returns to position mode.'))
-        status = QLabel('Waiting for joint feedback...')
-        layout.addWidget(status)
-        window.resize(600, 150)
         timer = QTimer(window)
 
         def tick():
@@ -177,12 +220,11 @@ def main():
                 window.close()
                 return
             rclpy.spin_once(node, timeout_sec=0)
-            _, _, message, fresh = node.render()
+            enabled, pending, message, fresh = node.render()
             node.log.state('feedback', fresh, 'Live joint feedback.' if fresh else
                            'Joint feedback unavailable; Gazebo holds the last valid pose.',
                            'info' if fresh else 'warning')
-            status.setText(message + ('\nLive joint feedback.' if fresh else
-                                      '\nJoint feedback unavailable; Gazebo holds the last valid pose.'))
+            window.update_status(enabled, pending, message, fresh)
 
         timer.timeout.connect(tick)
         timer.start(20)

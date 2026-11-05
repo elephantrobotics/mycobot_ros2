@@ -466,6 +466,6 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("with_gripper", default_value="false", choices=["true", "false"]),
         DeclareLaunchArgument("allow_collision", default_value="false", choices=["true", "false"],
-                              description="Real mode only: bypass project collision and ground checks."),
+                              description="Real mode only: permit initial ground collision; joint motion collision checks remain enabled."),
         OpaqueFunction(function=_build_environment),
     ])
