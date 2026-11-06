@@ -26,6 +26,20 @@ colcon build --packages-select mycobot_description mycobotpro450_gazeboros2
 # colcon build
 source install/setup.bash
 ```
+## 前置准备
+
+使用前需要确认有线网关正常才能跟机械臂正常通信，使用 `ip a` 查看有线网卡名称，然后调用：
+
+```bash
+# 确认电脑地址 192.168.0.171 未被占用
+sudo ip link set <你的有线网卡名称> up
+sudo ip addr replace 192.168.0.171/32 dev <你的有线网卡名称>
+sudo ip route replace 192.168.0.230/32 dev <你的有线网卡名称> src 192.168.0.171
+
+ip route get 192.168.0.230
+ping -c 3 -I <你的有线网卡名称> 192.168.0.230
+nc -vz -w 3 192.168.0.230 4500
+```
 
 ## 公共环境
 
@@ -63,7 +77,7 @@ ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gri
 ros2 launch mycobotpro450_gazeboros2 slider.launch.py environment:=real with_gripper:=false allow_collision:=true
 ```
 
-- 启动后的初始阶段，角度控制会被拒绝。需使用坐标控制器（键盘控制或 GUI 控制）沿 Z 轴上移，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
+- 启动后的初始阶段，角度控制会被拒绝。需通过键盘控制、GUI 控制沿 Z 轴上移，或通过拖动跟随，使机械臂本体回到水平面以上，再改用正常指令重新拉起公共环境。
 - `allow_collision:=true` 仅用于应急：坐标运动导致机械臂本体低于水平面的特殊情况。该参数默认为 `false`，且仅支持真机，即 `environment:=real`。
 - 该模式仅临时用于坐标运动导致机械臂本体陷入水平面以下的特殊情况。脱离异常区域后，请切换回正常公共环境使用机械臂。
 - 本工程的坐标运动仅限制末端不陷入水平面以下。具体见键盘控制的操作说明。
@@ -112,6 +126,7 @@ ros2 launch mycobotpro450_gazeboros2 teleop_keyboard.launch.py
 - 108 键布局下，主键盘区的 `-`（`_`）、`+`（`=`），以及小键盘区的 `-` / `+`，均可切换速度档位
 - 坐标控制进入奇异位姿时，机械臂 link5 的 LED 光圈变为蓝色，Qt 界面底部显示 `Motion rejected: singular position`。需先按 `C` 清除错误，再按 `M` 解锁，此时允许键盘控制运动。建议按 `2` 回到坐标控制 Home 位，否则在该位姿下继续运动容易再次进入奇异位姿。
 - 执行零位运动后也会进入奇异位姿，需依次按 `C`、`M` 进入坐标控制 Home 位，才能恢复功能。
+- 按键控制运动期间，请等待当前运动结束后再开始下一次运动；否则会触发软锁，需再次按 `M` 解锁后方可继续控制。
 - 控制期间不允许运动到水平面以下。末端距地面 20 mm 时会触发保护机制，需先长按 `X` 向上运动并脱离触发区域，才能继续其他运动按键；此时仍可调整速度档位。
 - 本工程的保护机制仅限制末端，不能保证机械臂本体不与地面碰撞，操作时需谨慎。
 - 按键控制不区分大小写。
