@@ -20,8 +20,9 @@ from pro630_collision_check import CollisionCheck, DEFAULT_COLLISION_DEPTH_TOLER
 from pro630_real_keyboard import RealPoseReader
 
 
-CARTESIAN_JUMP_THRESHOLD = 10.0  # XYZ: mm; RX/RY/RZ: degrees.
-CARTESIAN_SINGULAR_STATUS = 'The current pose is singular. Please use joint control to move away.'
+CARTESIAN_NOT_REACHED_STATUS = (
+    'The current pose may be singular. '
+    'Please use joint control to move away.')
 
 
 class CommandStopped(Exception):
@@ -249,11 +250,6 @@ class GuiBackend(CollisionCheck, Node):
         kind, target, speed = command['kind'], command['target'], command['speed']
         if kind == 'coords' and target[2] < 0 and not self.allow_collision:
             raise CommandRejected('Target Z must be at least 0 mm.')
-        previous_coords = None
-        coordinate_jump = False
-        if kind == 'coords':
-            with self._lock:
-                previous_coords = None if self._coords is None else list(self._coords)
         if kind == 'joints':
             self._validate_joint_target(target)
             self.cancelled()
@@ -309,22 +305,12 @@ class GuiBackend(CollisionCheck, Node):
                     if idle_since is None:
                         idle_since = time.monotonic()
                     elif time.monotonic() - idle_since >= 3.:
-                        if kind == 'coords' and coordinate_jump and reply and reply['received']:
-                            raise RuntimeError(CARTESIAN_SINGULAR_STATUS)
-                        raise RuntimeError('Motion not completed: target not reached.' if reply and reply['received']
-                                           else 'Command failed: no controller response.')
+                        if reply and reply['received']:
+                            raise RuntimeError(CARTESIAN_NOT_REACHED_STATUS)
+                        raise RuntimeError('Command failed: no controller response.')
                 else:
                     idle_since = None
             self.refresh_feedback()
-            if kind == 'coords':
-                with self._lock:
-                    current_coords = None if self._coords is None else list(self._coords)
-                if current_coords is not None:
-                    if previous_coords is not None and any(
-                            abs(current - previous) > CARTESIAN_JUMP_THRESHOLD
-                            for current, previous in zip(current_coords, previous_coords)):
-                        coordinate_jump = True
-                    previous_coords = current_coords
             self._stop.wait(.2)
         raise RuntimeError('SDK did not report completion within 600 seconds')
 
@@ -359,14 +345,14 @@ class GuiBackend(CollisionCheck, Node):
                     self.status(f'STOP failed: {exc}', 'error')
             except Exception as exc:
                 message = str(exc)
-                if message != CARTESIAN_SINGULAR_STATUS and not message.startswith(('Motion rejected:', 'Motion failed:', 'Motion stopped',
+                if message != CARTESIAN_NOT_REACHED_STATUS and not message.startswith(('Motion rejected:', 'Motion failed:', 'Motion stopped',
                                            'Motion not completed:', 'Command failed:')):
                     message = f'Command failed: {message}'
                 if self._active_kind is not None:
                     try:
                         self.stop_robot()
                     except Exception as stop_error:
-                        if message == CARTESIAN_SINGULAR_STATUS:
+                        if message == CARTESIAN_NOT_REACHED_STATUS:
                             self.get_logger().error(f'STOP failed: {stop_error}')
                         else:
                             message += f'; STOP failed: {stop_error}'
