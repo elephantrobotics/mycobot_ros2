@@ -1,80 +1,73 @@
-import os
-
-from ament_index_python import get_package_share_directory
-from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
+# -*- coding: utf-8 -*-
+"""Keyboard teleop launch with Pro 450 URDF profile selection."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import Command, LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+from mycobot_pro_450.pro450_launch_common import (
+    joint5_offset_actions,
+    resolve_profile_from_context,
+    resolve_rviz_config,
+    robot_state_publisher_node,
+)
+from mycobot_pro_450.pro450_profiles import declare_profile_launch_arguments
+
+
+def _setup(context, *args, **kwargs):
+    urdf_profile, gripper_profile, urdf_path, joint5_offset_deg = (
+        resolve_profile_from_context(context)
+    )
+    rvizconfig = resolve_rviz_config(context, urdf_profile, gripper_profile)
+
+    actions = []
+    actions.extend(joint5_offset_actions(joint5_offset_deg))
+    actions.append(robot_state_publisher_node(urdf_path))
+    actions.append(
+        Node(
+            package="mycobot_pro_450",
+            executable="listen_real_service",
+            name="listen_real_service",
+            output="screen",
+            parameters=[
+                {"ip": LaunchConfiguration("ip")},
+                {"port": LaunchConfiguration("port")},
+                {"joint5_offset_deg": float(joint5_offset_deg)},
+            ],
+        )
+    )
+    actions.append(
+        Node(
+            name="rviz2",
+            package="rviz2",
+            executable="rviz2",
+            output="screen",
+            arguments=["-d", rvizconfig],
+        )
+    )
+    return actions
 
 
 def generate_launch_description():
-    res = []
-
-    model_launch_arg = DeclareLaunchArgument(
-        "model",
-        default_value=os.path.join(
-            get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_pro_450/mycobot_pro_450.urdf"
-        )
+    return LaunchDescription(
+        declare_profile_launch_arguments()
+        + [
+            DeclareLaunchArgument(
+                "rvizconfig",
+                default_value="",
+                description="Optional RViz2 config override",
+            ),
+            DeclareLaunchArgument(
+                "ip",
+                default_value="192.168.0.232",
+                description="IP address used by the device",
+            ),
+            DeclareLaunchArgument(
+                "port",
+                default_value="4500",
+                description="Port number used by the device",
+            ),
+            OpaqueFunction(function=_setup),
+        ]
     )
-    res.append(model_launch_arg)
-
-    rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
-        default_value=os.path.join(
-            get_package_share_directory("mycobot_pro_450"),
-            "config/mycobot_pro_450.rviz"
-        )
-    )
-    res.append(rvizconfig_launch_arg)
-    
-    ip_launch_arg = DeclareLaunchArgument(
-        name="ip",
-        default_value="192.168.0.232",
-        description='IP address used by the device'
-    )
-    res.append(ip_launch_arg)
-
-    port_launch_arg = DeclareLaunchArgument(
-        name="port",
-        default_value="4500",
-        description='Port number used by the device'
-    )
-    res.append(port_launch_arg)
-    
-    robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
-                                       value_type=str)
-
-    robot_state_publisher_node = Node(
-        name="robot_state_publisher",
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        parameters=[{'robot_description': robot_description}],
-        arguments=[LaunchConfiguration("model")]
-    )
-    res.append(robot_state_publisher_node)
-
-    listen_real_service_node = Node(
-        package="mycobot_pro_450",
-        executable="listen_real_service",
-        name="listen_real_service",
-        output="screen",
-        parameters=[{
-        "ip": LaunchConfiguration("ip"),
-        "port": LaunchConfiguration("port")
-        }]
-    )
-    res.append(listen_real_service_node)
-    
-    rviz_node = Node(
-    name="rviz2",
-    package="rviz2",
-    executable="rviz2",
-    output="screen",
-    arguments=['-d', LaunchConfiguration("rvizconfig")],
-    )
-    res.append(rviz_node)
-
-    return LaunchDescription(res)

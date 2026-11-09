@@ -1,93 +1,99 @@
-import os
-
-from ament_index_python import get_package_share_directory
-from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
+# -*- coding: utf-8 -*-
+"""Force-gripper slider launch; keeps specialized executable, supports urdf:=legacy|v2."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import Command, LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+from mycobot_pro_450.pro450_launch_common import (
+    joint5_offset_actions,
+    resolve_rviz_config,
+    robot_state_publisher_node,
+)
+from mycobot_pro_450.pro450_profiles import (
+    get_joint5_offset_deg,
+    resolve_urdf_path,
+)
+
+
+def _setup(context, *args, **kwargs):
+    urdf_profile = LaunchConfiguration("urdf").perform(context)
+    model = LaunchConfiguration("model").perform(context)
+    gripper_profile = "f100"
+    try:
+        urdf_path = resolve_urdf_path(urdf_profile, gripper_profile, model)
+        joint5_offset_deg = get_joint5_offset_deg(urdf_profile)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    rvizconfig = resolve_rviz_config(context, urdf_profile, gripper_profile)
+
+    actions = []
+    actions.extend(joint5_offset_actions(joint5_offset_deg))
+    actions.append(robot_state_publisher_node(urdf_path))
+    actions.append(
+        Node(
+            package="joint_state_publisher_gui",
+            executable="joint_state_publisher_gui",
+            condition=IfCondition(LaunchConfiguration("gui")),
+        )
+    )
+    actions.append(
+        Node(
+            name="rviz2",
+            package="rviz2",
+            executable="rviz2",
+            output="screen",
+            arguments=["-d", rvizconfig],
+        )
+    )
+    actions.append(
+        Node(
+            package="mycobot_pro_450",
+            executable="slider_control_force_gripper",
+            name="slider_control_force_gripper",
+            parameters=[
+                {"ip": LaunchConfiguration("ip")},
+                {"port": LaunchConfiguration("port")},
+                {"joint5_offset_deg": float(joint5_offset_deg)},
+            ],
+            output="screen",
+        )
+    )
+    return actions
 
 
 def generate_launch_description():
-    res = []
-
-    model_launch_arg = DeclareLaunchArgument(
-        "model",
-        default_value=os.path.join(
-            get_package_share_directory("mycobot_description"),
-            "urdf/mycobot_pro_450/mycobot_pro_450_force_gripper.urdf"
-        )
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "urdf",
+                default_value="legacy",
+                description="Pro 450 structure profile: legacy or v2",
+            ),
+            DeclareLaunchArgument(
+                "model",
+                default_value="",
+                description="Optional URDF path override",
+            ),
+            DeclareLaunchArgument(
+                "rvizconfig",
+                default_value="",
+                description="Optional RViz2 config override",
+            ),
+            DeclareLaunchArgument("gui", default_value="true"),
+            DeclareLaunchArgument(
+                "ip",
+                default_value="192.168.0.232",
+                description="IP address used by the device",
+            ),
+            DeclareLaunchArgument(
+                "port",
+                default_value="4500",
+                description="Port number used by the device",
+            ),
+            OpaqueFunction(function=_setup),
+        ]
     )
-    res.append(model_launch_arg)
-
-    rvizconfig_launch_arg = DeclareLaunchArgument(
-        "rvizconfig",
-        default_value=os.path.join(
-            get_package_share_directory("mycobot_pro_450"),
-            "config/mycobot_pro_450.rviz"
-        )
-    )
-    res.append(rvizconfig_launch_arg)
-
-    gui_launch_arg = DeclareLaunchArgument(
-        "gui",
-        default_value="true"
-    )
-    res.append(gui_launch_arg)
-
-    ip_launch_arg = DeclareLaunchArgument(
-        name="ip",
-        default_value="192.168.0.232",
-        description='IP address used by the device'
-    )
-    res.append(ip_launch_arg)
-
-    port_launch_arg = DeclareLaunchArgument(
-        name="port",
-        default_value="4500",
-        description='Port number used by the device'
-    )
-    res.append(port_launch_arg)
-    
-    robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
-                                       value_type=str)
-
-    robot_state_publisher_node = Node(
-        name="robot_state_publisher",
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        parameters=[{'robot_description': robot_description}]
-    )
-    res.append(robot_state_publisher_node)
-
-    joint_state_publisher_gui_node = Node(
-        package='joint_state_publisher_gui',
-        executable='joint_state_publisher_gui',
-        condition=IfCondition(LaunchConfiguration('gui'))
-    )
-    res.append(joint_state_publisher_gui_node)
-
-    rviz_node = Node(
-        name="rviz2",
-        package="rviz2",
-        executable="rviz2",
-        output="screen",
-        arguments=['-d', LaunchConfiguration("rvizconfig")],
-    )
-    res.append(rviz_node)
-
-    slider_control_node = Node(
-        package="mycobot_pro_450",
-        executable="slider_control_force_gripper",
-        parameters=[
-            {'ip': LaunchConfiguration('ip')},
-            {'port': LaunchConfiguration('port')}
-        ],
-        name="slider_control_force_gripper",
-        output="screen"
-    )
-    res.append(slider_control_node)
-
-    return LaunchDescription(res)

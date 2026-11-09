@@ -66,7 +66,14 @@ setup(
         ('share/' + package_name + '/urdf'+'/mycobot_280_arduino', glob("urdf/mycobot_280_arduino/*")),
         ('share/' + package_name + '/urdf'+'/pro_adaptive_gripper', glob("urdf/pro_adaptive_gripper/*")),
         ('share/' + package_name + '/urdf'+'/pro_force_gripper', glob("urdf/pro_force_gripper/*")),
-        ('share/' + package_name + '/urdf'+'/mycobot_pro_450', glob("urdf/mycobot_pro_450/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_450',
+            [f for f in glob("urdf/mycobot_pro_450/*") if os.path.isfile(f)]),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_450/new_structure',
+            [f for f in glob("urdf/mycobot_pro_450/new_structure/*") if os.path.isfile(f)]),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_450/new_structure/meshes',
+            glob("urdf/mycobot_pro_450/new_structure/meshes/*")),
+        ('share/' + package_name + '/urdf'+'/mycobot_pro_450/new_structure/meshes_gripper',
+            glob("urdf/mycobot_pro_450/new_structure/meshes_gripper/*")),
         ('share/' + package_name + '/urdf'+'/ultraArm_p1', glob("urdf/ultraArm_p1/*")),
 
 
