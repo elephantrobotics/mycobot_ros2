@@ -8,8 +8,9 @@ import time
 from tkinter import messagebox
 import rclpy
 from rclpy.node import Node
-from pymycobot.robot_info import RobotLimit
 from mycobot_pro450_interfaces.srv import SetAngles, SetCoords, GripperStatus, GetCoords, GetAngles
+
+from mycobot_pro_450.joint5_support import load_robot_limit_profile
 
 
 class WindowNode(Node):
@@ -37,6 +38,21 @@ class WindowNode(Node):
         self.get_angles_client = self.create_client(GetAngles, '/get_angles')
         self.set_force_gripper_client = self.create_client(
             GripperStatus, '/set_force_gripper')
+
+        self.declare_parameter('joint5_offset_deg', 0.0)
+        self.joint5_offset_deg = (
+            self.get_parameter('joint5_offset_deg').get_parameter_value().double_value
+        )
+        self.robot_name, limits = load_robot_limit_profile(self.joint5_offset_deg)
+        self.angles_min = limits["angles_min"]
+        self.angles_max = limits["angles_max"]
+        self.coords_min = limits["coords_min"]
+        self.coords_max = limits["coords_max"]
+        self.get_logger().info(
+            "Using limit profile {} (joint5_offset_deg={})".format(
+                self.robot_name, self.joint5_offset_deg
+            )
+        )
 
         # Waiting for the service to go online
         while not self.set_angles_client.wait_for_service(timeout_sec=2.0):
@@ -74,7 +90,7 @@ class WindowNode(Node):
         # Calculate window position
         x = (self.ws / 2) - 190
         y = (self.hs / 2) - 250
-        self.win.geometry("470x440+{}+{}".format(int(x), int(y)))
+        self.win.geometry("600x480+{}+{}".format(int(x), int(y)))
 
         # GUI layout and widgets
         self.set_layout()
@@ -99,23 +115,8 @@ class WindowNode(Node):
             row=1, column=1, sticky="w", padx=3, pady=2
         )
 
-        # Suction pump control buttons
-        # tk.Button(self.frmLB, text=" 吸泵(开)", command=self.pump_open, width=5).grid(
-        #     row=2, column=0, sticky="w", padx=3, pady=20
-        # )
-        # tk.Button(self.frmLB, text="吸泵(关)", command=self.pump_close, width=5).grid(
-        #     row=2, column=1, sticky="w", padx=3, pady=2
-        # )
-
         # Periodic GUI update
         self.update_gui()
-
-        # Robot model and limits
-        self.robot_name = "Pro450Client"
-        self.angles_min = RobotLimit.robot_limit[self.robot_name]["angles_min"]
-        self.angles_max = RobotLimit.robot_limit[self.robot_name]["angles_max"]
-        self.coords_min = RobotLimit.robot_limit[self.robot_name]["coords_min"]
-        self.coords_max = RobotLimit.robot_limit[self.robot_name]["coords_max"]
 
     def worker(self):
         """Background thread that executes queued robot commands."""

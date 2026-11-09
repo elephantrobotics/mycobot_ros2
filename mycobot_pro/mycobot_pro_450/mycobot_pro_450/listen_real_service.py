@@ -12,6 +12,8 @@ from mycobot_pro450_interfaces.srv import SetAngles, SetCoords, GetCoords, Gripp
 import pymycobot
 from packaging import version
 
+from mycobot_pro_450.joint5_support import Joint5ProfileGuard
+
 # Minimum required pymycobot version
 MIN_REQUIRE_VERSION = '4.0.1'
 
@@ -80,9 +82,26 @@ class MyCobotDriver(Node):
         super().__init__('mycobot_driver_node')
         self.declare_parameter('ip', '192.168.0.232')
         self.declare_parameter('port', 4500)
+        self.declare_parameter('joint5_offset_deg', 0.0)
+        # Mirrors launch gripper:=none|f100 for separately started clients.
+        self.declare_parameter('gripper', 'none')
 
         ip = self.get_parameter("ip").get_parameter_value().string_value
         port = self.get_parameter("port").get_parameter_value().integer_value
+        configured_offset = (
+            self.get_parameter("joint5_offset_deg").get_parameter_value().double_value
+        )
+        self.gripper_profile = (
+            self.get_parameter("gripper").get_parameter_value().string_value or "none"
+        ).strip().lower()
+        if self.gripper_profile not in ("none", "f100"):
+            self.get_logger().warn(
+                "Invalid gripper='{}'; falling back to 'none'".format(
+                    self.gripper_profile
+                )
+            )
+            self.gripper_profile = "none"
+        self.get_logger().info("gripper profile: %s" % self.gripper_profile)
 
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
@@ -94,6 +113,10 @@ class MyCobotDriver(Node):
             self.mycobot_450.set_fresh_mode(0)
         time.sleep(0.05)
         self.mycobot_450.set_limit_switch(2, 0)
+
+        # Services stay in firmware degrees; joint_states publish logical degrees.
+        self.j5 = Joint5ProfileGuard(self.get_logger())
+        self.j5.configure(self.mycobot_450, configured_offset)
         
         self.pub = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.02, self.publish_joint_states)
@@ -117,13 +140,18 @@ class MyCobotDriver(Node):
             if not angles or not isinstance(angles, list) or len(angles) != 6:
                 self.get_logger().warn("Failed to get valid joint angles, fallback to [-1] * 6.")
                 return
+
+            logical = self.j5.convert_firmware_angles_to_logical(angles)
+            if logical is None:
+                return
             
-            positions = [math.radians(a) for a in angles]
+            positions = [math.radians(a) for a in logical]
             
-            if gripper_value is not None or gripper_value !=-1:
-                positions.append(math.radians(gripper_value))
-                
-            joint_names = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper_controller"]  
+            # Firmware gripper is 0..100; URDF gripper_controller expects 0..1.
+            if gripper_value is not None and gripper_value != -1:
+                positions.append(max(0.0, min(1.0, float(gripper_value) / 100.0)))
+
+            joint_names = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper_controller"] 
             if len(positions) < len(joint_names):
                 positions += [0.0] * (len(joint_names) - len(positions))  
                 
@@ -151,7 +179,6 @@ class MyCobotDriver(Node):
             whether the operation succeeded.
         """
         try:
-            lock = acquire('/tmp/mycobot_lock')
             angles = [
                 request.joint_1,
                 request.joint_2,
@@ -160,13 +187,21 @@ class MyCobotDriver(Node):
                 request.joint_5,
                 request.joint_6,
             ]
+            # Service wire format is firmware degrees.
+            if not self.j5.validate_firmware_j5(angles[4]):
+                response.flag = False
+                return response
+            lock = acquire('/tmp/mycobot_lock')
             speed = request.speed
             self.mycobot_450.send_angles(angles, speed)
             release(lock)
             response.flag = True
         except Exception as e:
             e = traceback.format_exc()
-            release(lock)
+            try:
+                release(lock)
+            except Exception:
+                pass
             self.get_logger().error(f"SetJointAngles service error: {e}")
             response.flag = False
         return response

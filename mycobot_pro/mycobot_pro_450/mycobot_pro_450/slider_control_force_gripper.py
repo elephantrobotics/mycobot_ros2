@@ -1,126 +1,142 @@
+# -*- coding: utf-8 -*-
+"""Slider control for Pro450 + F100 force gripper (logical → firmware)."""
+
+import math
 import threading
 import time
-import math
+
+import pymycobot
 import rclpy
+from packaging import version
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-import pymycobot
-from packaging import version
 
-# Minimum required pymycobot version
-MIN_REQUIRE_VERSION = '4.0.1'
+from mycobot_pro_450.joint5_support import Joint5ProfileGuard
+
+MIN_REQUIRE_VERSION = "4.0.1"
 
 current_verison = pymycobot.__version__
-print('current pymycobot library version: {}'.format(current_verison))
-
+print("current pymycobot library version: {}".format(current_verison))
 if version.parse(current_verison) < version.parse(MIN_REQUIRE_VERSION):
     raise RuntimeError(
-        'The version of pymycobot library must be greater than {} or higher. '
-        'The current version is {}. Please upgrade the library version.'.format(
+        "The version of pymycobot library must be greater than {} or higher. "
+        "The current version is {}. Please upgrade the library version.".format(
             MIN_REQUIRE_VERSION, current_verison
         )
     )
-else:
-    print('pymycobot library version meets the requirements!')
-    from pymycobot import Pro450Client
+print("pymycobot library version meets the requirements!")
+from pymycobot import Pro450Client  # noqa: E402
 
 
 class Slider_Subscriber(Node):
-    """ROS2 node that subscribes to joint states and controls MyCobotPro450, including gripper."""
+    """Subscribe to joint states and control arm + force gripper."""
 
     def __init__(self):
-        """Initialize the subscriber node and connect to MyCobotPro450."""
         super().__init__("control_slider")
-
-        # Subscribe to joint states
         self.subscription = self.create_subscription(
-            JointState,
-            "joint_states",
-            self.listener_callback,
-            10
+            JointState, "joint_states", self.listener_callback, 10
         )
-        self.subscription
 
-        # Declare robot connection parameters
-        self.declare_parameter('ip', '192.168.0.232')
-        self.declare_parameter('port', 4500)
+        self.declare_parameter("ip", "192.168.0.232")
+        self.declare_parameter("port", 4500)
+        self.declare_parameter("joint5_offset_deg", 0.0)
 
         ip = self.get_parameter("ip").get_parameter_value().string_value
         port = self.get_parameter("port").get_parameter_value().integer_value
+        configured_offset = (
+            self.get_parameter("joint5_offset_deg").get_parameter_value().double_value
+        )
 
         self.get_logger().info("ip:%s, port:%d" % (ip, port))
         self.mycobot_450 = Pro450Client(ip, port)
         time.sleep(0.05)
-        
-        if self.mycobot_450.is_power_on !=1:
+        if self.mycobot_450.is_power_on != 1:
             self.mycobot_450.power_on()
-        time.sleep(0.05)    
+        time.sleep(0.05)
         if self.mycobot_450.get_fresh_mode() != 1:
             self.mycobot_450.set_fresh_mode(1)
         time.sleep(0.05)
         self.mycobot_450.set_limit_switch(2, 0)
-        
+
+        self.j5 = Joint5ProfileGuard(self.get_logger())
+        self.j5.configure(self.mycobot_450, configured_offset)
+
+        self.command_lock = threading.Lock()
         self.angles_queue = None
-        self.gripper_value = None
+        self.pending_gripper_value = None
+        self.last_sent_angles = None
+        self.last_sent_gripper_value = None
 
         threading.Thread(target=self._send_loop, daemon=True).start()
 
     def listener_callback(self, msg: JointState):
-        """Process received joint states and control robot joints and force gripper.
+        if len(msg.position) < 6:
+            return
 
-        Args:
-            msg (JointState): ROS2 message containing joint positions in radians
-                and gripper position as additional elements.
+        logical = [
+            round(math.degrees(value), 2) for value in msg.position[:6]
+        ]
+        firmware = self.j5.convert_logical_angles_to_firmware(logical)
+        if firmware is None:
+            return
 
-        Returns:
-            None
-        """
-        data_list = []
-        gripper_value = 0
+        gripper_command = None
+        if "gripper_controller" in msg.name:
+            gripper_index = msg.name.index("gripper_controller")
+            if gripper_index < len(msg.position):
+                gripper_position = msg.position[gripper_index]
+                gripper_command = int(
+                    round(max(0.0, min(1.0, gripper_position)) * 100)
+                )
 
-        for i, value in enumerate(msg.position):
-            if i < 6:
-                # Convert radians to degrees for the robot joints
-                radians_to_angles = round(math.degrees(value), 2)
-                data_list.append(radians_to_angles)
-            else:
-                # Map force gripper value to 0-100 scale
-                mapped_value = value * 100
-                gripper_value = int(round(mapped_value, 2))
+        angles_unchanged = self.last_sent_angles is not None and all(
+            abs(current - previous) < 0.01
+            for current, previous in zip(firmware, self.last_sent_angles)
+        )
+        gripper_unchanged = (
+            gripper_command is None
+            or gripper_command == self.last_sent_gripper_value
+        )
+        if angles_unchanged and gripper_unchanged:
+            return
+
+        if not angles_unchanged:
+            self.last_sent_angles = list(firmware)
+        if gripper_command is not None:
+            self.last_sent_gripper_value = gripper_command
 
         self.get_logger().info(
-            f'joint_list: {data_list}, gripper_value: {gripper_value}')
-        # self.mycobot_450.send_angles(data_list, 25)
-        # self.mycobot_450.set_pro_gripper_angle(gripper_value)
-        self.angles_queue = data_list
-        self.gripper_value = gripper_value
+            "joint_list: {}, gripper_value: {}".format(
+                firmware,
+                gripper_command if gripper_command is not None else "unchanged",
+            )
+        )
+        with self.command_lock:
+            if not angles_unchanged:
+                self.angles_queue = firmware
+            if gripper_command is not None:
+                self.pending_gripper_value = gripper_command
 
     def _send_loop(self):
-        """Background loop to send angles and gripper commands to the robotic arm."""
         while True:
             time.sleep(0.01)
-            if self.angles_queue:
-                self.mycobot_450.send_angles(self.angles_queue, 25, _async=True)
+            with self.command_lock:
+                angles_to_send = self.angles_queue
+                gripper_to_send = self.pending_gripper_value
                 self.angles_queue = None
-            if self.gripper_value is not None:
-                self.mycobot_450.set_pro_gripper_angle(self.gripper_value)
-                self.gripper_value = None
-                
+                self.pending_gripper_value = None
+            # Prioritize gripper Modbus so arm stream cannot starve it.
+            if gripper_to_send is not None:
+                self.mycobot_450.set_pro_gripper_angle(gripper_to_send)
+            if angles_to_send is not None:
+                self.mycobot_450.send_angles(angles_to_send, 25)
+
+
 def main(args=None):
-    """Main function to run the Slider_Subscriber node.
-
-    Args:
-        args (list, optional): Command-line arguments for ROS2. Defaults to None.
-
-    Returns:
-        None
-    """
     rclpy.init(args=args)
-    slider_subscriber = Slider_Subscriber()
-
-    rclpy.spin(slider_subscriber)
-
-    slider_subscriber.destroy_node()
+    node = Slider_Subscriber()
+    rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
 
 

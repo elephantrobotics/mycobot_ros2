@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Slider control launch with Pro 450 URDF profile selection."""
+"""Slider control launch with Pro 450 URDF profile selection.
+
+``gripper:=none`` uses the stock joint_state_publisher_gui + slider_control.
+``gripper:=f100`` switches to the safe GUI (no Randomize) and
+slider_control_force_gripper for real arm+gripper control.
+"""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
@@ -11,6 +16,7 @@ from mycobot_pro_450.pro450_launch_common import (
     joint5_offset_actions,
     resolve_profile_from_context,
     resolve_rviz_config,
+    robot_description_parameter,
     robot_state_publisher_node,
 )
 from mycobot_pro_450.pro450_profiles import declare_profile_launch_arguments
@@ -21,17 +27,39 @@ def _setup(context, *args, **kwargs):
         resolve_profile_from_context(context)
     )
     rvizconfig = resolve_rviz_config(context, urdf_profile, gripper_profile)
+    use_force_gripper = gripper_profile == "f100"
 
     actions = []
     actions.extend(joint5_offset_actions(joint5_offset_deg))
     actions.append(robot_state_publisher_node(urdf_path))
-    actions.append(
-        Node(
-            package="joint_state_publisher_gui",
-            executable="joint_state_publisher_gui",
-            condition=IfCondition(LaunchConfiguration("gui")),
+
+    if use_force_gripper:
+        actions.append(
+            Node(
+                package="mycobot_pro_450",
+                executable="safe_joint_state_publisher_gui",
+                name="joint_state_publisher_gui",
+                condition=IfCondition(LaunchConfiguration("gui")),
+                parameters=[
+                    {"robot_description": robot_description_parameter(urdf_path)},
+                    {"use_gui": True},
+                ],
+                output="screen",
+            )
         )
-    )
+        control_executable = "slider_control_force_gripper"
+        control_name = "slider_control_force_gripper"
+    else:
+        actions.append(
+            Node(
+                package="joint_state_publisher_gui",
+                executable="joint_state_publisher_gui",
+                condition=IfCondition(LaunchConfiguration("gui")),
+            )
+        )
+        control_executable = "slider_control"
+        control_name = "slider_control"
+
     actions.append(
         Node(
             name="rviz2",
@@ -44,8 +72,8 @@ def _setup(context, *args, **kwargs):
     actions.append(
         Node(
             package="mycobot_pro_450",
-            executable="slider_control",
-            name="slider_control",
+            executable=control_executable,
+            name=control_name,
             parameters=[
                 {"ip": LaunchConfiguration("ip")},
                 {"port": LaunchConfiguration("port")},

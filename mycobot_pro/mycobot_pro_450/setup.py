@@ -62,6 +62,7 @@ setup(
             'slider_control_force_gripper = mycobot_pro_450.slider_control_force_gripper:main',
             'teleop_keyboard_force_gripper = mycobot_pro_450.teleop_keyboard_force_gripper:main',
             'simple_gui_force_gripper = mycobot_pro_450.simple_gui_force_gripper:main',
+            'safe_joint_state_publisher_gui = mycobot_pro_450.safe_joint_state_publisher_gui:main',
         ],
     },
 )

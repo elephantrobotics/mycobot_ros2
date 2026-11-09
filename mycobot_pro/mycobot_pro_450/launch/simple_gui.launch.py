@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Simple GUI launch with Pro 450 URDF profile selection."""
+"""Simple GUI launch with Pro 450 URDF profile selection.
+
+``gripper:=none`` runs simple_gui.
+``gripper:=f100`` switches to simple_gui_force_gripper (Open/Close buttons).
+"""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
@@ -20,6 +24,11 @@ def _setup(context, *args, **kwargs):
         resolve_profile_from_context(context)
     )
     rvizconfig = resolve_rviz_config(context, urdf_profile, gripper_profile)
+    use_force_gripper = gripper_profile == "f100"
+    gui_executable = (
+        "simple_gui_force_gripper" if use_force_gripper else "simple_gui"
+    )
+    gui_name = gui_executable
 
     actions = []
     actions.extend(joint5_offset_actions(joint5_offset_deg))
@@ -34,18 +43,20 @@ def _setup(context, *args, **kwargs):
                 {"ip": LaunchConfiguration("ip")},
                 {"port": LaunchConfiguration("port")},
                 {"joint5_offset_deg": float(joint5_offset_deg)},
+                {"gripper": gripper_profile},
             ],
         )
     )
     actions.append(
         Node(
-            name="simple_gui",
+            name=gui_name,
             package="mycobot_pro_450",
-            executable="simple_gui",
+            executable=gui_executable,
             parameters=[
                 {"ip": LaunchConfiguration("ip")},
                 {"port": LaunchConfiguration("port")},
                 {"joint5_offset_deg": float(joint5_offset_deg)},
+                {"gripper": gripper_profile},
             ],
             output="screen",
         )
