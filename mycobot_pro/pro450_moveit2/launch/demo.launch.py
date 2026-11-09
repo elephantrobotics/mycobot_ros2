@@ -53,7 +53,21 @@ def _launch_setup(context, *args, **kwargs):
     except ValueError as exc:
         raise RuntimeError(str(exc)) from exc
 
-    actions = []
+    actions = [
+        Node(
+            package="pro450_moveit2_control",
+            executable="moveit_profile",
+            name="pro450_moveit_profile",
+            output="screen",
+            parameters=[
+                {
+                    "urdf": urdf_profile,
+                    "gripper": gripper_profile,
+                    "joint5_offset_deg": 90.0 if urdf_profile == "v2" else 0.0,
+                }
+            ],
+        )
+    ]
     actions.extend(generate_static_virtual_joint_tfs_launch(moveit_config).entities)
     actions.extend(generate_rsp_launch(moveit_config).entities)
     actions.extend(generate_move_group_launch(moveit_config).entities)

@@ -48,6 +48,7 @@ setup(
     entry_points={
         'console_scripts': [
             'sync_plan = pro450_moveit2_control.sync_plan:main',
+            'moveit_profile = pro450_moveit2_control.moveit_profile:main',
         ],
     },
 )
