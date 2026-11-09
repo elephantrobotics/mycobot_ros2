@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="pro450_v2_force_gripper">
+    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+
+    <!-- Import Pro450 V2.0 Force Gripper urdf file -->
+    <xacro:include filename="$(find mycobot_description)/urdf/mycobot_pro_450/new_structure/mycobot_pro450_v2_force_gripper.urdf" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="pro450_v2_force_gripper.ros2_control.xacro" />
+
+
+    <xacro:pro450_v2_force_gripper_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>
