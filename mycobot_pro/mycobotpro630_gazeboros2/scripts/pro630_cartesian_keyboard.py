@@ -80,8 +80,11 @@ class CartesianKeyboardTransport:
                 sequence = self.stop_requested
                 pending = sequence > self.stop_completed
             if pending:
+                with self.lock:
+                    stopping = self.active
+                jog_axis = stopping[0] if stopping is not None and stopping[0] < 6 else None
                 try:
-                    self.accepted(self.sdk.priority_stop(), stop=True)
+                    self.accepted(self.sdk.priority_stop(jog_axis), stop=True)
                     with self.lock:
                         # Publish completion with the stopped-state update so a
                         # subsequent independent STOP cannot join a finished one.
@@ -536,9 +539,9 @@ class CartesianKeyboardTransport:
                 try:
                     self.cycle()
                 except KeyboardCommandCancelled:
-                    # A deliberate STOP cancelling an old write is not a controller fault.
-                    self.stop()
-                    self.notice('Command cancelled by STOP.', 'warning')
+                    # The release STOP already invalidated this write. stop() would
+                    # lock controls and force another STOP, so the next key needs M.
+                    pass
                 except Exception as exc:
                     self._fault(exc)
                 # Shorten scheduler latency without increasing coordinate RPC

@@ -368,6 +368,17 @@ class Pro630Client(_VendorClient):
         with self._api_lock.priority():
             return super().task_stop()  # Consume the reply before another request.
 
+    def jog_stop(self, axis):
+        # Socket jog_coord direction 0 stops that axis. task_stop only stops a program.
+        if type(axis) is not int or not 0 <= axis < 6:
+            raise ValueError('Jog stop axis must be 0..5')
+        name = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ')[axis]
+        with self._api_lock.priority():
+            reply = self.send_command(f'jog_coord({name},0,1)')
+        if reply not in ('[ok]', 'ok', '0', '1'):
+            raise RuntimeError(f'Jog stop failed: {reply!r}')
+        return None
+
     @staticmethod
     def _gripper_id(gripper_id):
         if type(gripper_id) is not int or gripper_id != GRIPPER_ID:

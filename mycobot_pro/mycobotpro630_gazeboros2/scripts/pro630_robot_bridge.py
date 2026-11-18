@@ -209,14 +209,17 @@ class RobotBridge(Node):
         self.lease.clear(token)
         self.transport_log.clear('lease_release')
 
-    def keyboard_stop(self, token):
+    def keyboard_stop(self, token, jog_axis=None):
         # Invalidate queued motions immediately. Native STOP still serializes
         # after the in-flight text reply; never interleave an unframed stream.
         with self.keyboard_stop_lock, self.lease.lock:
             self.lease.authorize(token, 'keyboard_stop')
             barrier = self.sdk.keyboard_stop_barrier
             generation = barrier.begin_stop()
-            result = self.sdk.stop(deceleration=0, _async=True)
+            if jog_axis is None:
+                result = self.sdk.stop(deceleration=0, _async=True)
+            else:
+                result = self.sdk.jog_stop(jog_axis)
             if result is not None and (type(result) is not int or result not in (0, 1)):
                 raise RuntimeError(f'Robot STOP failed: {result!r}')
             self.arm_active, self.arm_goal = False, None
@@ -264,10 +267,12 @@ class RobotBridge(Node):
                 result = ({'generation': self.sdk.keyboard_stop_barrier.generation}
                           if args[0] == 'keyboard' else True)
             elif method == 'keyboard_stop' or (method == 'stop' and self.lease.feature == 'keyboard'):
-                if (method == 'keyboard_stop' and (args or kwargs)) or (
-                        method == 'stop' and (args or kwargs != {'deceleration': 0, '_async': True})):
+                if method == 'stop' and (args or kwargs != {'deceleration': 0, '_async': True}):
                     raise ValueError('Invalid keyboard STOP arguments')
-                result = self.keyboard_stop(req.token)
+                if method == 'keyboard_stop' and (kwargs or len(args) > 1 or (
+                        args and (type(args[0]) is not int or not 0 <= args[0] < 6))):
+                    raise ValueError('Invalid keyboard STOP arguments')
+                result = self.keyboard_stop(req.token, args[0] if method == 'keyboard_stop' and args else None)
                 if method == 'stop':
                     result = result['result']
             elif method == 'get_angles':

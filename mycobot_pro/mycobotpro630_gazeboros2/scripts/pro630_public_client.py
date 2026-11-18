@@ -118,10 +118,10 @@ class PublicPro630Client:
             else:
                 self._angle_sample.motion_generation = previous
 
-    def priority_stop(self):
+    def priority_stop(self, jog_axis=None):
         if self.feature != 'keyboard':
             raise RuntimeError('Priority STOP is reserved for keyboard control')
-        packet = self._rpc('keyboard_stop')
+        packet = self._rpc('keyboard_stop', () if jog_axis is None else (int(jog_axis),))
         with self._generation_lock:
             self._keyboard_generation = max(self._keyboard_generation, packet['generation'])
         return packet['result']
