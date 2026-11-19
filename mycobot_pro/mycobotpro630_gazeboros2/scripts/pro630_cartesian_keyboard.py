@@ -13,6 +13,11 @@ CARTESIAN_AXES = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'Gripper')
 SPEED_GEARS = (6, 12, 18, 24, 30)  # Native SDK percentages, not physical units.
 GRIPPER_SPEED_GEARS = (4, 8, 12, 16, 20)
 LOW_Z_MM = 20.0  # Base-frame TCP height, including the installed tool offset.
+SINGULAR_WINDOW_S = 0.2
+SINGULAR_FIRST_WINDOW_S = 0.7
+SINGULAR_JOINT_DELTA_DEG = 0.2
+SINGULAR_MOTION_DELTA_DEG = 0.1
+SINGULAR_POSE_MESSAGE = 'The current pose may be singular. Please use joint control to move away.'
 COORD_POLL_PERIOD = 1.0 / 20.0
 WORKER_MAX_WAIT_S = 0.012  # Maximum scheduler wait; coordinate polling stays at 20 Hz.
 INIT_POSE_DEG = (0.,) * 6  # Model zero maps to hardware [0, -90, 0, -90, 0, 0].
@@ -49,6 +54,10 @@ class CartesianKeyboardTransport:
         self.stop_requested = self.stop_completed = 0
         self.priority_error = None
         self.priority_exit = threading.Event()
+        self._singular_samples = deque()
+        self._singular_jog = None
+        self._singular_moving = False
+        self._singular_locked = False
 
     def notice(self, text, level='info'):
         with self.lock:
@@ -96,7 +105,9 @@ class CartesianKeyboardTransport:
                         if sequence == self.stop_requested:
                             self.force_stop = False
                             self.stop_pending = self.active is not None
-                        self.notice('STOP sent.')
+                        singular = self._singular_locked
+                    self.notice(SINGULAR_POSE_MESSAGE if singular else 'STOP sent.',
+                                'warning' if singular else 'info')
                 except Exception as exc:
                     with self.lock:
                         self.priority_error = exc
@@ -107,6 +118,7 @@ class CartesianKeyboardTransport:
 
     def request_arm(self):
         with self.lock:
+            self._singular_locked = False
             self._queue_priority_stop()
             self.armed = False
             self.arm_requested = True
@@ -467,6 +479,57 @@ class CartesianKeyboardTransport:
                 self._stop_active()
                 return
 
+    def _remember_singular_sample(self, when, angles):
+        samples = self._singular_samples
+        if samples and samples[-1][0] == when:
+            return None
+        samples.append((when, tuple(angles)))
+        window = SINGULAR_WINDOW_S if self._singular_moving else SINGULAR_FIRST_WINDOW_S
+        if self._singular_moving:
+            while len(samples) >= 3 and when - samples[1][0] >= window:
+                samples.popleft()
+        for previous in reversed(samples):
+            if when - previous[0] >= window:
+                return previous
+        return None
+
+    def _watch_singular_jog(self):
+        """Public joint cache only. A held Cartesian jog that does not move is singular."""
+        with self.lock:
+            active, desired, armed = self.active, self.desired, self.armed
+        if not armed or active is None or active[0] >= 6 or desired != active:
+            self._singular_samples.clear()
+            self._singular_jog = None
+            self._singular_moving = False
+            return
+        jog = active[:2]
+        if jog != self._singular_jog:
+            self._singular_jog = jog
+            self._singular_samples.clear()
+            self._singular_moving = False
+        try:
+            angles = self.sdk.get_angles()
+            stamp = self.sdk.sample_time('arm')
+        except PublicArmFeedbackUnavailable:
+            return
+        if (not isinstance(stamp, (list, tuple)) or not stamp or
+                type(stamp[0]) not in (int, float) or not math.isfinite(stamp[0]) or
+                len(angles) != 6 or any(type(v) not in (int, float) or not math.isfinite(v) for v in angles)):
+            return
+        previous = self._remember_singular_sample(stamp[0], angles)
+        if previous is None:
+            return
+        limit = SINGULAR_MOTION_DELTA_DEG if self._singular_moving else SINGULAR_JOINT_DELTA_DEG
+        if max(abs(a - b) for a, b in zip(angles, previous[1])) >= limit - 1e-6:
+            self._singular_moving = True
+            return
+        self._singular_samples.clear()
+        self._singular_jog = None
+        self._singular_moving = False
+        with self.lock:
+            self._singular_locked = True
+        self.stop()
+
     def cycle(self):
         with self.lock:
             if self.stop_requested > self.stop_completed:
@@ -521,6 +584,7 @@ class CartesianKeyboardTransport:
             return
         if desired is not None:
             self._dispatch_desired(desired, epoch)
+        self._watch_singular_jog()
         self._save_home()
         self._start_pose()
         self._monitor_pose()
