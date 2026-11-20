@@ -133,7 +133,7 @@ ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py
 - 本工程的保护机制仅限制末端，不能保证机械臂本体不与地面碰撞，操作时需谨慎。
 - 按键控制不区分大小写。
 - 界面持续显示可操作按键、当前设定速度、速度档位、当前有效按键、提示信息等。
-- 630 进入奇异位置时，不会改变 LED 屏颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
+- 630 进入奇异位置时，不会改变 Atom 的颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
 
 坐标运动导致关节超限时：
 
@@ -150,7 +150,7 @@ ros2 launch mycobotpro630_gazeboros2 drag_follow_gazebo.launch.py
 仅支持真机。
 
 - 启动成功后，会拉起用于`拖动跟随`的 Qt 界面，界面和实际功能会自动适配公共环境是否有 myGripper F100 力控夹爪的情况。
-- `M`：控制机械臂进入自由拖动模式。进入后机械臂 link5 的 LED 屏变为黄色，此时按下 LED 屏并听到两声咔咔声即可开始自由拖动；松开 LED 屏后机械臂锁紧，但不会退出自由拖动模式。再次按下 `M` 退出自由拖动模式，锁紧六轴和夹爪。
+- `M`：控制机械臂进入自由拖动模式。进入后机械臂 link5 的 Atom 变为黄色，此时按下 Atom 并听到两声咔咔声即可开始自由拖动；松开 Atom 后机械臂锁紧，但不会退出自由拖动模式。再次按下 `M` 退出自由拖动模式，锁紧六轴和夹爪。
 - `Q`：关闭窗口退出。
 - 退出拖动跟随界面前，请将机械臂运动到零位附近，并确认关节未超限。程序退出时会自动清错并退出自由拖动模式。
 
@@ -172,7 +172,7 @@ ros2 launch mycobotpro630_gazeboros2 gui_control_gazebo.launch.py
 - 角度运动的路径检测到碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
 - 若当前位姿为奇异位姿，在 Qt 界面中调用坐标控制或角度控制时，会提示 `The current pose may be singular. Please use joint control to move away.`。此时无法进行坐标运动，需点击 `Home` 回到坐标控制 Home 位方可恢复运动。
 
-- 630 进入奇异位置时，不会改变 LED 屏颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
+- 630 进入奇异位置时，不会改变 Atom 的颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
 
 坐标运动导致关节超限时：
 
