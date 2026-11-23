@@ -25,6 +25,7 @@ from pro450_broker_support import FeatureLease, KEYBOARD_MOTION_METHODS
 from pro450_real_mirror import RealPoseBuffer
 from pro450_configuration import configure_node
 from pro450_control_logging import ControlLog, emit_log
+from pro450_drag_support import set_drag_mode_checked
 from pro450_tool_reference import ToolReferenceContext
 
 
@@ -140,7 +141,7 @@ class RobotBridge(Node):
                         if self.lease.expired():
                             self.release_owner(self.lease.token)
                 except Exception as exc:
-                    self.get_logger().error(f'Expired feature stop failed: {exc}')
+                    self.get_logger().error(f'Expired feature cleanup failed: {exc}')
             value, error = None, ''
             try:
                 with self.hardware_lock:
@@ -189,7 +190,7 @@ class RobotBridge(Node):
             self.stop_event.wait(.005)
 
     def release_owner(self, token):
-        # Called under the hardware lock. Never change motor enable on feature exit.
+        # Called under the hardware lock. Do not change arm motor enable on feature exit.
         self.lease.touch(token)
         if self.arm_active:
             self.sdk.stop(deceleration=0, _async=True)
@@ -203,6 +204,13 @@ class RobotBridge(Node):
             self.update_gripper(opening)
         if self.lease.feature in ('gui', 'keyboard') and self.tool_reference is not None:
             self.tool_reference.restore()
+        if self.lease.feature == 'drag':
+            try:
+                set_drag_mode_checked(self.sdk, 0, self.with_gripper)
+            except Exception as exc:
+                raise RuntimeError(f'Drag exit: failed to restore position control: {exc}') from exc
+            self.get_logger().info('Drag exit: position mode confirmed; gripper enable acknowledged.'
+                                   if self.with_gripper else 'Drag exit: position mode confirmed.')
         self.lease.clear(token)
 
     def keyboard_stop(self, token):
@@ -410,8 +418,12 @@ class RobotBridge(Node):
                     if self.lease.token is not None:
                         if self.sdk._closed.is_set():
                             clean = False
-                            self.get_logger().error(
-                                'Shutdown: robot stop/hold could not be confirmed (connection closed).')
+                            if self.lease.feature == 'drag':
+                                self.get_logger().error(
+                                    'Shutdown: drag exit position mode could not be confirmed (connection closed).')
+                            else:
+                                self.get_logger().error(
+                                    'Shutdown: robot stop/hold could not be confirmed (connection closed).')
                             if self.tool_reference is not None and self.tool_reference.saved is not None:
                                 self.get_logger().error('Shutdown: tool settings restore could not be confirmed (connection closed).')
                         else:
@@ -419,7 +431,7 @@ class RobotBridge(Node):
                                 self.release_owner(self.lease.token)
                             except Exception as exc:
                                 clean = False
-                                self.get_logger().error(f'Shutdown stop/hold failed: {exc}')
+                                self.get_logger().error(f'Shutdown feature cleanup failed: {exc}')
                         if self.lease.token is not None:
                             try:
                                 self.lease.clear(self.lease.token)

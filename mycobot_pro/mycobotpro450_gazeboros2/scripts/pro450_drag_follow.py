@@ -109,8 +109,7 @@ class DragFollow(Node):
             finally:
                 self.sdk.close()
                 self.sdk = None
-        # Only clear errors: do not implicitly switch mode or motor enable on exit.
-        self.log.state('closing', True, 'Drag following closed; control mode and motor enable states are preserved.')
+        self.log.state('closing', True, 'Drag following closed.')
 
 
 def main():
@@ -145,7 +144,8 @@ def main():
             layout.addWidget(self.status_label)
             self.feedback_label = QLabel()
             layout.addWidget(self.feedback_label)
-            layout.addWidget(QLabel('Closing preserves mode and motor states.'))
+            layout.addWidget(QLabel('Closing returns the arm to position mode and enables the gripper.'
+                                    if node.with_gripper else 'Closing returns the arm to position mode.'))
             self.update_status(0, False, node.state.message, False)
             self.resize(620, 220)
 
@@ -205,7 +205,7 @@ def main():
             super().focusOutEvent(event)
 
         def closeEvent(self, event):
-            node.log.event('Drag follow window closed; control mode and motor enable states are preserved.')
+            node.log.event('Drag follow window closed.')
             self._clear_keys('window closed')
             super().closeEvent(event)
 

@@ -37,6 +37,17 @@ def set_control_mode_checked(sdk, mode, cancelled=lambda: False):
         raise RuntimeError(f'Control mode was not confirmed (requested={mode}, actual={actual!r}); mode unknown')
 
 
+def set_drag_mode_checked(sdk, mode, with_gripper, cancelled=lambda: False):
+    set_control_mode_checked(sdk, mode, cancelled)
+    if cancelled():
+        raise ModeSwitchCancelled()
+    if with_gripper:
+        reply = sdk.set_pro_gripper_enabled(1 if mode == 0 else 0)
+        if type(reply) is not int or reply != 1:
+            raise RuntimeError(f'Arm mode confirmed, but gripper command was not acknowledged '
+                               f'(result={reply!r}); combined state unknown')
+
+
 class DragState:
     def __init__(self, sdk, clock=time.monotonic, with_gripper=True, report=None):
         self.report = report or (lambda text, level='info': None)
@@ -89,14 +100,7 @@ class DragState:
             return
         level = 'info'
         try:
-            set_control_mode_checked(self.sdk, target, self.is_closing)
-            if self.is_closing():
-                raise ModeSwitchCancelled()
-            if self.with_gripper:
-                reply = self.sdk.set_pro_gripper_enabled(1 if target == 0 else 0)
-                if type(reply) is not int or reply != 1:
-                    raise RuntimeError(f'Arm mode confirmed, but gripper command was not acknowledged '
-                                       f'(result={reply!r}); combined state unknown')
+            set_drag_mode_checked(self.sdk, target, self.with_gripper, self.is_closing)
         except ModeSwitchCancelled:
             with self.lock:
                 self.mode = None
