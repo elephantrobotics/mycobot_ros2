@@ -25,7 +25,7 @@
   <exec_depend>joy</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>controller_manager</exec_depend>
-  <exec_depend>python-tk</exec_depend>
+  <exec_depend>python3-tk</exec_depend>
   <exec_depend>mycobot_description</exec_depend>
 
 
