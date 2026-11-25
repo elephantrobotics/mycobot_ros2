@@ -87,22 +87,30 @@ class DragFollow(Node):
         self.stop_event.set()
         if self.worker is not None:
             self.worker.join(timeout=5.0)
+        worker_active = self.worker is not None and self.worker.is_alive()
         if self.sdk is not None:
             try:
                 if self._exit_mode_required:
-                    if self.worker is not None and self.worker.is_alive():
+                    if worker_active:
                         self.log.event('Exit free-move request not confirmed: control worker is still active.', 'error')
                     else:
-                        self.log.event('Exit requested: disabling arm free-move mode.')
-                        # The public adapter maps this to set_free_move_mode(False).
-                        # Do not call set_drag_enabled: gripper state stays unchanged.
-                        result = self.sdk.set_motor_enabled(254, 1)
-                        if type(result) is not int or result != 1:
-                            raise RuntimeError(f'Free-move exit was not acknowledged (result={result!r})')
-                        self.log.event('Arm free-move exit acknowledged.')
+                        if self.with_gripper:
+                            self.log.event('Exit requested: locking the six arm joints, then the gripper.')
+                        else:
+                            self.log.event('Exit requested: disabling arm free-move mode.')
+                        # Same lock path as M: six joints first, then the gripper when present.
+                        set_drag_enabled(self.sdk, True, self.with_gripper)
+                        self.log.event('Arm and gripper lock acknowledged.' if self.with_gripper
+                                       else 'Arm free-move exit acknowledged.')
             except Exception as exc:
                 self.log.event(f'Exit free-move request failed: {exc}', 'error')
             finally:
+                if self._exit_mode_required and not worker_active:
+                    try:
+                        count = self.sdk.clear_all_errors()
+                        self.log.event(f'Exit error queue cleared ({count} messages).')
+                    except Exception as exc:
+                        self.log.event(f'Exit error clear failed: {exc}', 'error')
                 self.sdk.close()
                 self.sdk = None
         self.log.state('closing', True, 'Drag following closed.')
@@ -140,7 +148,9 @@ def main():
             layout.addWidget(self.status_label)
             self.feedback_label = QLabel()
             layout.addWidget(self.feedback_label)
-            layout.addWidget(QLabel('Support the arm while released. Closing exits arm free-move mode.'))
+            closing = ('Closing locks the six joints, then the gripper.' if node.with_gripper
+                       else 'Closing exits arm free-move mode.')
+            layout.addWidget(QLabel(f'Support the arm while released. {closing}'))
             self.update_status(*node.render())
             self.resize(620, 220)
 
@@ -206,7 +216,9 @@ def main():
             super().focusOutEvent(event)
 
         def closeEvent(self, event):
-            node.log.event('Drag follow window closed; arm free-move exit will be requested.')
+            node.log.event('Drag follow window closed; arm and gripper lock will be requested.'
+                           if node.with_gripper else
+                           'Drag follow window closed; arm free-move exit will be requested.')
             self._clear_keys('window closed')
             super().closeEvent(event)
 

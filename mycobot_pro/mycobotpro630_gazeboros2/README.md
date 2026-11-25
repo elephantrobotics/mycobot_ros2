@@ -118,7 +118,6 @@ ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py
 
 - `M`：解锁控制
 - `N` 或 `Space`：停止并锁定
-- `C`：清除奇异位姿导致的报错
 - `Q`：关闭窗口并退出
 - 按住 `w` / `s`、`a` / `d`、`z` / `x` 分别控制位置 X、Y、Z；按住 `u` / `j`、`i` / `k`、`o` / `l` 分别控制姿态角 RX、RY、RZ
 - 按住 `g` / `h` 控制夹爪开合，未安装夹爪时无此功能
@@ -133,7 +132,7 @@ ros2 launch mycobotpro630_gazeboros2 teleop_keyboard.launch.py
 - 本工程的保护机制仅限制末端，不能保证机械臂本体不与地面碰撞，操作时需谨慎。
 - 按键控制不区分大小写。
 - 界面持续显示可操作按键、当前设定速度、速度档位、当前有效按键、提示信息等。
-- 630 进入奇异位置时，不会改变 Atom 的颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
+- 630 进入奇异位置时，不会改变 Atom 的颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose may be singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
 
 坐标运动导致关节超限时：
 
@@ -172,7 +171,7 @@ ros2 launch mycobotpro630_gazeboros2 gui_control_gazebo.launch.py
 - 角度运动的路径检测到碰撞时，会显示 `Rejected: collision detected` 并拒绝执行。
 - 若当前位姿为奇异位姿，在 Qt 界面中调用坐标控制或角度控制时，会提示 `The current pose may be singular. Please use joint control to move away.`。此时无法进行坐标运动，需点击 `Home` 回到坐标控制 Home 位方可恢复运动。
 
-- 630 进入奇异位置时，不会改变 Atom 的颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose is singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
+- 630 进入奇异位置时，不会改变 Atom 的颜色。如果机械臂静止但六轴坐标跳变，或调用坐标运动时打印 `The current pose may be singular. Please use joint control to move away`，即当前为奇异姿态，需要用角度运动脱离。可以参考[奇异姿态典例](https://docs.elephantrobotics.com/docs/pro630-cn/2-ProductFeature/2.5-CoordinateSystem.html)
 
 坐标运动导致关节超限时：
 
